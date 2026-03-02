@@ -210,7 +210,7 @@ Public Class Workspace
 
 #Region "テーブル除外機能"
     ''' <summary>
-    ''' 選択中のテーブルを除外リストに追加し、一覧から非表示にする
+    ''' 選択中のテーブル（複数可）を除外リストに追加し、一覧から非表示にする
     ''' </summary>
     Public Sub ExcludeSelectedTable()
         If lstTableList.SelectedItems.Count = 0 Then
@@ -219,40 +219,21 @@ Public Class Workspace
         End If
         If String.IsNullOrEmpty(_currentSchema) Then Return
 
-        Dim tableName = lstTableList.SelectedItems(0).Text
-        Dim tableKey = $"{_currentSchema}.{tableName}"
-        _excludedTables.Add(tableKey)
+        For Each item As ListViewItem In lstTableList.SelectedItems
+            Dim tableKey = $"{_currentSchema}.{item.Text}"
+            _excludedTables.Add(tableKey)
+        Next
         DisplayTablesForSchema(_currentSchema)
     End Sub
 
     ''' <summary>
-    ''' 現スキーマ内で除外/可視を反転する
-    ''' 可視テーブル → 除外に、除外テーブル → 可視に切り替え
+    ''' ListView の選択状態を反転する（選択中→未選択、未選択→選択中）
     ''' </summary>
-    Public Sub InvertExclusion()
-        If String.IsNullOrEmpty(_currentSchema) Then Return
-        If Not _tableList.ContainsKey(_currentSchema) Then Return
-
-        Dim allTables = _tableList(_currentSchema)
-        Dim newExcluded As New HashSet(Of String)
-
-        For Each tableInfo In allTables
-            Dim tableKey = $"{_currentSchema}.{tableInfo.Item1}"
-            If Not _excludedTables.Contains(tableKey) Then
-                ' 現在可視 → 除外に
-                newExcluded.Add(tableKey)
-            End If
-            ' 現在除外 → 可視に (newExcluded に追加しない)
+    Public Sub InvertSelection()
+        For Each item As ListViewItem In lstTableList.Items
+            item.Selected = Not item.Selected
         Next
-
-        ' 他のスキーマの除外は維持
-        Dim otherExcluded = _excludedTables.Where(Function(k) Not k.StartsWith(_currentSchema & "."))
-        _excludedTables = New HashSet(Of String)(otherExcluded)
-        For Each key In newExcluded
-            _excludedTables.Add(key)
-        Next
-
-        DisplayTablesForSchema(_currentSchema)
+        lstTableList.Focus()
     End Sub
 
     ''' <summary>
@@ -272,7 +253,7 @@ Public Class Workspace
 
     ' コンテキストメニュー: 選択を反転
     Private Sub mnuInvertExclusion_Click(sender As Object, e As EventArgs) Handles mnuInvertExclusion.Click
-        InvertExclusion()
+        InvertSelection()
     End Sub
 
     ' コンテキストメニュー: すべての除外を解除
