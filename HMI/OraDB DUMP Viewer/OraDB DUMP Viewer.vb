@@ -264,7 +264,27 @@ Public Class OraDB_DUMP_Viewer
     Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs) Handles ToolStripButton6.Click
         Dim ctx = GetExportContext()
         If ctx Is Nothing Then Return
-        MessageBox.Show("CSV 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        ' SaveFileDialog
+        Dim defaultName = $"{ctx.Schema}.{ctx.TableName}.csv"
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("CSV ファイル|*.csv|すべてのファイル|*.*", defaultName)
+        If outputPath Is Nothing Then Return
+
+        ' C DLL でストリーミング CSV エクスポート (進捗ダイアログ付き)
+        Using dlg As New ExportProgressDialog()
+            Dim success = dlg.RunExport(
+                Sub(worker, args)
+                    Dim ok = CsvExportLogic.ExportFromDump(ctx, outputPath)
+                    If Not ok Then
+                        args.Cancel = True
+                    End If
+                End Sub)
+
+            If success Then
+                MessageBox.Show($"CSV エクスポートが完了しました。" & vbCrLf & outputPath,
+                               "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
     End Sub
 
     Private Sub ToolStripButton7_Click(sender As Object, e As EventArgs) Handles ToolStripButton7.Click

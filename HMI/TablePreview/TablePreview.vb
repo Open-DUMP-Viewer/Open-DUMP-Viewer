@@ -406,6 +406,51 @@ Public Class TablePreview
 
 #End Region
 
+#Region "エクスポート"
+
+    ''' <summary>
+    ''' CSV 出力ボタンのクリックイベント
+    ''' フィルタ適用後のデータを CSV ファイルに出力する
+    ''' </summary>
+    Private Sub buttonExportCsv_Click(sender As Object, e As EventArgs) Handles buttonExportCsv.Click
+        If _filteredData Is Nothing OrElse _filteredData.Count = 0 Then
+            MessageBox.Show("エクスポートするデータがありません。", "情報",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        ' テーブル名をウィンドウタイトルから取得
+        Dim tblName = Me.Text.Replace("テーブルデータプレビュー - ", "")
+
+        ' SaveFileDialog
+        Dim defaultName = $"{tblName}.csv"
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("CSV ファイル|*.csv|すべてのファイル|*.*", defaultName)
+        If outputPath Is Nothing Then Return
+
+        ' フィルタ後データのコピーを取得 (エクスポート中のスレッド安全性)
+        Dim exportData = New List(Of String())(_filteredData)
+        Dim exportColumns = New List(Of String)(_columnNames)
+
+        ' 進捗ダイアログ付きエクスポート
+        Using dlg As New ExportProgressDialog()
+            Dim success = dlg.RunExport(
+                Sub(worker, args)
+                    Dim ok = CsvExportLogic.ExportFromData(exportData, exportColumns, outputPath, worker, tblName)
+                    If Not ok Then
+                        args.Cancel = True
+                    End If
+                End Sub)
+
+            If success Then
+                MessageBox.Show($"CSV エクスポートが完了しました。" & vbCrLf &
+                               $"{exportData.Count:#,0} 行を出力しました。" & vbCrLf & outputPath,
+                               "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
+    End Sub
+
+#End Region
+
 #Region "データ処理"
 
     ''' <summary>
