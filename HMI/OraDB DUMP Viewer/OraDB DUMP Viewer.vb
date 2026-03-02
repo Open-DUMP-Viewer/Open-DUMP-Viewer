@@ -350,7 +350,36 @@ Public Class OraDB_DUMP_Viewer
     Private Sub ToolStripButton8_Click(sender As Object, e As EventArgs) Handles ToolStripButton8.Click
         Dim ctx = GetExportContext()
         If ctx Is Nothing Then Return
-        MessageBox.Show("Access 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        ' SaveFileDialog
+        Dim defaultName = $"{ctx.Schema}.{ctx.TableName}.accdb"
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("Access データベース|*.accdb|すべてのファイル|*.*", defaultName)
+        If outputPath Is Nothing Then Return
+
+        ' テーブルデータを取得
+        Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
+        If tableData Is Nothing Then tableData = New List(Of String())
+
+        Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
+        Dim columnList = New List(Of String)(colNames)
+
+        ' 進捗ダイアログ付き Access エクスポート
+        Using dlg As New ExportProgressDialog()
+            Dim success = dlg.RunExport(
+                Sub(worker, args)
+                    Dim ok = AccessExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                                                      ctx.TableName, outputPath, worker)
+                    If Not ok Then
+                        args.Cancel = True
+                    End If
+                End Sub)
+
+            If success Then
+                MessageBox.Show($"Access エクスポートが完了しました。" & vbCrLf &
+                               $"{tableData.Count:#,0} 行を出力しました。" & vbCrLf & outputPath,
+                               "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
     End Sub
 
     Private Sub ToolStripButton9_Click(sender As Object, e As EventArgs) Handles ToolStripButton9.Click
