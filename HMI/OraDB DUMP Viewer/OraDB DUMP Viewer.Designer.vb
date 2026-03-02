@@ -98,7 +98,6 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripSeparator12 = New ToolStripSeparator()
         ToolStripButton7 = New ToolStripButton()
         ToolStripButton8 = New ToolStripButton()
-        ToolStripButton10 = New ToolStripButton()
         ToolStripButton9 = New ToolStripButton()
         ToolStripButton3 = New ToolStripButton()
         MenuStrip.SuspendLayout()
@@ -542,7 +541,7 @@ Partial Class OraDB_DUMP_Viewer
         ' ToolExport
         ' 
         ToolExport.ImageScalingSize = New Size(24, 24)
-        ToolExport.Items.AddRange(New ToolStripItem() {tolTablPproperty, ToolStripButton1, ToolStripSeparator11, ToolStripButton5, ToolStripButton6, ToolStripSeparator12, ToolStripButton7, ToolStripButton8, ToolStripButton10, ToolStripButton9, ToolStripButton3})
+        ToolExport.Items.AddRange(New ToolStripItem() {tolTablPproperty, ToolStripButton1, ToolStripSeparator11, ToolStripButton5, ToolStripButton6, ToolStripSeparator12, ToolStripButton7, ToolStripButton8, ToolStripButton9, ToolStripButton3})
         ToolExport.Location = New Point(0, 24)
         ToolExport.Name = "ToolExport"
         ToolExport.Size = New Size(1125, 31)
@@ -579,7 +578,7 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton5.ImageTransparentColor = Color.Magenta
         ToolStripButton5.Name = "ToolStripButton5"
         ToolStripButton5.Size = New Size(28, 28)
-        ToolStripButton5.Text = "スクリプト出力"
+        ToolStripButton5.Text = "SQL スクリプト"
         ' 
         ' ToolStripButton6
         ' 
@@ -588,7 +587,7 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton6.ImageTransparentColor = Color.Magenta
         ToolStripButton6.Name = "ToolStripButton6"
         ToolStripButton6.Size = New Size(28, 28)
-        ToolStripButton6.Text = "データ出力"
+        ToolStripButton6.Text = "CSV 出力"
         ' 
         ' ToolStripSeparator12
         ' 
@@ -602,7 +601,7 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton7.ImageTransparentColor = Color.Magenta
         ToolStripButton7.Name = "ToolStripButton7"
         ToolStripButton7.Size = New Size(28, 28)
-        ToolStripButton7.Text = "Excel形式で出力"
+        ToolStripButton7.Text = "Excel 出力"
         ' 
         ' ToolStripButton8
         ' 
@@ -611,17 +610,8 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton8.ImageTransparentColor = Color.Magenta
         ToolStripButton8.Name = "ToolStripButton8"
         ToolStripButton8.Size = New Size(28, 28)
-        ToolStripButton8.Text = "Access形式で出力"
-        ' 
-        ' ToolStripButton10
-        ' 
-        ToolStripButton10.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton10.Image = CType(resources.GetObject("ToolStripButton10.Image"), Image)
-        ToolStripButton10.ImageTransparentColor = Color.Magenta
-        ToolStripButton10.Name = "ToolStripButton10"
-        ToolStripButton10.Size = New Size(28, 28)
-        ToolStripButton10.Text = "テキスト形式で出力"
-        ' 
+        ToolStripButton8.Text = "Access 出力"
+        '
         ' ToolStripButton9
         ' 
         ToolStripButton9.DisplayStyle = ToolStripItemDisplayStyle.Image
@@ -629,7 +619,7 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton9.ImageTransparentColor = Color.Magenta
         ToolStripButton9.Name = "ToolStripButton9"
         ToolStripButton9.Size = New Size(28, 28)
-        ToolStripButton9.Text = "SQL Serverへ出力"
+        ToolStripButton9.Text = "SQL Server"
         ' 
         ' ToolStripButton3
         ' 
@@ -638,7 +628,7 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripButton3.ImageTransparentColor = Color.Magenta
         ToolStripButton3.Name = "ToolStripButton3"
         ToolStripButton3.Size = New Size(28, 28)
-        ToolStripButton3.Text = "ODBCで出力"
+        ToolStripButton3.Text = "ODBC"
         ' 
         ' OraDB_DUMP_Viewer
         ' 
@@ -734,7 +724,6 @@ Partial Class OraDB_DUMP_Viewer
     Friend WithEvents ToolStripButton6 As ToolStripButton
     Friend WithEvents ToolStripSeparator12 As ToolStripSeparator
     Friend WithEvents ToolStripButton7 As ToolStripButton
-    Friend WithEvents ToolStripButton10 As ToolStripButton
     Friend WithEvents ToolStripButton8 As ToolStripButton
     Friend WithEvents ToolStripButton9 As ToolStripButton
     Friend WithEvents tolTablPproperty As ToolStripButton

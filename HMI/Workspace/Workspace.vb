@@ -206,6 +206,42 @@ Public Class Workspace
     End Sub
 #End Region
 
+#Region "エクスポート用コンテキスト取得"
+    ''' <summary>
+    ''' 選択中のテーブルのエクスポート用コンテキスト情報を返す
+    ''' メインフォームのエクスポートボタンから呼び出される
+    ''' </summary>
+    Public Function GetSelectedTableExportContext() As ExportHelper.TableExportContext
+        If lstTableList.SelectedItems.Count = 0 Then Return Nothing
+        If String.IsNullOrEmpty(_currentSchema) Then Return Nothing
+
+        Dim tableName = lstTableList.SelectedItems(0).Text
+        Dim tableKey = $"{_currentSchema}.{tableName}"
+
+        Dim ctx As New ExportHelper.TableExportContext()
+        ctx.DumpFilePath = DumpFilePath
+        ctx.Schema = _currentSchema
+        ctx.TableName = tableName
+
+        If _columnNamesMap.ContainsKey(tableKey) Then
+            ctx.ColumnNames = _columnNamesMap(tableKey)
+        End If
+        If _columnTypesMap.ContainsKey(tableKey) Then
+            ctx.ColumnTypes = _columnTypesMap(tableKey)
+        End If
+
+        If _tableList.ContainsKey(_currentSchema) Then
+            Dim entry = _tableList(_currentSchema).Find(Function(x) x.Item1 = tableName)
+            If entry IsNot Nothing Then
+                ctx.RowCount = entry.Item2
+                ctx.DataOffset = entry.Item3
+            End If
+        End If
+
+        Return ctx
+    End Function
+#End Region
+
 #Region "データ表示処理"
     ''' <summary>
     ''' TreeViewにスキーマ一覧のみを表示

@@ -242,6 +242,56 @@ Public Class OraDB_DUMP_Viewer
     End Sub
 #End Region
 
+#Region "ツールバーイベント: エクスポート"
+    ''' <summary>
+    ''' エクスポート操作の共通処理: アクティブなWorkspaceからテーブル情報を取得
+    ''' </summary>
+    Private Function GetExportContext() As ExportHelper.TableExportContext
+        Dim ctx = ExportHelper.GetActiveTableContext()
+        If ctx Is Nothing Then
+            MessageBox.Show("ワークスペースでテーブルを選択してください。", "情報",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+        End If
+        Return ctx
+    End Function
+
+    Private Sub ToolStripButton5_Click(sender As Object, e As EventArgs) Handles ToolStripButton5.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("SQL スクリプト出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs) Handles ToolStripButton6.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("CSV 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub ToolStripButton7_Click(sender As Object, e As EventArgs) Handles ToolStripButton7.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("Excel 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub ToolStripButton8_Click(sender As Object, e As EventArgs) Handles ToolStripButton8.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("Access 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub ToolStripButton9_Click(sender As Object, e As EventArgs) Handles ToolStripButton9.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("SQL Server 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub ToolStripButton3_Click(sender As Object, e As EventArgs) Handles ToolStripButton3.Click
+        Dim ctx = GetExportContext()
+        If ctx Is Nothing Then Return
+        MessageBox.Show("ODBC 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+#End Region
+
 #Region "メニューイベント: 終了"
     Private Sub 終了XToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 終了XToolStripMenuItem.Click
         'アプリケーションを終了する
