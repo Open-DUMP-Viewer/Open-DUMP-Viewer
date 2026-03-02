@@ -424,7 +424,40 @@ Public Class OraDB_DUMP_Viewer
     Private Sub ToolStripButton3_Click(sender As Object, e As EventArgs) Handles ToolStripButton3.Click
         Dim ctx = GetExportContext()
         If ctx Is Nothing Then Return
-        MessageBox.Show("ODBC 出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        ' DB 接続ダイアログ (ODBC タブを初期選択)
+        Dim connDlg As New DatabaseConnectionDialog(selectOdbcTab:=True)
+        If connDlg.ShowDialog(Me) <> DialogResult.OK Then Return
+        If connDlg.IsSqlServer Then
+            MessageBox.Show("ODBC タブから接続してください。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        ' テーブルデータを取得
+        Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
+        If tableData Is Nothing Then tableData = New List(Of String())
+
+        Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
+        Dim columnList = New List(Of String)(colNames)
+
+        ' 進捗ダイアログ付き ODBC エクスポート
+        Using dlg As New ExportProgressDialog()
+            Dim connStr = connDlg.ConnectionString
+            Dim success = dlg.RunExport(
+                Sub(worker, args)
+                    Dim ok = OdbcExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                                                    ctx.TableName, connStr, worker)
+                    If Not ok Then
+                        args.Cancel = True
+                    End If
+                End Sub)
+
+            If success Then
+                MessageBox.Show($"ODBC エクスポートが完了しました。" & vbCrLf &
+                               $"{tableData.Count:#,0} 行を出力しました。",
+                               "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
     End Sub
 #End Region
 

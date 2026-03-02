@@ -17,7 +17,7 @@ Public Class DatabaseConnectionDialog
     <ComponentModel.Browsable(False)>
     Public Property ConnectionString As String = ""
 
-    Public Sub New()
+    Public Sub New(Optional selectOdbcTab As Boolean = False)
         InitializeComponent()
 
         ' 認証方式の選択肢
@@ -27,6 +27,11 @@ Public Class DatabaseConnectionDialog
 
         ' ODBC DSN 一覧を取得
         LoadOdbcDsnList()
+
+        ' ODBC タブを初期選択
+        If selectOdbcTab Then
+            tabControl.SelectedTab = tabOdbc
+        End If
     End Sub
 
     Private Sub DatabaseConnectionDialog_Load(sender As Object, e As EventArgs) Handles MyBase.Load
