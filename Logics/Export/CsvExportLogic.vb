@@ -18,7 +18,8 @@ Public Class CsvExportLogic
     ''' <param name="outputPath">出力先ファイルパス</param>
     ''' <returns>成功なら True</returns>
     Public Shared Function ExportFromDump(ctx As ExportHelper.TableExportContext, outputPath As String) As Boolean
-        Dim rc = OraDB_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath)
+        Dim rc = OraDB_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath,
+                                               ctx.Schema, ctx.DataOffset)
         If rc <> OraDB_NativeParser.ODV_OK Then
             Throw New Exception($"CSV エクスポートエラー (rc={rc})")
         End If

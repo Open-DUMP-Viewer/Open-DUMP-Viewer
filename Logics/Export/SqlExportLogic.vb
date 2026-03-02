@@ -16,7 +16,8 @@ Public Class SqlExportLogic
     ''' C DLL 経由で SQL エクスポート (全行・ストリーミング)
     ''' </summary>
     Public Shared Function ExportFromDump(ctx As ExportHelper.TableExportContext, outputPath As String, dbmsType As Integer) As Boolean
-        Dim rc = OraDB_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType)
+        Dim rc = OraDB_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType,
+                                               ctx.Schema, ctx.DataOffset)
         If rc <> OraDB_NativeParser.ODV_OK Then
             Throw New Exception($"SQL エクスポートエラー (rc={rc})")
         End If

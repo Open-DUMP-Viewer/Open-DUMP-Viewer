@@ -391,7 +391,14 @@ Public Class OraDB_NativeParser
     ''' <summary>
     ''' CSVエクスポート
     ''' </summary>
-    Public Shared Function ExportCsv(filePath As String, tableName As String, outputPath As String) As Integer
+    ''' <param name="filePath">DUMPファイルパス</param>
+    ''' <param name="tableName">テーブル名</param>
+    ''' <param name="outputPath">出力先ファイルパス</param>
+    ''' <param name="schema">スキーマ名 (テーブルフィルタ用)</param>
+    ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
+    Public Shared Function ExportCsv(filePath As String, tableName As String, outputPath As String,
+                                      Optional schema As String = Nothing,
+                                      Optional dataOffset As Long = 0) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Try
             Dim rc = odv_create_session(session)
@@ -399,6 +406,14 @@ Public Class OraDB_NativeParser
 
             rc = odv_set_dump_file(session, filePath)
             If rc <> ODV_OK Then Return rc
+
+            ' 高速シーク: DDL位置にジャンプ + テーブルフィルタ設定
+            If dataOffset > 0 Then
+                odv_set_data_offset(session, dataOffset)
+            End If
+            If tableName IsNot Nothing AndAlso tableName.Length > 0 Then
+                odv_set_table_filter(session, If(schema, ""), tableName)
+            End If
 
             Return odv_export_csv(session, tableName, outputPath)
 
@@ -416,7 +431,11 @@ Public Class OraDB_NativeParser
     ''' <param name="tableName">テーブル名</param>
     ''' <param name="outputPath">出力先ファイルパス</param>
     ''' <param name="dbmsType">DBMS種別 (0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server)</param>
-    Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer) As Integer
+    ''' <param name="schema">スキーマ名 (テーブルフィルタ用)</param>
+    ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
+    Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer,
+                                      Optional schema As String = Nothing,
+                                      Optional dataOffset As Long = 0) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Try
             Dim rc = odv_create_session(session)
@@ -424,6 +443,14 @@ Public Class OraDB_NativeParser
 
             rc = odv_set_dump_file(session, filePath)
             If rc <> ODV_OK Then Return rc
+
+            ' 高速シーク: DDL位置にジャンプ + テーブルフィルタ設定
+            If dataOffset > 0 Then
+                odv_set_data_offset(session, dataOffset)
+            End If
+            If tableName IsNot Nothing AndAlso tableName.Length > 0 Then
+                odv_set_table_filter(session, If(schema, ""), tableName)
+            End If
 
             Return odv_export_sql(session, tableName, outputPath, dbmsType)
 
