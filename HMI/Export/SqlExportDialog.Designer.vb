@@ -30,7 +30,7 @@ Partial Class SqlExportDialog
         lblDbms.Name = "lblDbms"
         lblDbms.Size = New Size(120, 15)
         lblDbms.TabIndex = 0
-        lblDbms.Text = "出力先 DBMS:"
+        lblDbms.Text = "出力先 DB:"
         '
         ' cboDbms
         '
