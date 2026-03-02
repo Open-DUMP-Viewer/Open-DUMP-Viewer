@@ -920,6 +920,46 @@ Public Class OraDB_DUMP_Viewer
     End Sub
 #End Region
 
+#Region "メニューイベント: ツール (LOBファイル抽出)"
+    Private Sub ファイルの取り出しFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ファイルの取り出しFToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then
+            MessageBox.Show("ワークスペースが開かれていません。", "LOBファイル抽出",
+                           MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim ctx = ws.GetSelectedTableExportContext()
+        If ctx Is Nothing Then
+            MessageBox.Show("テーブルを選択してください。", "LOBファイル抽出",
+                           MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        ' LOBカラムの有無チェック
+        If ctx.ColumnTypes Is Nothing OrElse ctx.ColumnTypes.Length = 0 Then
+            MessageBox.Show("カラム型情報がありません。", "LOBファイル抽出",
+                           MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim hasLob = ctx.ColumnTypes.Any(Function(t)
+                                              Dim u = If(t, "").ToUpperInvariant()
+                                              Return u.Contains("BLOB") OrElse u.Contains("CLOB")
+                                          End Function)
+        If Not hasLob Then
+            MessageBox.Show("選択テーブルにLOBカラム (BLOB/CLOB/NCLOB) がありません。", "LOBファイル抽出",
+                           MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using dlg As New LobExtractDialog(ctx.DumpFilePath, ctx.Schema, ctx.TableName,
+                                           ctx.ColumnNames, ctx.ColumnTypes, ctx.DataOffset)
+            dlg.ShowDialog(Me)
+        End Using
+    End Sub
+#End Region
+
 #Region "メニューイベント: 終了"
     Private Sub 終了XToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 終了XToolStripMenuItem.Click
         'アプリケーションを終了する

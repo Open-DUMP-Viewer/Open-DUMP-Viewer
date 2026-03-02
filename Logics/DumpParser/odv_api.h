@@ -147,6 +147,25 @@ ODV_API int __stdcall odv_export_csv(ODV_SESSION *s, const char *table_name, con
    dbms_type: 0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server */
 ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
 
+/* Extract LOB column data to individual files.
+   schema/table: target table (UTF-8)
+   lob_column:   name of the BLOB/CLOB/NCLOB column to extract
+   output_dir:   directory to write LOB files to
+   filename_col: column whose value is used as filename (NULL=sequential numbering)
+   extension:    file extension (NULL="lob")
+   data_offset:  DDL offset for fast seek (0=scan from beginning) */
+ODV_API int __stdcall odv_extract_lob(
+    ODV_SESSION *s,
+    const char *schema, const char *table,
+    const char *lob_column,
+    const char *output_dir,
+    const char *filename_col,
+    const char *extension,
+    int64_t data_offset);
+
+/* Get number of LOB files written by the last odv_extract_lob call */
+ODV_API int64_t __stdcall odv_get_lob_files_written(ODV_SESSION *s);
+
 /* Request cancellation of a running operation */
 ODV_API int __stdcall odv_cancel(ODV_SESSION *s);
 

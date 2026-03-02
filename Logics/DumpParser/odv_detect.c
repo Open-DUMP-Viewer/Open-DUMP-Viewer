@@ -37,6 +37,7 @@ static int find_bytes(const unsigned char *buf, int buf_len,
                       const char *pattern, int pat_len)
 {
     int i;
+    if (pat_len <= 0 || pat_len > buf_len) return -1;
     for (i = 0; i <= buf_len - pat_len; i++) {
         if (memcmp(buf + i, pattern, pat_len) == 0)
             return i;

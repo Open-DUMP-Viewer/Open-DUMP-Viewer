@@ -156,6 +156,22 @@ Public Class OraDB_NativeParser
     Private Shared Function odv_cancel(session As IntPtr) As Integer
     End Function
 
+    ' LOB抽出
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_extract_lob(session As IntPtr,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> schema As String,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> table As String,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> lobColumn As String,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> outputDir As String,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> filenameCol As String,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> extension As String,
+        dataOffset As Long) As Integer
+    End Function
+
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_get_lob_files_written(session As IntPtr) As Long
+    End Function
+
     ' ユーティリティ
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_get_version() As IntPtr
@@ -495,6 +511,66 @@ Public Class OraDB_NativeParser
         Finally
             If session <> IntPtr.Zero Then
                 odv_destroy_session(session)
+            End If
+        End Try
+    End Function
+    ''' <summary>
+    ''' LOBカラムのデータをファイルとして抽出
+    ''' </summary>
+    ''' <param name="filePath">DUMPファイルパス</param>
+    ''' <param name="schema">スキーマ名</param>
+    ''' <param name="tableName">テーブル名</param>
+    ''' <param name="lobColumn">LOBカラム名 (BLOB/CLOB/NCLOB)</param>
+    ''' <param name="outputDir">出力ディレクトリ</param>
+    ''' <param name="filenameCol">ファイル名に使用するカラム名 (Nothing=連番)</param>
+    ''' <param name="extension">ファイル拡張子 (Nothing="lob")</param>
+    ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
+    ''' <param name="progressAction">進捗コールバック (処理行数, 現在のテーブル名, パーセンテージ0-100)</param>
+    ''' <returns>書き出したファイル数 (エラー時は-1)</returns>
+    Public Shared Function ExtractLob(filePath As String, schema As String, tableName As String,
+                                       lobColumn As String, outputDir As String,
+                                       Optional filenameCol As String = Nothing,
+                                       Optional extension As String = Nothing,
+                                       Optional dataOffset As Long = 0,
+                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing) As Long
+        Dim session As IntPtr = IntPtr.Zero
+        Dim ctx As New ParseContext()
+        ctx.ProgressAction = progressAction
+        Dim gcHandle As GCHandle = GCHandle.Alloc(ctx)
+        Dim progCb As New ProgressCallback(AddressOf OnProgressCallback)
+
+        Try
+            Dim rc = odv_create_session(session)
+            If rc <> ODV_OK Then Return -1
+
+            ctx.SessionHandle = session
+
+            rc = odv_set_dump_file(session, filePath)
+            If rc <> ODV_OK Then Return -1
+
+            ' 進捗コールバック設定
+            Dim userData As IntPtr = GCHandle.ToIntPtr(gcHandle)
+            odv_set_progress_callback(session, progCb, userData)
+
+            ' LOB抽出実行
+            rc = odv_extract_lob(session, If(schema, ""), tableName, lobColumn,
+                                  outputDir, filenameCol, extension, dataOffset)
+
+            If rc <> ODV_OK AndAlso rc <> ODV_ERROR_CANCELLED Then
+                Return -1
+            End If
+
+            Return odv_get_lob_files_written(session)
+
+        Catch
+            Return -1
+        Finally
+            ctx.SessionHandle = IntPtr.Zero
+            If session <> IntPtr.Zero Then
+                odv_destroy_session(session)
+            End If
+            If gcHandle.IsAllocated Then
+                gcHandle.Free()
             End If
         End Try
     End Function

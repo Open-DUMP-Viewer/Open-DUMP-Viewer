@@ -630,14 +630,39 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
 
     case COL_BLOB:
     case COL_LONG_RAW: {
-        /* LOB: placeholder */
-        const char *ph = "%BLOB%";
-        set_value_string(val, ph, (int)strlen(ph));
+        /* LOB extraction mode: accumulate binary data */
+        if (s->lob_extract_mode && s->lob_column_index >= 0) {
+            /* Find which LOB column this is (LOB-only index) */
+            int li, lob_idx = 0;
+            for (li = 0; li < col_idx; li++) {
+                int ct = s->table.columns[li].type;
+                if (ct == COL_BLOB || ct == COL_CLOB || ct == COL_NCLOB)
+                    lob_idx++;
+            }
+            if (lob_idx < s->table.lob_col_count)
+                odv_lob_accumulate(s, lob_idx, data, data_len);
+        }
+        /* Always set placeholder for row callback display */
+        {
+            const char *ph = "%BLOB%";
+            set_value_string(val, ph, (int)strlen(ph));
+        }
         break;
     }
 
     case COL_CLOB:
     case COL_LONG: {
+        /* LOB extraction mode: accumulate text data */
+        if (s->lob_extract_mode && s->lob_column_index >= 0) {
+            int li, lob_idx = 0;
+            for (li = 0; li < col_idx; li++) {
+                int ct = s->table.columns[li].type;
+                if (ct == COL_BLOB || ct == COL_CLOB || ct == COL_NCLOB)
+                    lob_idx++;
+            }
+            if (lob_idx < s->table.lob_col_count)
+                odv_lob_accumulate(s, lob_idx, data, data_len);
+        }
         /* CLOB: store as string with charset conversion if needed */
         if (s->table.dump_charset != s->out_charset &&
             s->table.dump_charset != CHARSET_UNKNOWN) {
@@ -664,8 +689,20 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     }
 
     case COL_NCLOB: {
-        const char *ph = "%NCLOB%";
-        set_value_string(val, ph, (int)strlen(ph));
+        if (s->lob_extract_mode && s->lob_column_index >= 0) {
+            int li, lob_idx = 0;
+            for (li = 0; li < col_idx; li++) {
+                int ct = s->table.columns[li].type;
+                if (ct == COL_BLOB || ct == COL_CLOB || ct == COL_NCLOB)
+                    lob_idx++;
+            }
+            if (lob_idx < s->table.lob_col_count)
+                odv_lob_accumulate(s, lob_idx, data, data_len);
+        }
+        {
+            const char *ph = "%NCLOB%";
+            set_value_string(val, ph, (int)strlen(ph));
+        }
         break;
     }
 
@@ -749,6 +786,12 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
         s->record.max_columns = new_max;
     }
 
+    /* In LOB extraction mode, validate the target column exists */
+    if (s->lob_extract_mode) {
+        rc = odv_lob_check_column(s);
+        if (rc != ODV_OK) return rc;
+    }
+
     /* Allocate column data buffer */
     col_buf_size = ODV_EXP_READ_BUF_LEN;
     col_buf = (unsigned char *)malloc(col_buf_size);
@@ -764,7 +807,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             break; /* EOF */
         }
 
-        col_len = (int)len_buf[0] | ((int)len_buf[1] << 8);
+        col_len = (int)((unsigned int)len_buf[0] | ((unsigned int)len_buf[1] << 8));
 
 
         /* Special markers */
@@ -778,6 +821,12 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 }
                 row_count++;
                 s->table.record_count++;
+
+                /* LOB extraction: write accumulated data */
+                if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                    int lrc = odv_lob_write_file(s);
+                    if (lrc != ODV_OK) return lrc;
+                }
             }
             reset_record(&s->record);
             col_idx = 0;
@@ -801,11 +850,16 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
         /* Handle large data: 0xFF00 means 4-byte length follows */
         if (col_len == 0xFF00) {
             unsigned char big_len[4];
+            unsigned int ulen;
             if (fread(big_len, 1, 4, fp) != 4) break;
-            col_len = (int)big_len[0]
-                    | ((int)big_len[1] << 8)
-                    | ((int)big_len[2] << 16)
-                    | ((int)big_len[3] << 24);
+            ulen = (unsigned int)big_len[0]
+                 | ((unsigned int)big_len[1] << 8)
+                 | ((unsigned int)big_len[2] << 16)
+                 | ((unsigned int)big_len[3] << 24);
+            if (ulen > (unsigned int)ODV_EXP_RECORD_LEN) {
+                break; /* Invalid length — corrupted record */
+            }
+            col_len = (int)ulen;
         }
 
         /* Type-specific length validation (ref: check_column_length) */

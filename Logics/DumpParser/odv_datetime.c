@@ -110,15 +110,15 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
     switch (fmt) {
     case DATE_FMT_SLASH:
         if (out_size < 20) return ODV_ERROR_BUFFER_OVER;
-        sprintf(out, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);
+        snprintf(out, out_size, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);
         break;
     case DATE_FMT_COMPACT:
         if (out_size < 9) return ODV_ERROR_BUFFER_OVER;
-        sprintf(out, "%04d%02d%02d", yyyy, mm, dd);
+        snprintf(out, out_size, "%04d%02d%02d", yyyy, mm, dd);
         break;
     case DATE_FMT_FULL:
         if (out_size < 15) return ODV_ERROR_BUFFER_OVER;
-        sprintf(out, "%04d%02d%02d%02d%02d%02d", yyyy, mm, dd, hh, mi, ss);
+        snprintf(out, out_size, "%04d%02d%02d%02d%02d%02d", yyyy, mm, dd, hh, mi, ss);
         break;
     case DATE_FMT_CUSTOM:
         if (custom_fmt && custom_fmt[0]) {
@@ -127,7 +127,7 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
         /* Fall through to default if no custom format */
     default:
         if (out_size < 20) return ODV_ERROR_BUFFER_OVER;
-        sprintf(out, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);
+        snprintf(out, out_size, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);
         break;
     }
 
@@ -194,7 +194,7 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
         if (out_size < 30) return ODV_ERROR_BUFFER_OVER;
 
         /* Format nanoseconds, then trim trailing zeros */
-        sprintf(nano_str, "%09u", nano);
+        snprintf(nano_str, sizeof(nano_str), "%09u", nano);
         nano_len = 9;
         while (nano_len > 1 && nano_str[nano_len - 1] == '0') {
             nano_len--;
@@ -204,15 +204,15 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
         switch (fmt) {
         case DATE_FMT_SLASH:
         default:
-            sprintf(out, "%04d/%02d/%02d %02d:%02d:%02d.%s",
-                    yyyy, mm, dd, hh, mi, ss, nano_str);
+            snprintf(out, out_size, "%04d/%02d/%02d %02d:%02d:%02d.%s",
+                     yyyy, mm, dd, hh, mi, ss, nano_str);
             break;
         case DATE_FMT_COMPACT:
-            sprintf(out, "%04d%02d%02d", yyyy, mm, dd);
+            snprintf(out, out_size, "%04d%02d%02d", yyyy, mm, dd);
             break;
         case DATE_FMT_FULL:
-            sprintf(out, "%04d%02d%02d%02d%02d%02d.%s",
-                    yyyy, mm, dd, hh, mi, ss, nano_str);
+            snprintf(out, out_size, "%04d%02d%02d%02d%02d%02d.%s",
+                     yyyy, mm, dd, hh, mi, ss, nano_str);
             break;
         }
     } else {
@@ -263,7 +263,7 @@ int decode_binary_float(const unsigned char *buf, char *out, int out_size)
 
     /* Format and trim trailing zeros */
     if (out_size < 32) return ODV_ERROR_BUFFER_OVER;
-    sprintf(out, "%.10g", (double)fval);
+    snprintf(out, out_size, "%.10g", (double)fval);
 
     return ODV_OK;
 }
@@ -310,7 +310,7 @@ int decode_binary_double(const unsigned char *buf, char *out, int out_size)
 
     /* Format and trim trailing zeros */
     if (out_size < 32) return ODV_ERROR_BUFFER_OVER;
-    sprintf(out, "%.17g", dval);
+    snprintf(out, out_size, "%.17g", dval);
 
     return ODV_OK;
 }

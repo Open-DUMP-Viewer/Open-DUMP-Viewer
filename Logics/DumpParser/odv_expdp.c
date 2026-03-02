@@ -353,6 +353,12 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     non_lob_cols = s->table.col_count - s->table.lob_col_count;
     if (non_lob_cols <= 0) non_lob_cols = s->table.col_count;
 
+    /* In LOB extraction mode, validate the target column exists */
+    if (s->lob_extract_mode) {
+        rc = odv_lob_check_column(s);
+        if (rc != ODV_OK) return rc;
+    }
+
     /* Ensure record has enough columns */
     if (s->record.max_columns < s->table.col_count) {
         free_record(&s->record);
@@ -482,6 +488,71 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                     record_count++;
                     s->table.record_count++;
+
+                    /* LOB extraction: remaining columns are LOB data */
+                    if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
+                        int lob_i;
+                        for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
+                            /* Read LOB column length */
+                            int lb;
+                            int lob_len = 0;
+                            while (buf_pos >= buf_len) {
+                                buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                                if (buf_len <= 0) goto END_LOB_PARSE;
+                                buf_pos = 0;
+                                *address += buf_len;
+                            }
+                            lb = buf[buf_pos++];
+                            if (lb == 0xff) {
+                                /* NULL LOB */
+                                continue;
+                            } else if (lb == 0xfe) {
+                                /* 2-byte length */
+                                while (buf_pos >= buf_len) {
+                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                                    if (buf_len <= 0) goto END_LOB_PARSE;
+                                    buf_pos = 0; *address += buf_len;
+                                }
+                                lob_len = buf[buf_pos++];
+                                while (buf_pos >= buf_len) {
+                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                                    if (buf_len <= 0) goto END_LOB_PARSE;
+                                    buf_pos = 0; *address += buf_len;
+                                }
+                                lob_len |= (buf[buf_pos++] << 8);
+                            } else if (lb == 0x00) {
+                                /* Empty LOB */
+                                continue;
+                            } else {
+                                lob_len = lb;
+                            }
+
+                            /* Read lob_len bytes of LOB data */
+                            {
+                                int lob_read = 0;
+                                while (lob_read < lob_len && !s->cancelled) {
+                                    int avail = buf_len - buf_pos;
+                                    int need = lob_len - lob_read;
+                                    int chunk = (avail < need) ? avail : need;
+                                    if (chunk > 0) {
+                                        rc = odv_lob_accumulate(s, lob_i, buf + buf_pos, chunk);
+                                        if (rc != ODV_OK) return rc;
+                                        buf_pos += chunk;
+                                        lob_read += chunk;
+                                    }
+                                    if (buf_pos >= buf_len) {
+                                        buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                                        if (buf_len <= 0) goto END_LOB_PARSE;
+                                        buf_pos = 0; *address += buf_len;
+                                    }
+                                }
+                            }
+                        }
+                        /* Write LOB file and reset buffer */
+                        rc = odv_lob_write_file(s);
+                        if (rc != ODV_OK) return rc;
+                    }
+END_LOB_PARSE:
                     step = 1; /* back to expecting header */
                 }
 
@@ -613,6 +684,38 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                         record_count++;
                         s->table.record_count++;
+
+                        /* LOB extraction: read remaining LOB columns */
+                        if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
+                            int lob_i;
+                            for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
+                                int lb, lob_len = 0;
+                                while (buf_pos >= buf_len) {
+                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                                    if (buf_len <= 0) goto END_LOB_PARSE2;
+                                    buf_pos = 0; *address += buf_len;
+                                }
+                                lb = buf[buf_pos++];
+                                if (lb == 0xff) continue; /* NULL */
+                                else if (lb == 0xfe) {
+                                    while (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
+                                    lob_len = buf[buf_pos++];
+                                    while (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
+                                    lob_len |= (buf[buf_pos++] << 8);
+                                } else if (lb == 0x00) continue; /* empty */
+                                else lob_len = lb;
+
+                                { int lr = 0;
+                                while (lr < lob_len && !s->cancelled) {
+                                    int avail = buf_len - buf_pos, need = lob_len - lr, chunk = (avail < need) ? avail : need;
+                                    if (chunk > 0) { rc = odv_lob_accumulate(s, lob_i, buf + buf_pos, chunk); if (rc != ODV_OK) return rc; buf_pos += chunk; lr += chunk; }
+                                    if (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
+                                } }
+                            }
+                            rc = odv_lob_write_file(s);
+                            if (rc != ODV_OK) return rc;
+                        }
+END_LOB_PARSE2:
                         step = 1;
                     }
                 }

@@ -277,74 +277,52 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
         write_create_table(ctx, schema, table, col_count, col_names, dbms);
     }
 
-    /* Build cached prefix string */
+    /* Build cached prefix string (safe position tracking) */
     {
         int pos = 0;
-        pos += snprintf(ctx->insert_prefix + pos, sizeof(ctx->insert_prefix) - pos,
-                        "INSERT INTO ");
+        int remain = (int)sizeof(ctx->insert_prefix);
+        int n;
 
-        if (schema && schema[0] != '\0') {
+#define SAFE_APPEND(fmt, ...) do { \
+    n = snprintf(ctx->insert_prefix + pos, remain, fmt, ##__VA_ARGS__); \
+    if (n > 0 && n < remain) { pos += n; remain -= n; } \
+    else { remain = 0; } \
+} while(0)
+
+        SAFE_APPEND("INSERT INTO ");
+
+        if (schema && schema[0] != '\0' && remain > 0) {
             switch (dbms) {
-            case DBMS_MYSQL:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "`%s`.", schema);
-                break;
-            case DBMS_SQLSERVER:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "[%s].", schema);
-                break;
-            default:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "\"%s\".", schema);
-                break;
+            case DBMS_MYSQL:    SAFE_APPEND("`%s`.", schema); break;
+            case DBMS_SQLSERVER: SAFE_APPEND("[%s].", schema); break;
+            default:            SAFE_APPEND("\"%s\".", schema); break;
             }
         }
 
-        switch (dbms) {
-        case DBMS_MYSQL:
-            pos += snprintf(ctx->insert_prefix + pos,
-                            sizeof(ctx->insert_prefix) - pos, "`%s`", table);
-            break;
-        case DBMS_SQLSERVER:
-            pos += snprintf(ctx->insert_prefix + pos,
-                            sizeof(ctx->insert_prefix) - pos, "[%s]", table);
-            break;
-        default:
-            pos += snprintf(ctx->insert_prefix + pos,
-                            sizeof(ctx->insert_prefix) - pos, "\"%s\"", table);
-            break;
-        }
-
-        pos += snprintf(ctx->insert_prefix + pos,
-                        sizeof(ctx->insert_prefix) - pos, " (");
-
-        for (i = 0; i < col_count; i++) {
-            if (i > 0) {
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, ", ");
-            }
+        if (remain > 0) {
             switch (dbms) {
-            case DBMS_MYSQL:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "`%s`", col_names[i]);
-                break;
-            case DBMS_SQLSERVER:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "[%s]", col_names[i]);
-                break;
-            default:
-                pos += snprintf(ctx->insert_prefix + pos,
-                                sizeof(ctx->insert_prefix) - pos, "\"%s\"", col_names[i]);
-                break;
+            case DBMS_MYSQL:    SAFE_APPEND("`%s`", table); break;
+            case DBMS_SQLSERVER: SAFE_APPEND("[%s]", table); break;
+            default:            SAFE_APPEND("\"%s\"", table); break;
             }
         }
 
-        pos += snprintf(ctx->insert_prefix + pos,
-                        sizeof(ctx->insert_prefix) - pos, ") VALUES (");
+        SAFE_APPEND(" (");
 
-        if (pos >= (int)sizeof(ctx->insert_prefix)) {
-            ctx->insert_prefix[sizeof(ctx->insert_prefix) - 1] = '\0';
+        for (i = 0; i < col_count && remain > 0; i++) {
+            if (i > 0) SAFE_APPEND(", ");
+            switch (dbms) {
+            case DBMS_MYSQL:    SAFE_APPEND("`%s`", col_names[i]); break;
+            case DBMS_SQLSERVER: SAFE_APPEND("[%s]", col_names[i]); break;
+            default:            SAFE_APPEND("\"%s\"", col_names[i]); break;
+            }
         }
+
+        SAFE_APPEND(") VALUES (");
+
+#undef SAFE_APPEND
+
+        ctx->insert_prefix[sizeof(ctx->insert_prefix) - 1] = '\0';
     }
 }
 

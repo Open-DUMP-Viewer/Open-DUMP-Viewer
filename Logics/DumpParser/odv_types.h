@@ -308,6 +308,15 @@ struct _odv_session {
     int             csv_write_header;      /* 1=write column header row (default:1) */
     int             csv_write_types;       /* 1=write column type row (default:0) */
     int             sql_create_table;      /* 1=output CREATE TABLE DDL (default:0) */
+
+    /* LOB extraction options */
+    int             lob_extract_mode;      /* 1=extracting LOB files */
+    char            lob_column[ODV_OBJNAME_LEN + 1];   /* Target LOB column name */
+    int             lob_column_index;      /* LOB-only index of target column (-1=unset) */
+    char            lob_output_dir[ODV_PATH_LEN + 1];  /* Output directory */
+    char            lob_filename_col[ODV_OBJNAME_LEN + 1]; /* Column for filename (empty=sequential) */
+    char            lob_extension[32];     /* File extension (default "lob") */
+    int64_t         lob_files_written;     /* Count of files written */
 };
 
 /*---------------------------------------------------------------------------
@@ -380,5 +389,11 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
 
 /* odv_sql.c */
 int write_sql_file(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
+
+/* LOB helpers (odv_api.c) */
+int  odv_lob_check_column(ODV_SESSION *s);
+int  odv_lob_accumulate(ODV_SESSION *s, int lob_col_idx, const unsigned char *data, int len);
+int  odv_lob_write_file(ODV_SESSION *s);
+void odv_lob_reset_buffer(ODV_SESSION *s);
 
 #endif /* ODV_TYPES_H */
