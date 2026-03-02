@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OraDB DUMP Viewer - MSIX Package Manifest
+
+  NOTE: Identity Name and Publisher are placeholders.
+  After registering on Partner Center, replace with real values:
+    Name      = "12345YANAITaketo.OraDBDUMPViewer" (from Partner Center)
+    Publisher = "CN=XXXXXXXX-XXXX-..." (from Partner Center)
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="YOURNAME.OraDBDUMPViewer"
+    Version="1.0.0.0"
+    Publisher="CN=PLACEHOLDER"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>OraDB DUMP Viewer</DisplayName>
+    <PublisherDisplayName>YANAI Taketo</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Oracle EXP/EXPDP DUMPファイルビューア - Oracle環境なしでダンプファイルを解析・閲覧・エクスポート</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.16299.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="ja-JP" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="App"
+      Executable="OraDB DUMP Viewer.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="OraDB DUMP Viewer"
+        Description="Oracle EXP/EXPDP DUMPファイルビューア"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+          Wide310x150Logo="Assets\Wide310x150Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          ShortName="OraDB DUMP Viewer" />
+      </uap:VisualElements>
+
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- Native C DLL (P/Invoke) requires full trust -->
+    <rescap:Capability Name="runFullTrust" />
+    <!-- Network access for version check (GitHub API) -->
+    <Capability Name="internetClient" />
+  </Capabilities>
+
+</Package>
