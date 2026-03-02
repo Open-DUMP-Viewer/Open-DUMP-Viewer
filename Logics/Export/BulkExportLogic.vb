@@ -5,7 +5,7 @@ Imports System.ComponentModel
 ''' 一括エクスポートロジック
 '''
 ''' 複数テーブルを順次処理し、各形式の既存 ExportLogic を再利用する。
-''' テーブルごとに AnalyzeTable → Export → メモリ解放 のパターン。
+''' テーブルごとに ParseDump → Export → メモリ解放 のパターン。
 ''' </summary>
 Public Class BulkExportLogic
 
@@ -65,9 +65,8 @@ Public Class BulkExportLogic
 
                     Dim ctx = contexts(i)
 
-                    ' テーブルデータを取得
-                    Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-                    If tableData Is Nothing Then tableData = New List(Of String())
+                    ' テーブルデータを取得 (UIスレッド非依存の直接呼び出し)
+                    Dim tableData = LoadTableData(ctx)
 
                     Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
                     Dim columnList = New List(Of String)(colNames)
@@ -112,9 +111,7 @@ Public Class BulkExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"Excel 一括エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"Excel 一括エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 
@@ -130,8 +127,7 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
+            Dim tableData = LoadTableData(ctx)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
@@ -158,8 +154,7 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
+            Dim tableData = LoadTableData(ctx)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
@@ -186,8 +181,7 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
+            Dim tableData = LoadTableData(ctx)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
@@ -204,6 +198,24 @@ Public Class BulkExportLogic
     End Function
 
 #Region "ヘルパー"
+    ''' <summary>
+    ''' テーブルデータを DLL 経由で取得 (スレッドセーフ: UIアクセスなし)
+    ''' AnalyzeLogic.AnalyzeTable() はCOMMONのUI操作を含むため、
+    ''' BackgroundWorkerスレッドからは直接 OraDB_NativeParser.ParseDump() を使用する
+    ''' </summary>
+    Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext) As List(Of String())
+        Dim result = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+
+        If result IsNot Nothing AndAlso
+           result.ContainsKey(ctx.Schema) AndAlso
+           result(ctx.Schema).ContainsKey(ctx.TableName) Then
+            Return result(ctx.Schema)(ctx.TableName)
+        End If
+
+        Return New List(Of String())
+    End Function
+
     ''' <summary>テーブル単位の進捗報告</summary>
     Private Shared Sub ReportTableProgress(worker As BackgroundWorker, tableName As String,
                                             currentIndex As Integer, totalCount As Integer)

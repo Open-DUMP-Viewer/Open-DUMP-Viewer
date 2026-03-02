@@ -75,9 +75,7 @@ Public Class OdbcExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"ODBC エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"ODBC エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 

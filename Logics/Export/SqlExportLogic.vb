@@ -16,14 +16,11 @@ Public Class SqlExportLogic
     ''' C DLL 経由で SQL エクスポート (全行・ストリーミング)
     ''' </summary>
     Public Shared Function ExportFromDump(ctx As ExportHelper.TableExportContext, outputPath As String, dbmsType As Integer) As Boolean
-        Try
-            Dim rc = OraDB_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType)
-            Return rc = OraDB_NativeParser.ODV_OK
-        Catch ex As Exception
-            MessageBox.Show($"SQL エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
-        End Try
+        Dim rc = OraDB_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType)
+        If rc <> OraDB_NativeParser.ODV_OK Then
+            Throw New Exception($"SQL エクスポートエラー (rc={rc})")
+        End If
+        Return True
     End Function
 
     ''' <summary>
@@ -88,9 +85,7 @@ Public Class SqlExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"SQL エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"SQL エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 

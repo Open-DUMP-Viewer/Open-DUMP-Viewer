@@ -79,9 +79,7 @@ Public Class SqlServerExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"SQL Server エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"SQL Server エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 

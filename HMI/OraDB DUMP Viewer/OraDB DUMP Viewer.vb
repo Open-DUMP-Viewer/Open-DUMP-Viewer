@@ -386,22 +386,32 @@ Public Class OraDB_DUMP_Viewer
             Dim outputPath = ExportHelper.ShowSaveFileDialog("Excel ファイル|*.xlsx|すべてのファイル|*.*", defaultName)
             If outputPath Is Nothing Then Return
 
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
-
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
+            Dim exportedRows As Long = 0
 
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = ExcelExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                        ' データ取得もBackgroundWorker内で実行 (UIブロック防止)
+                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                        Dim rows As List(Of String()) = Nothing
+                        If tableData IsNot Nothing AndAlso
+                           tableData.ContainsKey(ctx.Schema) AndAlso
+                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                            rows = tableData(ctx.Schema)(ctx.TableName)
+                        End If
+                        If rows Is Nothing Then rows = New List(Of String())
+                        exportedRows = rows.Count
+
+                        Dim ok = ExcelExportLogic.Export(rows, columnList, ctx.ColumnTypes,
                                                          $"{ctx.Schema}.{ctx.TableName}", outputPath, worker)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
                     MessageBox.Show($"Excel エクスポートが完了しました。" & vbCrLf &
-                                   $"{tableData.Count:#,0} 行を出力しました。" & vbCrLf & outputPath,
+                                   $"{exportedRows:#,0} 行を出力しました。" & vbCrLf & outputPath,
                                    "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End If
             End Using
@@ -437,22 +447,31 @@ Public Class OraDB_DUMP_Viewer
             Dim outputPath = ExportHelper.ShowSaveFileDialog("Access データベース|*.accdb|すべてのファイル|*.*", defaultName)
             If outputPath Is Nothing Then Return
 
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
-
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
+            Dim exportedRows As Long = 0
 
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = AccessExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                        Dim rows As List(Of String()) = Nothing
+                        If tableData IsNot Nothing AndAlso
+                           tableData.ContainsKey(ctx.Schema) AndAlso
+                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                            rows = tableData(ctx.Schema)(ctx.TableName)
+                        End If
+                        If rows Is Nothing Then rows = New List(Of String())
+                        exportedRows = rows.Count
+
+                        Dim ok = AccessExportLogic.Export(rows, columnList, ctx.ColumnTypes,
                                                           ctx.TableName, outputPath, worker)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
                     MessageBox.Show($"Access エクスポートが完了しました。" & vbCrLf &
-                                   $"{tableData.Count:#,0} 行を出力しました。" & vbCrLf & outputPath,
+                                   $"{exportedRows:#,0} 行を出力しました。" & vbCrLf & outputPath,
                                    "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End If
             End Using
@@ -492,23 +511,32 @@ Public Class OraDB_DUMP_Viewer
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
-
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
+            Dim exportedRows As Long = 0
 
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connDlg.ConnectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = SqlServerExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                        Dim rows As List(Of String()) = Nothing
+                        If tableData IsNot Nothing AndAlso
+                           tableData.ContainsKey(ctx.Schema) AndAlso
+                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                            rows = tableData(ctx.Schema)(ctx.TableName)
+                        End If
+                        If rows Is Nothing Then rows = New List(Of String())
+                        exportedRows = rows.Count
+
+                        Dim ok = SqlServerExportLogic.Export(rows, columnList, ctx.ColumnTypes,
                                                              ctx.Schema, ctx.TableName, connStr, worker)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
                     MessageBox.Show($"SQL Server へのエクスポートが完了しました。" & vbCrLf &
-                                   $"{tableData.Count:#,0} 行を出力しました。",
+                                   $"{exportedRows:#,0} 行を出力しました。",
                                    "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End If
             End Using
@@ -546,23 +574,32 @@ Public Class OraDB_DUMP_Viewer
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
-            Dim tableData = AnalyzeLogic.AnalyzeTable(ctx.DumpFilePath, ctx.Schema, ctx.TableName, ctx.DataOffset)
-            If tableData Is Nothing Then tableData = New List(Of String())
-
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
+            Dim exportedRows As Long = 0
 
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connDlg.ConnectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = OdbcExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
+                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                        Dim rows As List(Of String()) = Nothing
+                        If tableData IsNot Nothing AndAlso
+                           tableData.ContainsKey(ctx.Schema) AndAlso
+                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                            rows = tableData(ctx.Schema)(ctx.TableName)
+                        End If
+                        If rows Is Nothing Then rows = New List(Of String())
+                        exportedRows = rows.Count
+
+                        Dim ok = OdbcExportLogic.Export(rows, columnList, ctx.ColumnTypes,
                                                         ctx.TableName, connStr, worker)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
                     MessageBox.Show($"ODBC エクスポートが完了しました。" & vbCrLf &
-                                   $"{tableData.Count:#,0} 行を出力しました。",
+                                   $"{exportedRows:#,0} 行を出力しました。",
                                    "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 End If
             End Using

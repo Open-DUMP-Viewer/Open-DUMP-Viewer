@@ -18,14 +18,11 @@ Public Class CsvExportLogic
     ''' <param name="outputPath">出力先ファイルパス</param>
     ''' <returns>成功なら True</returns>
     Public Shared Function ExportFromDump(ctx As ExportHelper.TableExportContext, outputPath As String) As Boolean
-        Try
-            Dim rc = OraDB_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath)
-            Return rc = OraDB_NativeParser.ODV_OK
-        Catch ex As Exception
-            MessageBox.Show($"CSV エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
-        End Try
+        Dim rc = OraDB_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath)
+        If rc <> OraDB_NativeParser.ODV_OK Then
+            Throw New Exception($"CSV エクスポートエラー (rc={rc})")
+        End If
+        Return True
     End Function
 
     ''' <summary>
@@ -82,9 +79,7 @@ Public Class CsvExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"CSV エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"CSV エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 

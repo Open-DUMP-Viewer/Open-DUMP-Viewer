@@ -20,6 +20,8 @@ Public Class ExportProgressDialog
     Private _startTime As DateTime
     Private _cancelled As Boolean = False
     Private _exportError As Exception = Nothing
+    Private _hasReceivedProgress As Boolean = False
+    Private WithEvents _elapsedTimer As New Timer()
 #End Region
 
 #Region "進捗情報クラス"
@@ -57,6 +59,9 @@ Public Class ExportProgressDialog
         InitializeComponent()
         _worker.WorkerReportsProgress = True
         _worker.WorkerSupportsCancellation = True
+
+        ' 経過時間を1秒ごとに更新するタイマー
+        _elapsedTimer.Interval = 1000
     End Sub
 #End Region
 
@@ -73,16 +78,25 @@ Public Class ExportProgressDialog
     Public Function RunExport(exportAction As Action(Of System.ComponentModel.BackgroundWorker, System.ComponentModel.DoWorkEventArgs)) As Boolean
         _exportError = Nothing
         _cancelled = False
+        _hasReceivedProgress = False
 
         AddHandler _worker.DoWork, Sub(s, e)
                                        exportAction(DirectCast(s, System.ComponentModel.BackgroundWorker), e)
                                    End Sub
 
+        ' 進捗報告がない場合に備えてマーキースタイルで開始
+        prgExport.Style = ProgressBarStyle.Marquee
+        lblTable.Text = "エクスポート処理中..."
+        lblRows.Text = ""
+
         _startTime = DateTime.Now
+        _elapsedTimer.Start()
         _worker.RunWorkerAsync()
 
         ' モーダル表示 (処理完了で自動的に閉じる)
         Me.ShowDialog()
+
+        _elapsedTimer.Stop()
 
         If _exportError IsNot Nothing Then
             MessageBox.Show($"エクスポートエラー: {_exportError.Message}", "エラー",
@@ -111,7 +125,20 @@ Public Class ExportProgressDialog
         btnCancel.Text = "中断中..."
     End Sub
 
+    Private Sub _elapsedTimer_Tick(sender As Object, e As EventArgs) Handles _elapsedTimer.Tick
+        ' 経過時間を1秒ごとに更新 (進捗報告がない場合でも表示を更新)
+        Dim elapsed = DateTime.Now - _startTime
+        lblElapsed.Text = $"経過時間: {FormatElapsed(elapsed)}"
+    End Sub
+
     Private Sub _worker_ProgressChanged(sender As Object, e As System.ComponentModel.ProgressChangedEventArgs) Handles _worker.ProgressChanged
+        ' 初回の進捗報告でマーキーからブロックスタイルに切り替え
+        If Not _hasReceivedProgress Then
+            _hasReceivedProgress = True
+            prgExport.Style = ProgressBarStyle.Blocks
+            prgExport.Value = 0
+        End If
+
         ' プログレスバー更新
         If e.ProgressPercentage >= 0 AndAlso e.ProgressPercentage <= 100 Then
             prgExport.Value = e.ProgressPercentage
@@ -138,6 +165,7 @@ Public Class ExportProgressDialog
     End Sub
 
     Private Sub _worker_RunWorkerCompleted(sender As Object, e As System.ComponentModel.RunWorkerCompletedEventArgs) Handles _worker.RunWorkerCompleted
+        _elapsedTimer.Stop()
         If e.Error IsNot Nothing Then
             _exportError = e.Error
         End If

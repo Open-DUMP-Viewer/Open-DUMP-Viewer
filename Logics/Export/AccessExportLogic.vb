@@ -25,11 +25,9 @@ Public Class AccessExportLogic
         Try
             ' ACE ドライバチェック
             If Not IsAceDriverAvailable() Then
-                MessageBox.Show("Microsoft Access Database Engine がインストールされていません。" & vbCrLf & vbCrLf &
-                               "以下からダウンロードしてインストールしてください:" & vbCrLf &
-                               "https://www.microsoft.com/ja-jp/download/details.aspx?id=54920",
-                               "ドライバが必要です", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                Return False
+                Throw New Exception("Microsoft Access Database Engine がインストールされていません。" & vbCrLf & vbCrLf &
+                                    "以下からダウンロードしてインストールしてください:" & vbCrLf &
+                                    "https://www.microsoft.com/ja-jp/download/details.aspx?id=54920")
             End If
 
             ' 既存ファイルを削除 (新規作成のため)
@@ -96,9 +94,7 @@ Public Class AccessExportLogic
             Return True
 
         Catch ex As Exception
-            MessageBox.Show($"Access エクスポートエラー: {ex.Message}", "エラー",
-                           MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return False
+            Throw New Exception($"Access エクスポートエラー: {ex.Message}", ex)
         End Try
     End Function
 
