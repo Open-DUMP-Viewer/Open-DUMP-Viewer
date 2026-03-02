@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.0.0] - 2026-03-02
+
+### 新機能: エクスポート
+- **CSV 出力**: RFC 4180 準拠。C DLL ストリーミング (全行) + VB.NET (フィルタ後) の2経路
+- **SQL スクリプト**: INSERT 文生成。Oracle / PostgreSQL / MySQL / SQL Server の4 DB 対応
+- **Excel 出力**: ClosedXML による .xlsx 生成。型別セル書式、ヘッダスタイル、列幅自動調整
+- **Access 出力**: ADOX + OleDb による .accdb 生成。1000行バッチトランザクション
+- **SQL Server 出力**: SqlBulkCopy による高速一括挿入。接続テスト・認証方式選択対応
+- **ODBC 出力**: 汎用 ODBC ドライバ経由で任意の DB に出力。DSN 選択 / 接続文字列直接入力
+- **進捗ダイアログ**: 全エクスポートで進捗表示 + キャンセル対応 (BackgroundWorker)
+- **TablePreview からの CSV 出力**: フィルタ/検索後のデータをそのまま CSV に出力
+
+### 共通基盤
+- ExportHelper: Oracle → 各 DB の型マッピング辞書、SQL/CSV エスケープヘルパー
+- ExportProgressDialog: ProgressBar + 行カウンタ + キャンセル機能
+- DatabaseConnectionDialog: SQL Server / ODBC の2タブ構成、接続テスト機能
+- C DLL API 拡張: `odv_export_sql()` (SQL INSERT 文ストリーミング生成)
+
+### 改善
+- ツールバーボタンの整理 (テキスト出力ボタンを CSV に統合、ボタン名を分かりやすく変更)
+
+### NuGet パッケージ追加
+- ClosedXML 0.105.0 (Excel 出力)
+- Microsoft.Data.SqlClient 6.1.4 (SQL Server 接続)
+- System.Data.OleDb 10.0.3 (Access 出力)
+- System.Data.Odbc 10.0.3 (ODBC 接続)
+
 ## [0.1.3] - 2026-03-02
 
 ### 新機能
