@@ -265,6 +265,17 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
     s->cancelled = 0;
     s->total_rows = 0;
 
+    /* Auto-detect dump kind if not done */
+    if (s->dump_type == DUMP_UNKNOWN) {
+        rc = detect_dump_kind(s);
+        if (rc != ODV_OK) {
+            fclose(ctx.fp);
+            s->row_cb = saved_cb;
+            s->row_ud = saved_ud;
+            return rc;
+        }
+    }
+
     switch (s->dump_type) {
     case DUMP_EXPDP:
     case DUMP_EXPDP_COMPRESS:
