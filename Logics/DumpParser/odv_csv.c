@@ -65,6 +65,9 @@ typedef struct {
     const char *target_table;   /* NULL = export all tables */
     const char *target_schema;
     int header_written;
+    ODV_SESSION *session;       /* For accessing column type info */
+    int write_header;           /* 1=output column name header row */
+    int write_types;            /* 1=output column type row after header */
 } CSV_CONTEXT;
 
 /*---------------------------------------------------------------------------
@@ -90,12 +93,27 @@ static void __stdcall csv_row_callback(
 
     /* Write header row on first data row */
     if (!ctx->header_written) {
-        for (i = 0; i < col_count; i++) {
-            if (i > 0) fputc(',', ctx->fp);
-            csv_write_escaped(ctx->fp, col_names[i]);
-        }
-        fputc('\n', ctx->fp);
         ctx->header_written = 1;
+
+        if (ctx->write_header) {
+            for (i = 0; i < col_count; i++) {
+                if (i > 0) fputc(',', ctx->fp);
+                csv_write_escaped(ctx->fp, col_names[i]);
+            }
+            fputc('\n', ctx->fp);
+        }
+
+        /* Write column type row if requested */
+        if (ctx->write_types && ctx->session) {
+            for (i = 0; i < col_count; i++) {
+                if (i > 0) fputc(',', ctx->fp);
+                if (i < ctx->session->table.col_count &&
+                    ctx->session->table.columns[i].type_str[0]) {
+                    csv_write_escaped(ctx->fp, ctx->session->table.columns[i].type_str);
+                }
+            }
+            fputc('\n', ctx->fp);
+        }
     }
 
     /* Write data row */
@@ -136,6 +154,9 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
     ctx.target_table = table_name;
     ctx.target_schema = NULL;
     ctx.header_written = 0;
+    ctx.session = s;
+    ctx.write_header = s->csv_write_header;
+    ctx.write_types = s->csv_write_types;
 
     /* Save and replace row callback */
     saved_cb = s->row_cb;

@@ -207,7 +207,7 @@ Partial Public Class AboutDialog
             $"start """" ""{msiPath}""" & vbCrLf &
             "exit"
 
-        File.WriteAllText(batPath, batContent, System.Text.Encoding.GetEncoding(932))
+        File.WriteAllText(batPath, batContent, New System.Text.UTF8Encoding(False))
 
         Dim psi As New ProcessStartInfo()
         psi.FileName = batPath

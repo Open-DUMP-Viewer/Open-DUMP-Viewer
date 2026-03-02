@@ -40,17 +40,31 @@ Public Class CsvExportLogic
                                           columnNames As List(Of String),
                                           outputPath As String,
                                           Optional worker As System.ComponentModel.BackgroundWorker = Nothing,
-                                          Optional tableName As String = "") As Boolean
+                                          Optional tableName As String = "",
+                                          Optional columnTypes As String() = Nothing) As Boolean
         Try
             Dim totalRows As Long = data.Count
 
             Using sw As New StreamWriter(outputPath, False, New UTF8Encoding(False))
                 ' ヘッダ行
-                For i As Integer = 0 To columnNames.Count - 1
-                    If i > 0 Then sw.Write(",")
-                    sw.Write(ExportHelper.EscapeCsvValue(columnNames(i)))
-                Next
-                sw.WriteLine()
+                If ExportOptions.CsvWriteHeader Then
+                    For i As Integer = 0 To columnNames.Count - 1
+                        If i > 0 Then sw.Write(",")
+                        sw.Write(ExportHelper.EscapeCsvValue(columnNames(i)))
+                    Next
+                    sw.WriteLine()
+
+                    ' 型行 (ヘッダの後に出力)
+                    If ExportOptions.CsvWriteTypes AndAlso columnTypes IsNot Nothing Then
+                        For i As Integer = 0 To columnNames.Count - 1
+                            If i > 0 Then sw.Write(",")
+                            If i < columnTypes.Length Then
+                                sw.Write(ExportHelper.EscapeCsvValue(columnTypes(i)))
+                            End If
+                        Next
+                        sw.WriteLine()
+                    End If
+                End If
 
                 ' データ行 (1行ずつストリーミング書き出し)
                 For rowIdx As Long = 0 To totalRows - 1

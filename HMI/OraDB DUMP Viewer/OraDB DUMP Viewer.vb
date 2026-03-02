@@ -16,6 +16,8 @@ Public Class OraDB_DUMP_Viewer
         COMMON.ReSet_StatusLavel()
         'プログレスバーをリセットする
         COMMON.ResetProgressBar()
+        'エクスポートオプションを読み込み
+        ExportOptions.Load()
 
         '起動時ライセンスチェック（RSA署名方式）
         '認証が完了するまでアプリケーションを使用不可にする
@@ -225,6 +227,13 @@ Public Class OraDB_DUMP_Viewer
 
     Private Sub ToolStripButton2_Click(sender As Object, e As EventArgs) Handles tolTablPproperty.Click
         ShowTableProperty()
+    End Sub
+#End Region
+
+#Region "メニューイベント: オプション"
+    Private Sub オプションOToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles オプションOToolStripMenuItem.Click
+        Dim dlg As New ExportOptionsDialog()
+        dlg.ShowDialog(Me)
     End Sub
 #End Region
 

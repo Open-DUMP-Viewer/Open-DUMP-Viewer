@@ -15,6 +15,7 @@
 
 #include "odv_types.h"
 #include <stdio.h>
+#include <string.h>
 
 /*---------------------------------------------------------------------------
     SQL export context
@@ -26,6 +27,8 @@ typedef struct {
     int         dbms_type;
     int         header_written;
     char        insert_prefix[4096];  /* Cached INSERT INTO ... VALUES ( */
+    ODV_SESSION *session;             /* For accessing column type info */
+    int         create_table;         /* 1=output CREATE TABLE DDL */
 } SQL_CONTEXT;
 
 /*---------------------------------------------------------------------------
@@ -91,6 +94,162 @@ static int is_numeric_value(const char *val)
 }
 
 /*---------------------------------------------------------------------------
+    map_oracle_to_target_type
+
+    Maps an Oracle type string to the equivalent type for the target DBMS.
+ ---------------------------------------------------------------------------*/
+static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
+{
+    /* Extract base name (before parenthesis) */
+    static char result[256];
+    char base[64];
+    const char *paren;
+    int i;
+
+    if (!oracle_type || !oracle_type[0]) return "VARCHAR(255)";
+
+    /* Copy and uppercase the base name */
+    paren = strchr(oracle_type, '(');
+    if (paren) {
+        int len = (int)(paren - oracle_type);
+        if (len > 63) len = 63;
+        for (i = 0; i < len; i++) {
+            base[i] = (oracle_type[i] >= 'a' && oracle_type[i] <= 'z')
+                     ? oracle_type[i] - 32 : oracle_type[i];
+        }
+        base[len] = '\0';
+        /* Trim trailing spaces */
+        while (len > 0 && base[len-1] == ' ') base[--len] = '\0';
+    } else {
+        int len = (int)strlen(oracle_type);
+        if (len > 63) len = 63;
+        for (i = 0; i < len; i++) {
+            base[i] = (oracle_type[i] >= 'a' && oracle_type[i] <= 'z')
+                     ? oracle_type[i] - 32 : oracle_type[i];
+        }
+        base[len] = '\0';
+        while (len > 0 && base[len-1] == ' ') base[--len] = '\0';
+    }
+
+    if (dbms == DBMS_ORACLE) {
+        /* Oracle: return as-is */
+        snprintf(result, sizeof(result), "%s", oracle_type);
+        return result;
+    }
+
+    if (dbms == DBMS_POSTGRES) {
+        if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
+            return "VARCHAR(255)";
+        }
+        if (strcmp(base, "NUMBER") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "NUMERIC%s", paren); return result; }
+            return "NUMERIC";
+        }
+        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "TIMESTAMP";
+        if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "TEXT";
+        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "BYTEA";
+        if (strcmp(base, "BINARY_FLOAT") == 0) return "REAL";
+        if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE PRECISION";
+        if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
+            return "CHAR(1)";
+        }
+        return "TEXT";
+    }
+
+    if (dbms == DBMS_MYSQL) {
+        if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
+            return "VARCHAR(255)";
+        }
+        if (strcmp(base, "NUMBER") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
+            return "DECIMAL(38,10)";
+        }
+        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "DATETIME";
+        if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "LONGTEXT";
+        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "LONGBLOB";
+        if (strcmp(base, "BINARY_FLOAT") == 0) return "FLOAT";
+        if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE";
+        if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
+            return "CHAR(1)";
+        }
+        return "TEXT";
+    }
+
+    if (dbms == DBMS_SQLSERVER) {
+        if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "NVARCHAR%s", paren); return result; }
+            return "NVARCHAR(255)";
+        }
+        if (strcmp(base, "NUMBER") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
+            return "DECIMAL(38,10)";
+        }
+        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "DATETIME2";
+        if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "NVARCHAR(MAX)";
+        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "VARBINARY(MAX)";
+        if (strcmp(base, "BINARY_FLOAT") == 0) return "REAL";
+        if (strcmp(base, "BINARY_DOUBLE") == 0) return "FLOAT";
+        if (strcmp(base, "CHAR") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "NCHAR%s", paren); return result; }
+            return "NCHAR(1)";
+        }
+        if (strcmp(base, "NCHAR") == 0) {
+            snprintf(result, sizeof(result), "%s", oracle_type);
+            return result;
+        }
+        return "NVARCHAR(MAX)";
+    }
+
+    /* Unknown DBMS: return as-is */
+    snprintf(result, sizeof(result), "%s", oracle_type);
+    return result;
+}
+
+/*---------------------------------------------------------------------------
+    write_create_table
+
+    Outputs CREATE TABLE DDL for the target DBMS.
+ ---------------------------------------------------------------------------*/
+static void write_create_table(SQL_CONTEXT *ctx, const char *schema,
+                                const char *table, int col_count,
+                                const char **col_names, int dbms)
+{
+    FILE *fp = ctx->fp;
+    int i;
+
+    if (!ctx->session) return;
+
+    fprintf(fp, "CREATE TABLE ");
+
+    if (schema && schema[0] != '\0') {
+        sql_write_identifier(fp, schema, dbms);
+        fputc('.', fp);
+    }
+    sql_write_identifier(fp, table, dbms);
+    fprintf(fp, " (\n");
+
+    for (i = 0; i < col_count; i++) {
+        if (i > 0) fprintf(fp, ",\n");
+        fprintf(fp, "    ");
+        sql_write_identifier(fp, col_names[i], dbms);
+        fputc(' ', fp);
+
+        if (i < ctx->session->table.col_count &&
+            ctx->session->table.columns[i].type_str[0]) {
+            fputs(map_oracle_to_target_type(ctx->session->table.columns[i].type_str, dbms), fp);
+        } else {
+            fputs("VARCHAR(255)", fp);
+        }
+    }
+
+    fprintf(fp, "\n);\n\n");
+}
+
+/*---------------------------------------------------------------------------
     build_insert_prefix
 
     Builds the "INSERT INTO schema.table (col1, col2, ...) VALUES (" prefix
@@ -103,8 +262,6 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
     FILE *fp = ctx->fp;
     int i;
 
-    /* We build it directly to file and also mark as built */
-    /* Actually, we write the prefix each time for simplicity */
     ctx->header_written = 1;
 
     /* Write CREATE TABLE comment at the top */
@@ -114,6 +271,11 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
     }
     fprintf(fp, "%s\n", table);
     fprintf(fp, "-- Generated by OraDB DUMP Viewer\n\n");
+
+    /* Output CREATE TABLE DDL if requested */
+    if (ctx->create_table) {
+        write_create_table(ctx, schema, table, col_count, col_names, dbms);
+    }
 
     /* Build cached prefix string */
     {
@@ -254,6 +416,8 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
     ctx.dbms_type = dbms_type;
     ctx.header_written = 0;
     ctx.insert_prefix[0] = '\0';
+    ctx.session = s;
+    ctx.create_table = s->sql_create_table;
 
     /* Save and replace row callback */
     saved_cb = s->row_cb;

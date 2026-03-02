@@ -37,6 +37,66 @@ Namespace My
 #End If
 #End Region
         
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("0")>  _
+        Public Property ExportDateFormat() As Integer
+            Get
+                Return CType(Me("ExportDateFormat"),Integer)
+            End Get
+            Set
+                Me("ExportDateFormat") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("YYYY-MM-DD HH24:MI:SS")>  _
+        Public Property ExportCustomDateFormat() As String
+            Get
+                Return CType(Me("ExportCustomDateFormat"),String)
+            End Get
+            Set
+                Me("ExportCustomDateFormat") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
+        Public Property ExportCsvWriteHeader() As Boolean
+            Get
+                Return CType(Me("ExportCsvWriteHeader"),Boolean)
+            End Get
+            Set
+                Me("ExportCsvWriteHeader") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
+        Public Property ExportCsvWriteTypes() As Boolean
+            Get
+                Return CType(Me("ExportCsvWriteTypes"),Boolean)
+            End Get
+            Set
+                Me("ExportCsvWriteTypes") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
+        Public Property ExportSqlCreateTable() As Boolean
+            Get
+                Return CType(Me("ExportSqlCreateTable"),Boolean)
+            End Get
+            Set
+                Me("ExportSqlCreateTable") = value
+            End Set
+        End Property
+
         Public Shared ReadOnly Property [Default]() As MySettings
             Get
                 

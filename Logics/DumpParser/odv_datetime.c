@@ -36,7 +36,47 @@
          DATE_FMT_COMPACT => "YYYYMMDD"
          DATE_FMT_FULL    => "YYYYMMDDHHMMSS"
  ---------------------------------------------------------------------------*/
-int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_size, int fmt)
+/*---------------------------------------------------------------------------
+    format_date_custom
+
+    Formats date components using a custom format string.
+    Tokens: YYYY, MM, DD, HH24, MI, SS
+    All other characters are output literally.
+ ---------------------------------------------------------------------------*/
+static int format_date_custom(const char *fmt_str, int yyyy, int mm, int dd,
+                               int hh, int mi, int ss, char *out, int out_size)
+{
+    const char *p = fmt_str;
+    int pos = 0;
+
+    while (*p && pos < out_size - 1) {
+        if (strncmp(p, "YYYY", 4) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%04d", yyyy);
+            p += 4;
+        } else if (strncmp(p, "MM", 2) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%02d", mm);
+            p += 2;
+        } else if (strncmp(p, "DD", 2) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%02d", dd);
+            p += 2;
+        } else if (strncmp(p, "HH24", 4) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%02d", hh);
+            p += 4;
+        } else if (strncmp(p, "MI", 2) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%02d", mi);
+            p += 2;
+        } else if (strncmp(p, "SS", 2) == 0) {
+            pos += snprintf(out + pos, out_size - pos, "%02d", ss);
+            p += 2;
+        } else {
+            out[pos++] = *p++;
+        }
+    }
+    out[pos] = '\0';
+    return ODV_OK;
+}
+
+int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt)
 {
     int yyyy, mm, dd, hh, mi, ss;
 
@@ -80,6 +120,11 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
         if (out_size < 15) return ODV_ERROR_BUFFER_OVER;
         sprintf(out, "%04d%02d%02d%02d%02d%02d", yyyy, mm, dd, hh, mi, ss);
         break;
+    case DATE_FMT_CUSTOM:
+        if (custom_fmt && custom_fmt[0]) {
+            return format_date_custom(custom_fmt, yyyy, mm, dd, hh, mi, ss, out, out_size);
+        }
+        /* Fall through to default if no custom format */
     default:
         if (out_size < 20) return ODV_ERROR_BUFFER_OVER;
         sprintf(out, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);
@@ -97,7 +142,7 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
 
     Output: "YYYY/MM/DD HH:MI:SS.NNNNNNNNN"
  ---------------------------------------------------------------------------*/
-int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int out_size, int fmt)
+int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt)
 {
     int yyyy, mm, dd, hh, mi, ss;
     unsigned int nano = 0;
@@ -136,6 +181,11 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
              |  (unsigned int)buf[10];
     }
 
+    /* Custom format: delegate to format_date_custom (ignores nanoseconds) */
+    if (fmt == DATE_FMT_CUSTOM && custom_fmt && custom_fmt[0]) {
+        return format_date_custom(custom_fmt, yyyy, mm, dd, hh, mi, ss, out, out_size);
+    }
+
     /* Format output */
     if (nano > 0) {
         char nano_str[16];
@@ -167,7 +217,7 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
         }
     } else {
         /* No nanoseconds: same as DATE */
-        rc = decode_oracle_date(buf, 7, out, out_size, fmt);
+        rc = decode_oracle_date(buf, 7, out, out_size, fmt, custom_fmt);
         return rc;
     }
 

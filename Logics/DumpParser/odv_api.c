@@ -33,6 +33,13 @@ static void clear_session(ODV_SESSION *s)
     s->dump_charset = CHARSET_UTF8;
     s->out_charset = CHARSET_UTF8;
     s->last_progress_pct = -1;
+
+    /* Export option defaults */
+    s->date_format = DATE_FMT_SLASH;
+    s->custom_date_format[0] = '\0';
+    s->csv_write_header = 1;
+    s->csv_write_types = 0;
+    s->sql_create_table = 0;
 }
 
 /*---------------------------------------------------------------------------
@@ -160,6 +167,33 @@ ODV_API int __stdcall odv_set_data_offset(ODV_SESSION *s, int64_t offset)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->seek_offset = offset;
+    return ODV_OK;
+}
+
+ODV_API int __stdcall odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    s->date_format = fmt;
+    if (fmt == DATE_FMT_CUSTOM && custom_fmt) {
+        odv_strcpy(s->custom_date_format, custom_fmt, sizeof(s->custom_date_format) - 1);
+    } else {
+        s->custom_date_format[0] = '\0';
+    }
+    return ODV_OK;
+}
+
+ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    s->csv_write_header = write_header;
+    s->csv_write_types = write_types;
+    return ODV_OK;
+}
+
+ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    s->sql_create_table = create_table;
     return ODV_OK;
 }
 

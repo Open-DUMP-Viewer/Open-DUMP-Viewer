@@ -18,8 +18,25 @@
 - DatabaseConnectionDialog: SQL Server / ODBC の2タブ構成、接続テスト機能
 - C DLL API 拡張: `odv_export_sql()` (SQL INSERT 文ストリーミング生成)
 
+### エクスポートオプション
+- 日付フォーマット選択: YYYY/MM/DD HH:MI:SS / YYYYMMDD / YYYYMMDDHHMMSS / カスタム書式
+- CSV: カラム名ヘッダ出力 ON/OFF、カラム型行出力 ON/OFF
+- SQL スクリプト: CREATE TABLE DDL 出力 ON/OFF (Oracle/PG/MySQL/MSSQL 対応)
+- 設定の永続化 (アプリ再起動後も保持)
+- ツール → オプション メニューから設定
+
+### テーブル管理
+- テーブル除外機能: ListView で選択したテーブルをエクスポート対象から除外
+- 一括エクスポート: 全可視テーブルを一度にエクスポート (CSV/SQL/Excel/Access/SQL Server/ODBC)
+- 「選択を反転」機能
+
 ### 改善
 - ツールバーボタンの整理 (テキスト出力ボタンを CSV に統合、ボタン名を分かりやすく変更)
+
+### バグ修正
+- バージョンアップ機能のエンコーディングエラーを修正 (Encoding 932 → UTF-8)
+- エクスポートダイアログのフリーズを修正
+- CSV/SQL エクスポートで dump_type 未検出により 0 行になるバグを修正
 
 ### NuGet パッケージ追加
 - ClosedXML 0.105.0 (Excel 出力)

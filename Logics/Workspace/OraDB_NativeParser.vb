@@ -22,6 +22,12 @@ Public Class OraDB_NativeParser
     Public Const DUMP_EXPDP_COMPRESS As Integer = 1
     Public Const DUMP_EXP As Integer = 10
     Public Const DUMP_EXP_DIRECT As Integer = 11
+
+    ' Date format constants
+    Public Const DATE_FMT_SLASH As Integer = 0      ' YYYY/MM/DD HH:MI:SS
+    Public Const DATE_FMT_COMPACT As Integer = 1    ' YYYYMMDD
+    Public Const DATE_FMT_FULL As Integer = 2       ' YYYYMMDDHHMMSS
+    Public Const DATE_FMT_CUSTOM As Integer = 3     ' Custom format string
 #End Region
 
 #Region "コールバックデリゲート"
@@ -105,6 +111,20 @@ Public Class OraDB_NativeParser
         <MarshalAs(UnmanagedType.LPUTF8Str)> table As String) As Integer
     End Function
 
+    ' エクスポートオプション
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_date_format(session As IntPtr, fmt As Integer,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> customFmt As String) As Integer
+    End Function
+
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_csv_options(session As IntPtr, writeHeader As Integer, writeTypes As Integer) As Integer
+    End Function
+
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_sql_options(session As IntPtr, createTable As Integer) As Integer
+    End Function
+
     ' 操作
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_check_dump_kind(session As IntPtr, ByRef dumpType As Integer) As Integer
@@ -158,6 +178,15 @@ Public Class OraDB_NativeParser
         If ptr = IntPtr.Zero Then Return String.Empty
         Return Marshal.PtrToStringUTF8(ptr)
     End Function
+
+    ''' <summary>
+    ''' セッションにエクスポートオプションを適用
+    ''' </summary>
+    Private Shared Sub ApplyExportOptions(session As IntPtr)
+        odv_set_date_format(session, ExportOptions.DateFormat, ExportOptions.CustomDateFormat)
+        odv_set_csv_options(session, If(ExportOptions.CsvWriteHeader, 1, 0), If(ExportOptions.CsvWriteTypes, 1, 0))
+        odv_set_sql_options(session, If(ExportOptions.SqlCreateTable, 1, 0))
+    End Sub
 
     ''' <summary>
     ''' char** 配列から String配列に変換
@@ -313,6 +342,9 @@ Public Class OraDB_NativeParser
                 Throw New Exception($"ダンプファイル設定エラー: {errMsg}")
             End If
 
+            ' エクスポートオプション適用（日付フォーマット等）
+            ApplyExportOptions(session)
+
             ' コールバック設定
             Dim userData As IntPtr = GCHandle.ToIntPtr(gcHandle)
             odv_set_row_callback(session, rowCb, userData)
@@ -407,6 +439,9 @@ Public Class OraDB_NativeParser
             rc = odv_set_dump_file(session, filePath)
             If rc <> ODV_OK Then Return rc
 
+            ' エクスポートオプション適用
+            ApplyExportOptions(session)
+
             ' 高速シーク: DDL位置にジャンプ + テーブルフィルタ設定
             If dataOffset > 0 Then
                 odv_set_data_offset(session, dataOffset)
@@ -443,6 +478,9 @@ Public Class OraDB_NativeParser
 
             rc = odv_set_dump_file(session, filePath)
             If rc <> ODV_OK Then Return rc
+
+            ' エクスポートオプション適用
+            ApplyExportOptions(session)
 
             ' 高速シーク: DDL位置にジャンプ + テーブルフィルタ設定
             If dataOffset > 0 Then

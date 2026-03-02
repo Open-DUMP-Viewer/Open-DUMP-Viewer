@@ -570,7 +570,7 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
         break;
 
     case COL_DATE:
-        rc = decode_oracle_date(data, data_len, tmp, sizeof(tmp), DATE_FMT_SLASH);
+        rc = decode_oracle_date(data, data_len, tmp, sizeof(tmp), s->date_format, s->custom_date_format);
         if (rc == ODV_OK) {
             set_value_string(val, tmp, (int)strlen(tmp));
         } else {
@@ -581,7 +581,7 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     case COL_TIMESTAMP:
     case COL_TIMESTAMP_TZ:
     case COL_TIMESTAMP_LTZ:
-        rc = decode_oracle_timestamp(data, data_len, tmp, sizeof(tmp), DATE_FMT_SLASH);
+        rc = decode_oracle_timestamp(data, data_len, tmp, sizeof(tmp), s->date_format, s->custom_date_format);
         if (rc == ODV_OK) {
             set_value_string(val, tmp, (int)strlen(tmp));
         } else {

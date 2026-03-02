@@ -532,7 +532,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                         case COL_DATE:
                             decode_oracle_date(v->data, v->data_len,
                                               decode_buf, sizeof(decode_buf),
-                                              DATE_FMT_SLASH);
+                                              s->date_format, s->custom_date_format);
                             set_value_string(v, decode_buf, (int)strlen(decode_buf));
                             v->type = col->type;
                             break;
@@ -542,7 +542,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                         case COL_TIMESTAMP_LTZ:
                             decode_oracle_timestamp(v->data, v->data_len,
                                                     decode_buf, sizeof(decode_buf),
-                                                    DATE_FMT_SLASH);
+                                                    s->date_format, s->custom_date_format);
                             set_value_string(v, decode_buf, (int)strlen(decode_buf));
                             v->type = col->type;
                             break;

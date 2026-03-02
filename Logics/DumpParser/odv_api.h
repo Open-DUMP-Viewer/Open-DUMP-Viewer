@@ -112,6 +112,21 @@ ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, c
    Set to 0 to disable (default: scan from beginning). */
 ODV_API int __stdcall odv_set_data_offset(ODV_SESSION *s, int64_t offset);
 
+/* Set date format for export output.
+   fmt: 0=YYYY/MM/DD HH:MI:SS, 1=YYYYMMDD, 2=YYYYMMDDHHMMSS, 3=Custom
+   custom_fmt: format string for fmt=3 (tokens: YYYY,MM,DD,HH24,MI,SS)
+               Pass NULL for non-custom formats. */
+ODV_API int __stdcall odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt);
+
+/* Set CSV export options.
+   write_header: 1=output column name header row (default), 0=skip
+   write_types:  1=output column type row after header, 0=skip (default) */
+ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types);
+
+/* Set SQL export options.
+   create_table: 1=output CREATE TABLE DDL before INSERTs, 0=skip (default) */
+ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table);
+
 /*---------------------------------------------------------------------------
     Operations
  ---------------------------------------------------------------------------*/

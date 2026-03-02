@@ -120,6 +120,7 @@
 #define DATE_FMT_SLASH         0     /* YYYY/MM/DD HH:MI:SS */
 #define DATE_FMT_COMPACT       1     /* YYYYMMDD */
 #define DATE_FMT_FULL          2     /* YYYYMMDDHH24MISS */
+#define DATE_FMT_CUSTOM        3     /* Custom format string */
 
 /* Output CSV escaping */
 #define CSV_ESCAPE_COMMA     0x04
@@ -300,6 +301,13 @@ struct _odv_session {
 
     /* Progress tracking (file-position-based percentage with hysteresis) */
     int             last_progress_pct;  /* Last reported percentage (0-100) */
+
+    /* Export options */
+    int             date_format;           /* 0=SLASH, 1=COMPACT, 2=FULL, 3=CUSTOM */
+    char            custom_date_format[256]; /* Format string for DATE_FMT_CUSTOM */
+    int             csv_write_header;      /* 1=write column header row (default:1) */
+    int             csv_write_types;       /* 1=write column type row (default:0) */
+    int             sql_create_table;      /* 1=output CREATE TABLE DDL (default:0) */
 };
 
 /*---------------------------------------------------------------------------
@@ -354,8 +362,8 @@ void update_meta_cache(ODV_SESSION *s);
 int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_size);
 
 /* odv_datetime.c */
-int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_size, int fmt);
-int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int out_size, int fmt);
+int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt);
+int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt);
 int decode_binary_float(const unsigned char *buf, char *out, int out_size);
 int decode_binary_double(const unsigned char *buf, char *out, int out_size);
 
