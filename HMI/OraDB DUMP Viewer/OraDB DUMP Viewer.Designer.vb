@@ -52,8 +52,6 @@ Partial Class OraDB_DUMP_Viewer
         ツールバーTToolStripMenuItem = New ToolStripMenuItem()
         エクスポートToolStripMenuItem = New ToolStripMenuItem()
         ステータスバーSToolStripMenuItem = New ToolStripMenuItem()
-        ToolStripSeparator4 = New ToolStripSeparator()
-        最新の情報に更新RToolStripMenuItem = New ToolStripMenuItem()
         オブジェクトOToolStripMenuItem = New ToolStripMenuItem()
         開くToolStripMenuItem1 = New ToolStripMenuItem()
         ToolStripSeparator5 = New ToolStripSeparator()
@@ -72,7 +70,6 @@ Partial Class OraDB_DUMP_Viewer
         ツールTToolStripMenuItem = New ToolStripMenuItem()
         ファイルの取り出しFToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator8 = New ToolStripSeparator()
-        レポート定義DToolStripMenuItem = New ToolStripMenuItem()
         オプションOToolStripMenuItem = New ToolStripMenuItem()
         ウィンドウWToolStripMenuItem = New ToolStripMenuItem()
         重ねて表示CToolStripMenuItem = New ToolStripMenuItem()
@@ -226,7 +223,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 元に戻すUToolStripMenuItem
         ' 
-        元に戻すUToolStripMenuItem.Enabled = False
         元に戻すUToolStripMenuItem.Name = "元に戻すUToolStripMenuItem"
         元に戻すUToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.Z
         元に戻すUToolStripMenuItem.Size = New Size(184, 22)
@@ -234,7 +230,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' やり直しRToolStripMenuItem
         ' 
-        やり直しRToolStripMenuItem.Enabled = False
         やり直しRToolStripMenuItem.Name = "やり直しRToolStripMenuItem"
         やり直しRToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.Y
         やり直しRToolStripMenuItem.Size = New Size(184, 22)
@@ -247,7 +242,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 切り取りTToolStripMenuItem
         ' 
-        切り取りTToolStripMenuItem.Enabled = False
         切り取りTToolStripMenuItem.Name = "切り取りTToolStripMenuItem"
         切り取りTToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.X
         切り取りTToolStripMenuItem.Size = New Size(184, 22)
@@ -255,7 +249,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' ToolStripMenuItem1
         ' 
-        ToolStripMenuItem1.Enabled = False
         ToolStripMenuItem1.Name = "ToolStripMenuItem1"
         ToolStripMenuItem1.ShortcutKeys = Keys.Control Or Keys.C
         ToolStripMenuItem1.Size = New Size(184, 22)
@@ -263,7 +256,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 貼り付けPToolStripMenuItem
         ' 
-        貼り付けPToolStripMenuItem.Enabled = False
         貼り付けPToolStripMenuItem.Name = "貼り付けPToolStripMenuItem"
         貼り付けPToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.V
         貼り付けPToolStripMenuItem.Size = New Size(184, 22)
@@ -276,7 +268,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' すべて選択AToolStripMenuItem1
         ' 
-        すべて選択AToolStripMenuItem1.Enabled = False
         すべて選択AToolStripMenuItem1.Name = "すべて選択AToolStripMenuItem1"
         すべて選択AToolStripMenuItem1.ShortcutKeys = Keys.Control Or Keys.A
         すべて選択AToolStripMenuItem1.Size = New Size(184, 22)
@@ -284,7 +275,7 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 表示VToolStripMenuItem
         ' 
-        表示VToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ツールバーTToolStripMenuItem, ステータスバーSToolStripMenuItem, ToolStripSeparator4, 最新の情報に更新RToolStripMenuItem})
+        表示VToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ツールバーTToolStripMenuItem, ステータスバーSToolStripMenuItem})
         表示VToolStripMenuItem.Name = "表示VToolStripMenuItem"
         表示VToolStripMenuItem.Size = New Size(58, 22)
         表示VToolStripMenuItem.Text = "表示(&V)"
@@ -311,18 +302,6 @@ Partial Class OraDB_DUMP_Viewer
         ステータスバーSToolStripMenuItem.Name = "ステータスバーSToolStripMenuItem"
         ステータスバーSToolStripMenuItem.Size = New Size(199, 22)
         ステータスバーSToolStripMenuItem.Text = "ステータスバー(&S)"
-        ' 
-        ' ToolStripSeparator4
-        ' 
-        ToolStripSeparator4.Name = "ToolStripSeparator4"
-        ToolStripSeparator4.Size = New Size(196, 6)
-        ' 
-        ' 最新の情報に更新RToolStripMenuItem
-        ' 
-        最新の情報に更新RToolStripMenuItem.Name = "最新の情報に更新RToolStripMenuItem"
-        最新の情報に更新RToolStripMenuItem.ShortcutKeys = Keys.F5
-        最新の情報に更新RToolStripMenuItem.Size = New Size(199, 22)
-        最新の情報に更新RToolStripMenuItem.Text = "最新の情報に更新(&R)"
         ' 
         ' オブジェクトOToolStripMenuItem
         ' 
@@ -417,7 +396,7 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' ツールTToolStripMenuItem
         ' 
-        ツールTToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ファイルの取り出しFToolStripMenuItem, ToolStripSeparator8, レポート定義DToolStripMenuItem, オプションOToolStripMenuItem})
+        ツールTToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {ファイルの取り出しFToolStripMenuItem, ToolStripSeparator8, オプションOToolStripMenuItem})
         ツールTToolStripMenuItem.Name = "ツールTToolStripMenuItem"
         ツールTToolStripMenuItem.Size = New Size(60, 22)
         ツールTToolStripMenuItem.Text = "ツール(&T)"
@@ -432,12 +411,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ToolStripSeparator8.Name = "ToolStripSeparator8"
         ToolStripSeparator8.Size = New Size(169, 6)
-        ' 
-        ' レポート定義DToolStripMenuItem
-        ' 
-        レポート定義DToolStripMenuItem.Name = "レポート定義DToolStripMenuItem"
-        レポート定義DToolStripMenuItem.Size = New Size(172, 22)
-        レポート定義DToolStripMenuItem.Text = "レポート定義(&D)"
         ' 
         ' オプションOToolStripMenuItem
         ' 
@@ -682,8 +655,6 @@ Partial Class OraDB_DUMP_Viewer
     Friend WithEvents ツールバーTToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents エクスポートToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ステータスバーSToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents ToolStripSeparator4 As ToolStripSeparator
-    Friend WithEvents 最新の情報に更新RToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents オブジェクトOToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents 開くToolStripMenuItem1 As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator5 As ToolStripSeparator
@@ -702,7 +673,6 @@ Partial Class OraDB_DUMP_Viewer
     Friend WithEvents ツールTToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ファイルの取り出しFToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator8 As ToolStripSeparator
-    Friend WithEvents レポート定義DToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents オプションOToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ウィンドウWToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents 重ねて表示CToolStripMenuItem As ToolStripMenuItem

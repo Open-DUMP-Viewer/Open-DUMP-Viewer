@@ -230,6 +230,103 @@ Public Class OraDB_DUMP_Viewer
     End Sub
 #End Region
 
+#Region "メニューイベント: 閉じる"
+    Private Sub 閉じるCToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 閉じるCToolStripMenuItem.Click
+        Dim activeChild = Me.ActiveMdiChild
+        If activeChild IsNot Nothing Then activeChild.Close()
+    End Sub
+#End Region
+
+#Region "メニューイベント: 編集操作"
+    Private Sub 元に戻すUToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 元に戻すUToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws IsNot Nothing Then
+            ws.UndoExclusion()
+        End If
+    End Sub
+
+    Private Sub やり直しRToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles やり直しRToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws IsNot Nothing Then
+            ws.RedoExclusion()
+        End If
+    End Sub
+
+    Private Sub 切り取りTToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 切り取りTToolStripMenuItem.Click
+        SendKeys.Send("^x")
+    End Sub
+
+    Private Sub コピーToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ToolStripMenuItem1.Click
+        SendKeys.Send("^c")
+    End Sub
+
+    Private Sub 貼り付けPToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 貼り付けPToolStripMenuItem.Click
+        SendKeys.Send("^v")
+    End Sub
+
+    Private Sub すべて選択AToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles すべて選択AToolStripMenuItem1.Click
+        SendKeys.Send("^a")
+    End Sub
+#End Region
+
+#Region "メニューイベント: オブジェクト操作"
+    Private Sub 開くToolStripMenuItem1_Click(sender As Object, e As EventArgs) Handles 開くToolStripMenuItem1.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then
+            MessageBox.Show("ワークスペースが開かれていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        ws.OpenSelectedTable()
+    End Sub
+
+    Private Sub すべてのフィルタをクリアFToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles すべてのフィルタをクリアFToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws IsNot Nothing Then ws.RestoreAllExcludedTables()
+    End Sub
+
+    Private Sub 削除DToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 削除DToolStripMenuItem.Click
+        Dim ws = ExportHelper.GetActiveWorkspace()
+        If ws IsNot Nothing Then ws.ExcludeSelectedTable()
+    End Sub
+
+    Private Sub 更新の取り消しCToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 更新の取り消しCToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws IsNot Nothing Then ws.UndoExclusion()
+    End Sub
+
+    Private Sub スクリプトWSToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles スクリプトWSToolStripMenuItem.Click
+        ToolStripButton5_Click(sender, e)
+    End Sub
+
+    Private Sub データDToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles データDToolStripMenuItem.Click
+        ToolStripButton6_Click(sender, e)
+    End Sub
+
+    Private Sub オブジェクト一覧ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles オブジェクト一覧ToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then
+            MessageBox.Show("ワークスペースが開かれていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("テキストファイル|*.txt|すべてのファイル|*.*", "オブジェクト一覧.txt")
+        If outputPath Is Nothing Then Return
+        ws.ExportTableListReport(outputPath)
+        MessageBox.Show($"オブジェクト一覧を出力しました。" & vbCrLf & outputPath, "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    Private Sub テーブル定義ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles テーブル定義ToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then
+            MessageBox.Show("ワークスペースが開かれていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("テキストファイル|*.txt|すべてのファイル|*.*", "テーブル定義.txt")
+        If outputPath Is Nothing Then Return
+        ws.ExportTableDefinitionReport(outputPath)
+        MessageBox.Show($"テーブル定義を出力しました。" & vbCrLf & outputPath, "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+#End Region
+
 #Region "メニューイベント: オプション"
     Private Sub オプションOToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles オプションOToolStripMenuItem.Click
         Dim dlg As New ExportOptionsDialog()

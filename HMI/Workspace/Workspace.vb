@@ -1,11 +1,16 @@
 ﻿Imports System.Collections.Generic
+Imports System.ComponentModel
 
 Public Class Workspace
     Inherits Form
 
 #Region "フィールド・コンストラクタ"
-    Private DumpFilePath As String
-    Private WorkspacePath As String
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    <Browsable(False)>
+    Public Property DumpFilePath As String
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    <Browsable(False)>
+    Public Property WorkspacePath As String
     ''' <summary>テーブル一覧メタデータ (スキーマ名→(テーブル名, 行数, データオフセット)リスト)</summary>
     Private _tableList As New Dictionary(Of String, List(Of Tuple(Of String, Long, Long)))
     ''' <summary>テーブルごとのカラム名 (キー: "schema.table")</summary>
@@ -15,6 +20,10 @@ Public Class Workspace
     Private _currentSchema As String = String.Empty
     ''' <summary>除外テーブル (キー: "schema.table")</summary>
     Private _excludedTables As New HashSet(Of String)
+    ''' <summary>除外操作の元に戻すスタック</summary>
+    Private _undoStack As New Stack(Of HashSet(Of String))
+    ''' <summary>除外操作のやり直しスタック</summary>
+    Private _redoStack As New Stack(Of HashSet(Of String))
 
     ' 引数ありコンストラクタ
     Public Sub New(value1 As String, value2 As String)
@@ -113,6 +122,14 @@ Public Class Workspace
     ''' DUMPファイル全体をスキャンするが、行データは選択テーブルのみメモリに蓄積
     ''' </summary>
     Private Sub LstTableList_DoubleClick(sender As Object, e As EventArgs)
+        OpenSelectedTable()
+    End Sub
+
+    ''' <summary>
+    ''' 選択中のテーブルをTablePreviewで開く
+    ''' メインフォームのメニューから呼び出し可能
+    ''' </summary>
+    Public Sub OpenSelectedTable()
         If lstTableList.SelectedItems.Count = 0 Then
             MessageBox.Show("テーブルが選択されていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
@@ -219,6 +236,10 @@ Public Class Workspace
         End If
         If String.IsNullOrEmpty(_currentSchema) Then Return
 
+        ' Undo 用に現在の状態を保存
+        _undoStack.Push(New HashSet(Of String)(_excludedTables))
+        _redoStack.Clear()
+
         For Each item As ListViewItem In lstTableList.SelectedItems
             Dim tableKey = $"{_currentSchema}.{item.Text}"
             _excludedTables.Add(tableKey)
@@ -245,6 +266,38 @@ Public Class Workspace
             DisplayTablesForSchema(_currentSchema)
         End If
     End Sub
+
+    ''' <summary>除外操作を元に戻す</summary>
+    Public Sub UndoExclusion()
+        If _undoStack.Count = 0 Then Return
+        _redoStack.Push(New HashSet(Of String)(_excludedTables))
+        _excludedTables = _undoStack.Pop()
+        If Not String.IsNullOrEmpty(_currentSchema) Then
+            DisplayTablesForSchema(_currentSchema)
+        End If
+    End Sub
+
+    ''' <summary>除外操作をやり直す</summary>
+    Public Sub RedoExclusion()
+        If _redoStack.Count = 0 Then Return
+        _undoStack.Push(New HashSet(Of String)(_excludedTables))
+        _excludedTables = _redoStack.Pop()
+        If Not String.IsNullOrEmpty(_currentSchema) Then
+            DisplayTablesForSchema(_currentSchema)
+        End If
+    End Sub
+
+    Public ReadOnly Property CanUndo As Boolean
+        Get
+            Return _undoStack.Count > 0
+        End Get
+    End Property
+
+    Public ReadOnly Property CanRedo As Boolean
+        Get
+            Return _redoStack.Count > 0
+        End Get
+    End Property
 
     ' コンテキストメニュー: 除外
     Private Sub mnuExclude_Click(sender As Object, e As EventArgs) Handles mnuExclude.Click
@@ -375,6 +428,55 @@ Public Class Workspace
         Catch ex As Exception
             MessageBox.Show($"スキーマツリーの作成に失敗しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' テーブル一覧レポートをテキストファイルに出力
+    ''' </summary>
+    Public Sub ExportTableListReport(outputPath As String)
+        Using sw As New System.IO.StreamWriter(outputPath, False, System.Text.Encoding.UTF8)
+            sw.WriteLine($"オブジェクト一覧レポート: {System.IO.Path.GetFileName(DumpFilePath)}")
+            sw.WriteLine($"出力日時: {DateTime.Now:yyyy/MM/dd HH:mm:ss}")
+            sw.WriteLine(New String("-"c, 80))
+            sw.WriteLine($"{"スキーマ",-20} {"テーブル名",-30} {"行数",10}")
+            sw.WriteLine(New String("-"c, 80))
+            For Each schemaKvp In _tableList
+                For Each t In schemaKvp.Value
+                    sw.WriteLine($"{schemaKvp.Key,-20} {t.Item1,-30} {t.Item2,10:#,0}")
+                Next
+            Next
+        End Using
+    End Sub
+
+    ''' <summary>
+    ''' テーブル定義レポートをテキストファイルに出力
+    ''' </summary>
+    Public Sub ExportTableDefinitionReport(outputPath As String)
+        If lstTableList.SelectedItems.Count = 0 OrElse String.IsNullOrEmpty(_currentSchema) Then Return
+        Using sw As New System.IO.StreamWriter(outputPath, False, System.Text.Encoding.UTF8)
+            sw.WriteLine($"テーブル定義レポート: {System.IO.Path.GetFileName(DumpFilePath)}")
+            sw.WriteLine($"出力日時: {DateTime.Now:yyyy/MM/dd HH:mm:ss}")
+            For Each selectedItem As ListViewItem In lstTableList.SelectedItems
+                Dim tableName = selectedItem.Text
+                Dim tableKey = $"{_currentSchema}.{tableName}"
+                sw.WriteLine()
+                sw.WriteLine(New String("="c, 60))
+                sw.WriteLine($"テーブル: {_currentSchema}.{tableName}")
+                sw.WriteLine(New String("="c, 60))
+                Dim colNames As String() = Nothing
+                Dim colTypes As String() = Nothing
+                If _columnNamesMap.ContainsKey(tableKey) Then colNames = _columnNamesMap(tableKey)
+                If _columnTypesMap.ContainsKey(tableKey) Then colTypes = _columnTypesMap(tableKey)
+                If colNames IsNot Nothing Then
+                    sw.WriteLine($"{"#",4} {"カラム名",-30} {"型",-30}")
+                    sw.WriteLine(New String("-"c, 60))
+                    For i = 0 To colNames.Length - 1
+                        Dim typeName = If(colTypes IsNot Nothing AndAlso i < colTypes.Length, colTypes(i), "")
+                        sw.WriteLine($"{i + 1,4} {colNames(i),-30} {typeName,-30}")
+                    Next
+                End If
+            Next
+        End Using
     End Sub
 
     ''' <summary>
