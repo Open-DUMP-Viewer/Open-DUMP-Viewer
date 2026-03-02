@@ -61,12 +61,17 @@ NUMBER / DATE / TIMESTAMP / VARCHAR2 / CHAR / CLOB / BINARY_FLOAT / BINARY_DOUBL
 | **高度な検索** | 12 種類の演算子 / AND・OR 複合条件 / 大文字小文字区別 | 実装済み |
 | **文字セット自動判定** | UTF-8 / Shift_JIS / EUC-JP を自動検出・変換 | 実装済み |
 | **進捗表示** | 解析の進捗率・残り時間・処理速度をリアルタイム表示 | 実装済み |
-| CSV エクスポート | RFC 4180 準拠の CSV 出力 | 今後対応予定 |
-| SQL スクリプト生成 | Oracle / PostgreSQL / MySQL / MSSQL 対応の INSERT 文生成 | 今後対応予定 |
-| Excel エクスポート | .xlsx 形式での出力 | 今後対応予定 |
-| Access エクスポート | .mdb / .accdb 形式での出力 | 今後対応予定 |
-| SQL Server 出力 | SQL Server への直接エクスポート | 今後対応予定 |
-| ODBC 出力 | ODBC 接続によるエクスポート | 今後対応予定 |
+| **CSV エクスポート** | RFC 4180 準拠の CSV 出力 (単一 / 一括) | 実装済み |
+| **SQL スクリプト生成** | Oracle / PostgreSQL / MySQL / MSSQL 対応の INSERT 文生成 | 実装済み |
+| **Excel エクスポート** | .xlsx 形式での出力 (ClosedXML) | 実装済み |
+| **Access エクスポート** | .accdb 形式での出力 (OleDb) | 実装済み |
+| **SQL Server 出力** | SQL Server への直接エクスポート (SqlBulkCopy) | 実装済み |
+| **ODBC 出力** | ODBC 接続によるエクスポート | 実装済み |
+| **LOB ファイル抽出** | BLOB / CLOB / NCLOB データを個別ファイルに抽出 | 実装済み |
+| **ワークスペース保存** | 作業状態 (除外テーブル・フィルタ等) の保存・復元 (.odvw) | 実装済み |
+| **テーブル除外** | 不要テーブルの非表示 / 元に戻す (Undo/Redo) | 実装済み |
+| **最近使ったファイル** | ダンプファイル・ワークスペースの MRU リスト | 実装済み |
+| **ヘルプ** | HTML ヘルプ (CHM 対応) / F1 キー | 実装済み |
 
 ---
 
