@@ -258,7 +258,32 @@ Public Class OraDB_DUMP_Viewer
     Private Sub ToolStripButton5_Click(sender As Object, e As EventArgs) Handles ToolStripButton5.Click
         Dim ctx = GetExportContext()
         If ctx Is Nothing Then Return
-        MessageBox.Show("SQL スクリプト出力は準備中です。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+
+        ' DBMS 選択ダイアログ
+        Dim sqlDlg As New SqlExportDialog()
+        If sqlDlg.ShowDialog(Me) <> DialogResult.OK Then Return
+        Dim dbmsType = sqlDlg.SelectedDbmsType
+
+        ' SaveFileDialog
+        Dim defaultName = $"{ctx.Schema}.{ctx.TableName}.sql"
+        Dim outputPath = ExportHelper.ShowSaveFileDialog("SQL ファイル|*.sql|すべてのファイル|*.*", defaultName)
+        If outputPath Is Nothing Then Return
+
+        ' C DLL でストリーミング SQL エクスポート
+        Using dlg As New ExportProgressDialog()
+            Dim success = dlg.RunExport(
+                Sub(worker, args)
+                    Dim ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
+                    If Not ok Then
+                        args.Cancel = True
+                    End If
+                End Sub)
+
+            If success Then
+                MessageBox.Show($"SQL スクリプト出力が完了しました。" & vbCrLf & outputPath,
+                               "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End Using
     End Sub
 
     Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs) Handles ToolStripButton6.Click

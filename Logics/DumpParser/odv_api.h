@@ -128,6 +128,10 @@ ODV_API int __stdcall odv_parse_dump(ODV_SESSION *s);
 /* Export a specific table to CSV file */
 ODV_API int __stdcall odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path);
 
+/* Export a specific table to SQL INSERT statements
+   dbms_type: 0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server */
+ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
+
 /* Request cancellation of a running operation */
 ODV_API int __stdcall odv_cancel(ODV_SESSION *s);
 

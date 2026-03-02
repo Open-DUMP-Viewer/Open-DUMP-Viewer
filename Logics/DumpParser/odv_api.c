@@ -246,6 +246,12 @@ ODV_API int __stdcall odv_export_csv(ODV_SESSION *s, const char *table_name, con
     return write_csv_file(s, table_name, output_path);
 }
 
+ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type)
+{
+    if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
+    return write_sql_file(s, table_name, output_path, dbms_type);
+}
+
 ODV_API int __stdcall odv_cancel(ODV_SESSION *s)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;

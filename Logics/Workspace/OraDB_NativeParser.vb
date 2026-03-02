@@ -125,6 +125,13 @@ Public Class OraDB_NativeParser
         <MarshalAs(UnmanagedType.LPStr)> outputPath As String) As Integer
     End Function
 
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall, CharSet:=CharSet.Ansi)>
+    Private Shared Function odv_export_sql(session As IntPtr,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> tableName As String,
+        <MarshalAs(UnmanagedType.LPStr)> outputPath As String,
+        dbmsType As Integer) As Integer
+    End Function
+
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_cancel(session As IntPtr) As Integer
     End Function
@@ -394,6 +401,31 @@ Public Class OraDB_NativeParser
             If rc <> ODV_OK Then Return rc
 
             Return odv_export_csv(session, tableName, outputPath)
+
+        Finally
+            If session <> IntPtr.Zero Then
+                odv_destroy_session(session)
+            End If
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' SQL INSERT文エクスポート
+    ''' </summary>
+    ''' <param name="filePath">DUMPファイルパス</param>
+    ''' <param name="tableName">テーブル名</param>
+    ''' <param name="outputPath">出力先ファイルパス</param>
+    ''' <param name="dbmsType">DBMS種別 (0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server)</param>
+    Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer) As Integer
+        Dim session As IntPtr = IntPtr.Zero
+        Try
+            Dim rc = odv_create_session(session)
+            If rc <> ODV_OK Then Return rc
+
+            rc = odv_set_dump_file(session, filePath)
+            If rc <> ODV_OK Then Return rc
+
+            Return odv_export_sql(session, tableName, outputPath, dbmsType)
 
         Finally
             If session <> IntPtr.Zero Then
