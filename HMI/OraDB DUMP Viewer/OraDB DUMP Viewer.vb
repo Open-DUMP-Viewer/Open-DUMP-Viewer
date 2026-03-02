@@ -3,32 +3,39 @@ Imports System.Text
 
 Public Class OraDB_DUMP_Viewer
 
-#Region "フォームロード・初期化"
-    ''' <summary>
-    ''' フォームロードイベント
-    ''' </summary>
-    ''' <param name="sender"></param>
-    ''' <param name="e"></param>
-    Private Sub OraDB_DUMP_Viewer_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        '初期化処理をここに記述
+    Private Const MRU_MAX As Integer = 5
 
-        'ステータスラベルのテキストをリセットする
+#Region "フォームロード・初期化"
+    Private Sub OraDB_DUMP_Viewer_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         COMMON.ReSet_StatusLavel()
-        'プログレスバーをリセットする
         COMMON.ResetProgressBar()
-        'エクスポートオプションを読み込み
         ExportOptions.Load()
 
-        '起動時ライセンスチェック（RSA署名方式）
-        '認証が完了するまでアプリケーションを使用不可にする
         If Not CheckAndActivateLicense() Then
             Application.Exit()
             Return
         End If
 
-        'ステータスラベルにライセンス保有者名を反映
         COMMON.ReSet_StatusLavel()
 
+        ' MRU メニュー構築
+        BuildMruMenus()
+        ' ワークスペース依存メニューの初期状態
+        UpdateWorkspaceMenuState()
+    End Sub
+
+    ''' <summary>MDI 子ウィンドウの切替時にメニュー有効化を更新</summary>
+    Private Sub OraDB_DUMP_Viewer_MdiChildActivate(sender As Object, e As EventArgs) Handles MyBase.MdiChildActivate
+        UpdateWorkspaceMenuState()
+    End Sub
+
+    ''' <summary>ワークスペースが開いているかどうかでメニュー有効/無効を制御</summary>
+    Private Sub UpdateWorkspaceMenuState()
+        Dim hasWorkspace = (TryCast(Me.ActiveMdiChild, Workspace) IsNot Nothing)
+        ワークスペースの保存SToolStripMenuItem.Enabled = hasWorkspace
+        名前を付けてワークスペースを保存AToolStripMenuItem.Enabled = hasWorkspace
+        ワークスペースを閉じるLToolStripMenuItem.Enabled = hasWorkspace
+        閉じるCToolStripMenuItem.Enabled = hasWorkspace
     End Sub
 #End Region
 
@@ -104,33 +111,215 @@ Public Class OraDB_DUMP_Viewer
 #End Region
 
 #Region "メニューイベント: ダンプファイル"
-    ''' <summary>
-    ''' ToolStripMenuItem「ダンプファイル(D)」クリックイベント
-    ''' クリックされると、ダンプファイルのパスを取得する
-    ''' </summary>
-    ''' <param name="sender"></param>
-    ''' <param name="e"></param>
     Private Sub ダンプファイルDToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ダンプファイルDToolStripMenuItem.Click
-        Dim filePath As String = String.Empty
-
-        'ステータスラベルのテキストを更新する
         COMMON.Set_StatusLavel("ダンプファイルのパスを選択してください...")
-
-        'ダンプファイルのパスを取得する
-        filePath = MenuStripLogics.ダンプファイルDToolStripMenuItem()
-
-        If filePath = String.Empty Then
-            'キャンセルされた場合、ステータスラベルのテキストをリセットする
+        Dim filePath = MenuStripLogics.ダンプファイルDToolStripMenuItem()
+        If String.IsNullOrEmpty(filePath) Then
             COMMON.ReSet_StatusLavel()
             Return
         End If
 
+        OpenDumpFile(filePath)
+        COMMON.ReSet_StatusLavel()
+    End Sub
+
+    ''' <summary>ダンプファイルを開き、MRU に追加する</summary>
+    Private Sub OpenDumpFile(filePath As String, Optional wsData As WorkspaceData = Nothing)
         Dim childForm As New Workspace(filePath, "")
-        childForm.MdiParent = Me   ' 親フォームを指定
+        childForm.MdiParent = Me
         childForm.Show()
 
-        'ステータスラベルのテキストをリセットする
-        COMMON.ReSet_StatusLavel()
+        ' ワークスペース状態の復元
+        If wsData IsNot Nothing Then
+            childForm.LoadWorkspaceState(wsData)
+        End If
+
+        ' MRU にダンプファイルを追加
+        AddToMru(My.Settings.RecentDumpFiles, filePath)
+        BuildMruMenus()
+    End Sub
+#End Region
+
+#Region "メニューイベント: ワークスペース保存/読込"
+    ''' <summary>ワークスペースファイル (.odvw) を開く</summary>
+    Private Sub ワークスペースToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ワークスペースToolStripMenuItem.Click
+        Using dlg As New OpenFileDialog()
+            dlg.Title = "ワークスペースを開く"
+            dlg.Filter = "ワークスペースファイル (*.odvw)|*.odvw|すべてのファイル (*.*)|*.*"
+            dlg.RestoreDirectory = True
+            If dlg.ShowDialog() <> DialogResult.OK Then Return
+
+            Try
+                Dim data = WorkspaceData.Load(dlg.FileName)
+                If String.IsNullOrEmpty(data.DumpFilePath) OrElse Not File.Exists(data.DumpFilePath) Then
+                    MessageBox.Show("ワークスペースに指定されたダンプファイルが見つかりません。" & vbCrLf & data.DumpFilePath,
+                                    "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    Return
+                End If
+
+                OpenDumpFile(data.DumpFilePath, data)
+
+                ' 開いた Workspace に保存パスを設定
+                Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+                If ws IsNot Nothing Then ws.WorkspacePath = dlg.FileName
+
+                ' MRU にワークスペースを追加
+                AddToMru(My.Settings.RecentWorkspaces, dlg.FileName)
+                BuildMruMenus()
+            Catch ex As Exception
+                MessageBox.Show($"ワークスペースの読み込みに失敗しました。" & vbCrLf & ex.Message,
+                                "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Using
+    End Sub
+
+    ''' <summary>ワークスペースを上書き保存</summary>
+    Private Sub ワークスペースの保存SToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ワークスペースの保存SToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then Return
+
+        If String.IsNullOrEmpty(ws.WorkspacePath) Then
+            ' まだ保存先がない場合は「名前を付けて保存」
+            SaveWorkspaceAs(ws)
+        Else
+            SaveWorkspace(ws, ws.WorkspacePath)
+        End If
+    End Sub
+
+    ''' <summary>名前を付けてワークスペースを保存</summary>
+    Private Sub 名前を付けてワークスペースを保存AToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles 名前を付けてワークスペースを保存AToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then Return
+        SaveWorkspaceAs(ws)
+    End Sub
+
+    Private Sub SaveWorkspaceAs(ws As Workspace)
+        Using dlg As New SaveFileDialog()
+            dlg.Title = "ワークスペースを保存"
+            dlg.Filter = "ワークスペースファイル (*.odvw)|*.odvw|すべてのファイル (*.*)|*.*"
+            dlg.DefaultExt = "odvw"
+            dlg.FileName = Path.GetFileNameWithoutExtension(ws.DumpFilePath) & ".odvw"
+            dlg.RestoreDirectory = True
+            If dlg.ShowDialog() <> DialogResult.OK Then Return
+            SaveWorkspace(ws, dlg.FileName)
+        End Using
+    End Sub
+
+    Private Sub SaveWorkspace(ws As Workspace, savePath As String)
+        Try
+            Dim data = ws.GetWorkspaceData()
+            data.Save(savePath)
+            ws.WorkspacePath = savePath
+
+            ' MRU にワークスペースを追加
+            AddToMru(My.Settings.RecentWorkspaces, savePath)
+            BuildMruMenus()
+
+            MessageBox.Show("ワークスペースを保存しました。" & vbCrLf & savePath,
+                            "完了", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Catch ex As Exception
+            MessageBox.Show($"ワークスペースの保存に失敗しました。" & vbCrLf & ex.Message,
+                            "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    ''' <summary>ワークスペースを閉じる（保存確認あり）</summary>
+    Private Sub ワークスペースを閉じるLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles ワークスペースを閉じるLToolStripMenuItem.Click
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        If ws Is Nothing Then Return
+
+        Dim result = MessageBox.Show("ワークスペースを保存してから閉じますか？",
+                                      "確認", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question)
+        Select Case result
+            Case DialogResult.Yes
+                If String.IsNullOrEmpty(ws.WorkspacePath) Then
+                    SaveWorkspaceAs(ws)
+                Else
+                    SaveWorkspace(ws, ws.WorkspacePath)
+                End If
+                ws.Close()
+            Case DialogResult.No
+                ws.Close()
+            Case DialogResult.Cancel
+                ' キャンセル — 何もしない
+        End Select
+    End Sub
+#End Region
+
+#Region "MRU (最近使ったファイル)"
+    ''' <summary>MRU リストにパスを追加 (重複時は先頭に移動)</summary>
+    Private Sub AddToMru(ByRef collection As System.Collections.Specialized.StringCollection, path As String)
+        If collection Is Nothing Then collection = New System.Collections.Specialized.StringCollection()
+        ' 既存エントリを削除して先頭に追加
+        If collection.Contains(path) Then collection.Remove(path)
+        collection.Insert(0, path)
+        ' 最大件数を超えたら末尾を削除
+        While collection.Count > MRU_MAX
+            collection.RemoveAt(collection.Count - 1)
+        End While
+        My.Settings.Save()
+    End Sub
+
+    ''' <summary>MRU メニューを動的に構築</summary>
+    Private Sub BuildMruMenus()
+        BuildMruSubmenu(最近使ったワークスペースWToolStripMenuItem, My.Settings.RecentWorkspaces, AddressOf MruWorkspace_Click)
+        BuildMruSubmenu(最近使ったダンプファイルDToolStripMenuItem, My.Settings.RecentDumpFiles, AddressOf MruDumpFile_Click)
+    End Sub
+
+    Private Sub BuildMruSubmenu(parent As ToolStripMenuItem, collection As System.Collections.Specialized.StringCollection, handler As EventHandler)
+        parent.DropDownItems.Clear()
+        If collection Is Nothing OrElse collection.Count = 0 Then
+            parent.Enabled = False
+            Return
+        End If
+
+        parent.Enabled = True
+        Dim index = 1
+        For Each path As String In collection
+            If String.IsNullOrEmpty(path) Then Continue For
+            Dim item As New ToolStripMenuItem($"&{index} {path}")
+            item.Tag = path
+            AddHandler item.Click, handler
+            parent.DropDownItems.Add(item)
+            index += 1
+        Next
+    End Sub
+
+    Private Sub MruWorkspace_Click(sender As Object, e As EventArgs)
+        Dim item = TryCast(sender, ToolStripMenuItem)
+        If item Is Nothing Then Return
+        Dim path = CStr(item.Tag)
+        If Not File.Exists(path) Then
+            MessageBox.Show("ファイルが見つかりません。" & vbCrLf & path, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+        Try
+            Dim data = WorkspaceData.Load(path)
+            If String.IsNullOrEmpty(data.DumpFilePath) OrElse Not File.Exists(data.DumpFilePath) Then
+                MessageBox.Show("ワークスペースに指定されたダンプファイルが見つかりません。" & vbCrLf & data.DumpFilePath,
+                                "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return
+            End If
+            OpenDumpFile(data.DumpFilePath, data)
+            Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+            If ws IsNot Nothing Then ws.WorkspacePath = path
+            AddToMru(My.Settings.RecentWorkspaces, path)
+            BuildMruMenus()
+        Catch ex As Exception
+            MessageBox.Show($"ワークスペースの読み込みに失敗しました。" & vbCrLf & ex.Message,
+                            "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub MruDumpFile_Click(sender As Object, e As EventArgs)
+        Dim item = TryCast(sender, ToolStripMenuItem)
+        If item Is Nothing Then Return
+        Dim path = CStr(item.Tag)
+        If Not File.Exists(path) Then
+            MessageBox.Show("ファイルが見つかりません。" & vbCrLf & path, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End If
+        OpenDumpFile(path)
     End Sub
 #End Region
 

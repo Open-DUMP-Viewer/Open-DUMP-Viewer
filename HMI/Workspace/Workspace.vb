@@ -315,6 +315,76 @@ Public Class Workspace
     End Sub
 #End Region
 
+#Region "ワークスペース保存/復元"
+    ''' <summary>現在の状態を WorkspaceData に詰めて返す</summary>
+    Public Function GetWorkspaceData() As WorkspaceData
+        Dim data As New WorkspaceData()
+        data.DumpFilePath = DumpFilePath
+        data.ExcludedTables = New List(Of String)(_excludedTables)
+        data.SearchFilter = txtTableSearch.Text
+        data.CurrentSchema = _currentSchema
+
+        ' TreeView の展開ノード名を収集
+        data.ExpandedNodes = New List(Of String)
+        If treeDBList.Nodes.Count > 0 Then
+            CollectExpandedNodes(treeDBList.Nodes(0), data.ExpandedNodes)
+        End If
+        Return data
+    End Function
+
+    Private Sub CollectExpandedNodes(node As TreeNode, result As List(Of String))
+        If node.IsExpanded Then result.Add(node.Text)
+        For Each child As TreeNode In node.Nodes
+            CollectExpandedNodes(child, result)
+        Next
+    End Sub
+
+    ''' <summary>WorkspaceData から除外テーブル・検索フィルタ・TreeView展開を復元する</summary>
+    Public Sub LoadWorkspaceState(data As WorkspaceData)
+        ' 除外テーブル復元
+        _excludedTables.Clear()
+        If data.ExcludedTables IsNot Nothing Then
+            For Each t In data.ExcludedTables
+                _excludedTables.Add(t)
+            Next
+        End If
+        _undoStack.Clear()
+        _redoStack.Clear()
+
+        ' 検索フィルタ復元
+        If data.SearchFilter IsNot Nothing Then
+            txtTableSearch.Text = data.SearchFilter
+        End If
+
+        ' スキーマ選択復元
+        If Not String.IsNullOrEmpty(data.CurrentSchema) AndAlso _tableList.ContainsKey(data.CurrentSchema) Then
+            _currentSchema = data.CurrentSchema
+            ' TreeView で該当ノードを選択
+            If treeDBList.Nodes.Count > 0 Then
+                For Each child As TreeNode In treeDBList.Nodes(0).Nodes
+                    If ExtractSchemaName(child.Text) = data.CurrentSchema Then
+                        treeDBList.SelectedNode = child
+                        Exit For
+                    End If
+                Next
+            End If
+            DisplayTablesForSchema(data.CurrentSchema)
+        End If
+
+        ' TreeView 展開ノード復元
+        If data.ExpandedNodes IsNot Nothing AndAlso treeDBList.Nodes.Count > 0 Then
+            RestoreExpandedNodes(treeDBList.Nodes(0), data.ExpandedNodes)
+        End If
+    End Sub
+
+    Private Sub RestoreExpandedNodes(node As TreeNode, expandedNames As List(Of String))
+        If expandedNames.Contains(node.Text) Then node.Expand()
+        For Each child As TreeNode In node.Nodes
+            RestoreExpandedNodes(child, expandedNames)
+        Next
+    End Sub
+#End Region
+
 #Region "エクスポート用コンテキスト取得"
     ''' <summary>
     ''' 選択中のテーブルのエクスポート用コンテキスト情報を返す

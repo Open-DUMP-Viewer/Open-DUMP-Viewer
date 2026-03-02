@@ -355,9 +355,9 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
 
     s->table.col_count = col_count;
 
-    /* Count LOB columns (ref: e2c_parse_exp_ddl)
+    /* Count LOB columns.
        LOB types: BLOB, CLOB, NCLOB, BFILE, USER_DEFINE
-       Note: LONG and LONG_RAW are NOT counted as LOB (ref: line 2830-2836) */
+       Note: LONG and LONG_RAW are NOT counted as LOB */
     {
         int i;
         for (i = 0; i < col_count; i++) {
@@ -876,8 +876,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
         }
         col_idx++;
 
-        /* Ref: safety check — too many columns means record structure is corrupt
-           (ref: e2c_expdmp.c line 740, col_ct > tbl_col_num)
+        /* Safety check — too many columns means record structure is corrupt.
            Allow extra for LOB columns beyond regular col_count */
         if (col_idx > s->table.col_count + s->table.lob_col_count + 1) {
             /* Scan forward to find 0xFFFF table end marker */
@@ -1147,8 +1146,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                        Format: INSERT INTO "schema"."table" or INSERT INTO "table"
                        Only transition to binary metadata (step 3) if they
                        match; otherwise this is a DDL INSERT (e.g. PL/SQL)
-                       and should be ignored.
-                       (ref: e2c_expdmp.c line 1856-1884) */
+                       and should be ignored. */
                     char ins_table[ODV_OBJNAME_LEN + 1] = {0};
                     {
                         const char *ip = extract_identifier(word + 12, ins_table, ODV_OBJNAME_LEN);
@@ -1226,8 +1224,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
             case 2: /* Column type byte */
                 meta_col_type = (int)c;
 
-                /* Check type code against known Oracle internal types
-                   (ref: e2c_expdmp.c step 3, case 2) */
+                /* Check type code against known Oracle internal types */
                 switch (c) {
                 case 0x3A: /* XMLTYPE — unsupported */
                     s->table.name[0] = '\0';
@@ -1264,8 +1261,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     break;
 
                 default:
-                    /* Unknown type — WARNING and continue parsing
-                       (ref: e2c_expdmp.c line 1982-2013, break not continue) */
+                    /* Unknown type — WARNING and continue parsing */
                     is_char_type = 0;
                     break;
                 }
@@ -1354,11 +1350,10 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
 
             case 13: /* LOB column name bytes */
                 if (c < 0x04) {
-                    /* End of LOB column name (ref: e2c_expdmp.c line 2098-2111) */
+                    /* End of LOB column name */
                     meta_lob_idx++;
                     if (meta_lob_idx >= s->table.lob_col_count) {
-                        /* All LOB names read — go to null padding
-                           (ref: null_ct reset only when all LOBs done) */
+                        /* All LOB names read — go to null padding */
                         null_count = 0;
                         meta_lob_idx = 0;
                         data_step = 20; /* final null padding */
@@ -1371,7 +1366,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                 break;
 
             case 20: /* Null padding before record data */
-                /* Ref: e2c_expdmp.c step 3, data_step 20 */
+                /* Null padding before record data begins */
                 if (c == 0x00) {
                     null_count++;
                 } else if (c == 0xFF) {

@@ -130,7 +130,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' ワークスペースToolStripMenuItem
         ' 
-        ワークスペースToolStripMenuItem.Enabled = False
         ワークスペースToolStripMenuItem.Name = "ワークスペースToolStripMenuItem"
         ワークスペースToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.Shift Or Keys.O
         ワークスペースToolStripMenuItem.Size = New Size(238, 22)
@@ -156,7 +155,6 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' ワークスペースの保存SToolStripMenuItem
         ' 
-        ワークスペースの保存SToolStripMenuItem.Enabled = False
         ワークスペースの保存SToolStripMenuItem.Name = "ワークスペースの保存SToolStripMenuItem"
         ワークスペースの保存SToolStripMenuItem.ShortcutKeys = Keys.Control Or Keys.S
         ワークスペースの保存SToolStripMenuItem.Size = New Size(257, 22)
@@ -164,14 +162,12 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 名前を付けてワークスペースを保存AToolStripMenuItem
         ' 
-        名前を付けてワークスペースを保存AToolStripMenuItem.Enabled = False
         名前を付けてワークスペースを保存AToolStripMenuItem.Name = "名前を付けてワークスペースを保存AToolStripMenuItem"
         名前を付けてワークスペースを保存AToolStripMenuItem.Size = New Size(257, 22)
         名前を付けてワークスペースを保存AToolStripMenuItem.Text = "名前を付けてワークスペースを保存(&A)..."
         ' 
         ' ワークスペースを閉じるLToolStripMenuItem
         ' 
-        ワークスペースを閉じるLToolStripMenuItem.Enabled = False
         ワークスペースを閉じるLToolStripMenuItem.Name = "ワークスペースを閉じるLToolStripMenuItem"
         ワークスペースを閉じるLToolStripMenuItem.Size = New Size(257, 22)
         ワークスペースを閉じるLToolStripMenuItem.Text = "ワークスペースを閉じる(&L)"
@@ -196,14 +192,12 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ' 最近使ったワークスペースWToolStripMenuItem
         ' 
-        最近使ったワークスペースWToolStripMenuItem.Enabled = False
         最近使ったワークスペースWToolStripMenuItem.Name = "最近使ったワークスペースWToolStripMenuItem"
         最近使ったワークスペースWToolStripMenuItem.Size = New Size(257, 22)
         最近使ったワークスペースWToolStripMenuItem.Text = "最近使ったワークスペース(&W)"
         ' 
         ' 最近使ったダンプファイルDToolStripMenuItem
         ' 
-        最近使ったダンプファイルDToolStripMenuItem.Enabled = False
         最近使ったダンプファイルDToolStripMenuItem.Name = "最近使ったダンプファイルDToolStripMenuItem"
         最近使ったダンプファイルDToolStripMenuItem.Size = New Size(257, 22)
         最近使ったダンプファイルDToolStripMenuItem.Text = "最近使ったダンプファイル(&D)"

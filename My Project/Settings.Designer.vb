@@ -97,6 +97,28 @@ Namespace My
             End Set
         End Property
 
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute()>  _
+        Public Property RecentWorkspaces() As Global.System.Collections.Specialized.StringCollection
+            Get
+                Return CType(Me("RecentWorkspaces"),Global.System.Collections.Specialized.StringCollection)
+            End Get
+            Set
+                Me("RecentWorkspaces") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute()>  _
+        Public Property RecentDumpFiles() As Global.System.Collections.Specialized.StringCollection
+            Get
+                Return CType(Me("RecentDumpFiles"),Global.System.Collections.Specialized.StringCollection)
+            End Get
+            Set
+                Me("RecentDumpFiles") = value
+            End Set
+        End Property
+
         Public Shared ReadOnly Property [Default]() As MySettings
             Get
                 
