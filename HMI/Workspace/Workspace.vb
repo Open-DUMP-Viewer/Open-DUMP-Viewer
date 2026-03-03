@@ -126,10 +126,10 @@ Public Class Workspace
     End Sub
 
     ''' <summary>
-    ''' 選択中のテーブルをTablePreviewで開く
+    ''' 選択中のテーブルをTablePreviewで開く (非同期版: UIスレッドをブロックしない)
     ''' メインフォームのメニューから呼び出し可能
     ''' </summary>
-    Public Sub OpenSelectedTable()
+    Public Async Sub OpenSelectedTable()
         If lstTableList.SelectedItems.Count = 0 Then
             MessageBox.Show("テーブルが選択されていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
@@ -144,17 +144,19 @@ Public Class Workspace
                 Return
             End If
 
-            ' テーブルのデータオフセットを取得（高速シーク用）
+            ' テーブルのデータオフセットと期待行数を取得
             Dim dataOffset As Long = 0
+            Dim expectedRowCount As Long = 0
             If _tableList.ContainsKey(_currentSchema) Then
                 Dim entry = _tableList(_currentSchema).Find(Function(x) x.Item1 = tableName)
                 If entry IsNot Nothing Then
                     dataOffset = entry.Item3
+                    expectedRowCount = entry.Item2
                 End If
             End If
 
-            ' フェーズ2: 選択テーブルのみ解析（dataOffset>0ならDDL位置に高速シーク）
-            Dim tableData = AnalyzeLogic.AnalyzeTable(DumpFilePath, _currentSchema, tableName, dataOffset)
+            ' フェーズ2: 選択テーブルのみ非同期解析（UIスレッドをブロックしない）
+            Dim tableData = Await AnalyzeLogic.AnalyzeTableAsync(DumpFilePath, _currentSchema, tableName, dataOffset, expectedRowCount)
 
             ' 列名を取得（Phase1のListTablesで取得済みのキャッシュから）
             Dim columnNames As New List(Of String)
@@ -553,9 +555,8 @@ Public Class Workspace
     ''' 指定されたスキーマのテーブル一覧をListViewに表示
     ''' </summary>
     Private Sub DisplayTablesForSchema(schemaName As String)
-        lstTableList.Items.Clear()
-
         If String.IsNullOrEmpty(schemaName) Then
+            lstTableList.Items.Clear()
             Return
         End If
 
@@ -567,37 +568,45 @@ Public Class Workspace
         Try
             Dim tables = _tableList(schemaName)
 
-            If tables Is Nothing OrElse tables.Count = 0 Then
-                Return
-            End If
+            ' BeginUpdate/EndUpdate で描画を抑制（大量テーブル時のパフォーマンス改善）
+            lstTableList.BeginUpdate()
+            Try
+                lstTableList.Items.Clear()
 
-            ' テーブル検索フィルタ（大文字小文字区別しない部分一致）
-            Dim searchText = txtTableSearch.Text.Trim()
-
-            For Each tableInfo In tables
-                Dim tableName = tableInfo.Item1
-                Dim rowCount = tableInfo.Item2
-
-                ' 除外テーブルをスキップ
-                Dim tableKey = $"{schemaName}.{tableName}"
-                If _excludedTables.Contains(tableKey) Then
-                    Continue For
+                If tables Is Nothing OrElse tables.Count = 0 Then
+                    Return
                 End If
 
-                ' フィルタ: 検索文字列が空でなければ部分一致でスキップ判定
-                If searchText.Length > 0 AndAlso
-                   Not tableName.Contains(searchText, StringComparison.OrdinalIgnoreCase) Then
-                    Continue For
-                End If
+                ' テーブル検索フィルタ（大文字小文字区別しない部分一致）
+                Dim searchText = txtTableSearch.Text.Trim()
 
-                ' ListViewItemを作成
-                Dim item As New ListViewItem(tableName)
-                item.SubItems.Add(schemaName)       ' 所有者
-                item.SubItems.Add("TABLE")          ' 種類
-                item.SubItems.Add(rowCount.ToString("#,0"))  ' 行数
+                For Each tableInfo In tables
+                    Dim tableName = tableInfo.Item1
+                    Dim rowCount = tableInfo.Item2
 
-                lstTableList.Items.Add(item)
-            Next
+                    ' 除外テーブルをスキップ
+                    Dim tableKey = $"{schemaName}.{tableName}"
+                    If _excludedTables.Contains(tableKey) Then
+                        Continue For
+                    End If
+
+                    ' フィルタ: 検索文字列が空でなければ部分一致でスキップ判定
+                    If searchText.Length > 0 AndAlso
+                       Not tableName.Contains(searchText, StringComparison.OrdinalIgnoreCase) Then
+                        Continue For
+                    End If
+
+                    ' ListViewItemを作成
+                    Dim item As New ListViewItem(tableName)
+                    item.SubItems.Add(schemaName)       ' 所有者
+                    item.SubItems.Add("TABLE")          ' 種類
+                    item.SubItems.Add(rowCount.ToString("#,0"))  ' 行数
+
+                    lstTableList.Items.Add(item)
+                Next
+            Finally
+                lstTableList.EndUpdate()
+            End Try
 
         Catch ex As Exception
             MessageBox.Show($"テーブル一覧の表示に失敗しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)

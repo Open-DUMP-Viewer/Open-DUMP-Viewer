@@ -152,6 +152,61 @@ Public Class AnalyzeLogic
     End Function
 
     ''' <summary>
+    ''' 指定されたテーブルのみ非同期で解析する（UIスレッドをブロックしない）
+    ''' </summary>
+    Public Shared Async Function AnalyzeTableAsync(filePath As String, schemaName As String, tableName As String,
+                                                    Optional dataOffset As Long = 0,
+                                                    Optional expectedRowCount As Long = 0) As Task(Of List(Of String()))
+        Try
+            ValidateFilePath(filePath)
+
+            COMMON.InitProgressBar()
+            Dim startTime As DateTime = DateTime.Now
+
+            ' 進捗コールバック: BeginInvoke でUIスレッドにマーシャル
+            Dim mainForm = Application.OpenForms.OfType(Of OraDB_DUMP_Viewer)().FirstOrDefault()
+            Dim progressAction As Action(Of Long, String, Integer) = Nothing
+            If mainForm IsNot Nothing Then
+                progressAction = Sub(rowsProcessed As Long, currentTable As String, pct As Integer)
+                                     mainForm.BeginInvoke(Sub()
+                                                              COMMON.UpdateProgress(rowsProcessed, currentTable, pct, startTime)
+                                                          End Sub)
+                                 End Sub
+            End If
+
+            ' バックグラウンドスレッドで解析実行
+            Dim result = Await Task.Run(Function()
+                                            Return OraDB_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount)
+                                        End Function)
+
+            Dim elapsed As TimeSpan = DateTime.Now - startTime
+            COMMON.ResetProgressBar()
+
+            ' 結果からテーブルデータを抽出
+            If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
+                Dim rows = result(schemaName)(tableName)
+                COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+                Return rows
+            End If
+
+            COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
+            Return New List(Of String())()
+
+        Catch ex As DllNotFoundException
+            MessageBox.Show($"解析DLLが見つかりません: {ex.Message}" & vbCrLf &
+                           "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
+                           "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            COMMON.ResetProgressBar()
+            Return New List(Of String())()
+
+        Catch ex As Exception
+            MessageBox.Show($"テーブル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            COMMON.ResetProgressBar()
+            Return New List(Of String())()
+        End Try
+    End Function
+
+    ''' <summary>
     ''' ファイルパスの妥当性をチェック
     ''' </summary>
     Private Shared Sub ValidateFilePath(filePath As String)

@@ -234,6 +234,9 @@ Public Class OraDB_NativeParser
         Public FilterSchema As String = Nothing
         Public FilterTable As String = Nothing
 
+        ' List<T>の初期容量に使う期待行数 (ListTablesで取得済みの行数)
+        Public ExpectedRowCount As Long = 0
+
         ' テーブル切替検出用キャッシュ（毎行のマーシャリングを回避）
         Public LastSchema As String = ""
         Public LastTable As String = ""
@@ -331,12 +334,14 @@ Public Class OraDB_NativeParser
                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
                                       Optional filterSchema As String = Nothing,
                                       Optional filterTable As String = Nothing,
-                                      Optional dataOffset As Long = 0) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
+                                      Optional dataOffset As Long = 0,
+                                      Optional expectedRowCount As Long = 0) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ParseContext()
         ctx.ProgressAction = progressAction
         ctx.FilterSchema = filterSchema
         ctx.FilterTable = filterTable
+        ctx.ExpectedRowCount = expectedRowCount
         Dim gcHandle As GCHandle = GCHandle.Alloc(ctx)
 
         ' コールバックデリゲートをフィールドに保持（GC回収防止）
@@ -629,10 +634,11 @@ Public Class OraDB_NativeParser
                 ctx.AllData(schema) = schemaTables
             End If
 
-            ' テーブル行リストを確保
+            ' テーブル行リストを確保（期待行数で初期容量を予約）
             Dim tableRows As List(Of String()) = Nothing
             If Not schemaTables.TryGetValue(table, tableRows) Then
-                tableRows = New List(Of String())
+                Dim capacity = If(ctx.ExpectedRowCount > 0, CInt(Math.Min(ctx.ExpectedRowCount, 10000000)), 0)
+                tableRows = New List(Of String())(capacity)
                 schemaTables(table) = tableRows
             End If
 
@@ -675,9 +681,11 @@ Public Class OraDB_NativeParser
 
             ctx.ProgressAction?.Invoke(rowsProcessed, currentTable, pct)
 
-            ' UIメッセージポンプを処理してステータスバー/プログレスバーを再描画
-            ' (DLL処理がUIスレッドをブロックするため、明示的にポンプを回す必要がある)
-            Application.DoEvents()
+            ' UIスレッドで実行中の場合のみ DoEvents でメッセージポンプを回す
+            ' (Task.Run で実行中の場合はUIスレッドが自由なため不要)
+            If Not Threading.Thread.CurrentThread.IsBackground Then
+                Application.DoEvents()
+            End If
 
         Catch
             ' コールバック中の例外は握りつぶす
