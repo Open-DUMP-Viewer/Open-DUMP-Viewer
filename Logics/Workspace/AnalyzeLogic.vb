@@ -46,7 +46,7 @@ Public Class AnalyzeLogic
                     totalRows += table.Value.Count
                 Next
             Next
-            COMMON.Set_StatusLavel($"解析完了: {totalTables}テーブル, {totalRows:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset($"解析完了: {totalTables}テーブル, {totalRows:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
 
             Return result
 
@@ -55,11 +55,13 @@ Public Class AnalyzeLogic
                            "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
                            "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New Dictionary(Of String, Dictionary(Of String, List(Of String())))()
 
         Catch ex As Exception
             MessageBox.Show($"ダンプファイル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New Dictionary(Of String, Dictionary(Of String, List(Of String())))()
         End Try
     End Function
@@ -84,7 +86,7 @@ Public Class AnalyzeLogic
             Dim elapsed As TimeSpan = DateTime.Now - startTime
 
             COMMON.ResetProgressBar()
-            COMMON.Set_StatusLavel($"テーブル一覧取得完了: {tables.Count}テーブル ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset($"テーブル一覧取得完了: {tables.Count}テーブル ({elapsed.TotalSeconds:F1}秒)")
 
             Return tables
 
@@ -93,10 +95,13 @@ Public Class AnalyzeLogic
                            "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
                            "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of Tuple(Of String, String, Integer, Long, Long))()
 
         Catch ex As Exception
             MessageBox.Show($"テーブル一覧取得中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of Tuple(Of String, String, Integer, Long, Long))()
         End Try
     End Function
@@ -130,11 +135,11 @@ Public Class AnalyzeLogic
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
                 Dim rows = result(schemaName)(tableName)
-                COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+                COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
                 Return rows
             End If
 
-            COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
             Return New List(Of String())()
 
         Catch ex As DllNotFoundException
@@ -142,11 +147,13 @@ Public Class AnalyzeLogic
                            "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
                            "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
 
         Catch ex As Exception
             MessageBox.Show($"テーブル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
         End Try
     End Function
@@ -185,11 +192,11 @@ Public Class AnalyzeLogic
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
                 Dim rows = result(schemaName)(tableName)
-                COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+                COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
                 Return rows
             End If
 
-            COMMON.Set_StatusLavel($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
             Return New List(Of String())()
 
         Catch ex As DllNotFoundException
@@ -197,11 +204,13 @@ Public Class AnalyzeLogic
                            "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
                            "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
 
         Catch ex As Exception
             MessageBox.Show($"テーブル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
+            COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
         End Try
     End Function

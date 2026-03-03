@@ -1,14 +1,53 @@
 ﻿Public Class COMMON
 
 #Region "ステータスラベル関連"
+
+    ''' <summary>
+    ''' ステータスラベル自動リセット用タイマー
+    ''' </summary>
+    Private Shared _statusResetTimer As Timer
+
     ''' <summary>
     ''' ToolStripStatusLabelにテキストを設定する
     ''' </summary>
     ''' <param name="text"></param>
     Public Shared Sub Set_StatusLavel(text As String)
+        ' 既存のリセットタイマーをキャンセル
+        StopStatusResetTimer()
         'ステータスラベルのテキストを更新する
         OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = text
         Application.DoEvents() ' UIの更新を強制
+    End Sub
+
+    ''' <summary>
+    ''' ToolStripStatusLabelにテキストを設定し、指定秒後にデフォルトに自動リセットする
+    ''' </summary>
+    ''' <param name="text">表示するテキスト</param>
+    ''' <param name="autoResetSeconds">自動リセットまでの秒数 (デフォルト: 5秒)</param>
+    Public Shared Sub Set_StatusLavel_AutoReset(text As String, Optional autoResetSeconds As Integer = 5)
+        Set_StatusLavel(text)
+        StartStatusResetTimer(autoResetSeconds)
+    End Sub
+
+    Private Shared Sub StopStatusResetTimer()
+        If _statusResetTimer IsNot Nothing Then
+            _statusResetTimer.Stop()
+            _statusResetTimer.Dispose()
+            _statusResetTimer = Nothing
+        End If
+    End Sub
+
+    Private Shared Sub StartStatusResetTimer(seconds As Integer)
+        StopStatusResetTimer()
+        _statusResetTimer = New Timer()
+        _statusResetTimer.Interval = seconds * 1000
+        AddHandler _statusResetTimer.Tick, AddressOf OnStatusResetTimerTick
+        _statusResetTimer.Start()
+    End Sub
+
+    Private Shared Sub OnStatusResetTimerTick(sender As Object, e As EventArgs)
+        StopStatusResetTimer()
+        ReSet_StatusLavel()
     End Sub
 
     ''' <summary>
