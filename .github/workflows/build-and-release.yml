@@ -268,27 +268,7 @@ jobs:
             -o "./publish/OraDBDumpViewer_v${version}_installer.msi"
 
       # ─────────────────────────────────────
-      # 15. MSIX アイコンアセット生成
-      # ─────────────────────────────────────
-      - name: Generate MSIX icon assets
-        shell: pwsh
-        run: |
-          & "$env:GITHUB_WORKSPACE\Store\generate_assets.ps1"
-
-      # ─────────────────────────────────────
-      # 16. MSIX パッケージのビルド
-      # ─────────────────────────────────────
-      - name: Build MSIX package
-        shell: pwsh
-        run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          & "$env:GITHUB_WORKSPACE\Store\build_msix.ps1" `
-            -PublishDir "./publish/app" `
-            -Version $version `
-            -OutputPath "./publish/OraDBDumpViewer_v${version}.msix"
-
-      # ─────────────────────────────────────
-      # 17. GitHub Release の作成 & アップロード
+      # 15. GitHub Release の作成 & アップロード
       #     body に CHANGELOG.md の内容を使用
       # ─────────────────────────────────────
       - name: Create GitHub Release
@@ -302,29 +282,11 @@ jobs:
           files: |
             ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_portable.zip
             ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer.msi
-            ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}.msix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ─────────────────────────────────────
-      # 18. Microsoft Store への自動提出
-      #     msstore CLI で MSIX をアップロード
-      # ─────────────────────────────────────
-      - name: Publish to Microsoft Store
-        if: secrets.STORE_APP_ID != ''
-        shell: pwsh
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-        run: |
-          dotnet tool install --global MSStore.CLI
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          $msixPath = "./publish/OraDBDumpViewer_v${version}.msix"
-          msstore publish -i ${{ secrets.STORE_APP_ID }} -p $msixPath
-
-      # ─────────────────────────────────────
-      # 19. Winget パッケージマニフェストの自動PR
+      # 16. Winget パッケージマニフェストの自動PR
       #     microsoft/winget-pkgs へ PR を送信
       # ─────────────────────────────────────
       - name: Publish to Winget

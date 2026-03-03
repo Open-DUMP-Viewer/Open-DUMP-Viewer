@@ -16,26 +16,6 @@ Partial Public Class AboutDialog
     ''' <summary>最新リリースのMSIダウンロードURL（更新ボタン押下時に使用）</summary>
     Private _msiDownloadUrl As String = Nothing
 
-    ''' <summary>
-    ''' MSIX パッケージとして実行されているかどうかを判定する
-    ''' Store 版ではアプリ内更新を抑制する（Store が更新管理するため）
-    ''' </summary>
-    Private Shared Function IsRunningAsMsixPackage() As Boolean
-        Try
-            ' MSIX パッケージ内では GetCurrentPackageFullName API が成功する
-            Dim length As Integer = 0
-            Dim result = GetCurrentPackageFullName(length, Nothing)
-            ' ERROR_INSUFFICIENT_BUFFER (122) = パッケージあり, APPMODEL_ERROR_NO_PACKAGE (15700) = パッケージなし
-            Return result = 122
-        Catch
-            Return False
-        End Try
-    End Function
-
-    <Runtime.InteropServices.DllImport("kernel32.dll", CharSet:=Runtime.InteropServices.CharSet.Unicode, SetLastError:=True)>
-    Private Shared Function GetCurrentPackageFullName(ByRef packageFullNameLength As Integer, packageFullName As System.Text.StringBuilder) As Integer
-    End Function
-
     Public Sub New()
         InitializeComponent()
 
@@ -46,13 +26,6 @@ Partial Public Class AboutDialog
 
         lblVersion.Text = $"バージョン: v{currentVersion}"
         lblCopyright.Text = $"Copyright (C) {DateTime.Now.Year} YANAI Taketo"
-
-        ' Store 版の場合は更新チェック不要（Store が管理）
-        If IsRunningAsMsixPackage() Then
-            lblLatestVersion.Text = "Microsoft Store から更新できます"
-            lblLatestVersion.ForeColor = Color.Gray
-            Return
-        End If
 
         ' 最新バージョンを非同期で確認
         CheckLatestVersionAsync(currentVersion)
