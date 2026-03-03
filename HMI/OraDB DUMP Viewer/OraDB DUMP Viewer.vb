@@ -22,6 +22,30 @@ Public Class OraDB_DUMP_Viewer
         BuildMruMenus()
         ' ワークスペース依存メニューの初期状態
         UpdateWorkspaceMenuState()
+
+        ' ドラッグ&ドロップでダンプファイルを開けるようにする
+        Me.AllowDrop = True
+    End Sub
+
+    Private Sub OraDB_DUMP_Viewer_DragEnter(sender As Object, e As DragEventArgs) Handles MyBase.DragEnter
+        If e.Data.GetDataPresent(DataFormats.FileDrop) Then
+            e.Effect = DragDropEffects.Copy
+        Else
+            e.Effect = DragDropEffects.None
+        End If
+    End Sub
+
+    Private Sub OraDB_DUMP_Viewer_DragDrop(sender As Object, e As DragEventArgs) Handles MyBase.DragDrop
+        Dim files = TryCast(e.Data.GetData(DataFormats.FileDrop), String())
+        If files Is Nothing OrElse files.Length = 0 Then Return
+
+        For Each filePath In files
+            If File.Exists(filePath) Then
+                OpenDumpFile(filePath)
+            End If
+        Next
+
+        COMMON.ReSet_StatusLavel()
     End Sub
 
     ''' <summary>MDI 子ウィンドウの切替時にメニュー有効化を更新</summary>
