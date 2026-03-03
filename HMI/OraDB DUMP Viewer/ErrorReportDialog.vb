@@ -1,21 +1,33 @@
-Imports System.Reflection
-Imports System.Runtime.InteropServices
-
 ''' <summary>
 ''' エラー報告ダイアログ
 ''' Cloudflare Worker 経由で GitHub Issue を自動作成する
+''' 個人情報は収集しない（ユーザー名、PC名、ファイルパス等は含まない）
 ''' </summary>
 Partial Public Class ErrorReportDialog
 
-    Public Sub New()
+    Private _sysInfo As ErrorReportLogic.SystemInfo
+
+    ''' <summary>
+    ''' ダンプファイルのパスを指定してエラー報告ダイアログを生成する
+    ''' パス自体は送信しない (サイズ・形式のみ収集)
+    ''' </summary>
+    Public Sub New(Optional dumpFilePath As String = Nothing)
         InitializeComponent()
 
-        ' 環境情報を自動取得して表示
-        Dim asm = Assembly.GetExecutingAssembly()
-        Dim ver = asm.GetName().Version
-        lblVersionValue.Text = $"v{ver.Major}.{ver.Minor}.{ver.Build}"
-        lblOSValue.Text = RuntimeInformation.OSDescription
-        lblDotNetValue.Text = RuntimeInformation.FrameworkDescription
+        ' 個人情報を含まない環境情報を自動収集
+        _sysInfo = ErrorReportLogic.CollectSystemInfo(dumpFilePath)
+
+        ' 収集した情報をユーザーに透明に表示
+        lblVersionValue.Text = _sysInfo.AppVersion
+        lblDllVersionValue.Text = _sysInfo.DllVersion
+        lblOSValue.Text = _sysInfo.OsVersion
+        lblDotNetValue.Text = _sysInfo.DotNetVersion
+        lblArchValue.Text = $"{_sysInfo.Architecture} (プロセス: {_sysInfo.ProcessArchitecture})"
+        lblLocaleValue.Text = _sysInfo.Locale
+        lblDpiValue.Text = _sysInfo.DpiScale
+        lblMemoryValue.Text = _sysInfo.MemoryMB
+        lblScreenValue.Text = _sysInfo.ScreenResolution
+        lblDumpInfoValue.Text = _sysInfo.DumpFileInfo
     End Sub
 
     ''' <summary>
@@ -45,9 +57,7 @@ Partial Public Class ErrorReportDialog
                 txtTitle.Text.Trim(),
                 txtDescription.Text.Trim(),
                 txtContact.Text.Trim(),
-                lblVersionValue.Text,
-                lblOSValue.Text,
-                lblDotNetValue.Text
+                _sysInfo
             )
 
             prgSubmit.Visible = False

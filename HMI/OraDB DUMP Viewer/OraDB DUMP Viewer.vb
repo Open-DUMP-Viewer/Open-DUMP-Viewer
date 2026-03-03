@@ -543,7 +543,9 @@ Public Class OraDB_DUMP_Viewer
 
 #Region "メニューイベント: エラー報告"
     Private Sub エラー報告RToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles エラー報告RToolStripMenuItem.Click
-        Dim dlg As New ErrorReportDialog()
+        Dim ws = TryCast(Me.ActiveMdiChild, Workspace)
+        Dim dumpPath As String = If(ws IsNot Nothing, ws.DumpFilePath, Nothing)
+        Dim dlg As New ErrorReportDialog(dumpPath)
         dlg.ShowDialog(Me)
     End Sub
 #End Region
