@@ -41,6 +41,15 @@ Public Class TablePreview
     ''' <summary>テーブルの列名リスト</summary>
     Private _columnNames As List(Of String)
 
+    ''' <summary>スキーマ名</summary>
+    Private _schema As String
+
+    ''' <summary>テーブル名</summary>
+    Private _tableName As String
+
+    ''' <summary>カラム型情報</summary>
+    Private _columnTypes As String()
+
     ''' <summary>列名→インデックスの逆引きマップ（O(1) lookup）</summary>
     Private _columnIndexMap As Dictionary(Of String, Integer)
 
@@ -70,13 +79,16 @@ Public Class TablePreview
 
     ''' <summary>
     ''' コンストラクタ
-    ''' 
+    '''
     ''' テーブルデータ、列名、テーブル名を受け取り、フォームを初期化する。
     ''' </summary>
     ''' <param name="tableData">表示するテーブルデータ</param>
     ''' <param name="columnNames">テーブルの列名リスト</param>
     ''' <param name="tableName">テーブル名（ウィンドウタイトルに使用）</param>
-    Public Sub New(tableData As List(Of String()), columnNames As List(Of String), tableName As String)
+    ''' <param name="schema">スキーマ名（エクスポート用）</param>
+    ''' <param name="columnTypes">カラム型配列（エクスポート用）</param>
+    Public Sub New(tableData As List(Of String()), columnNames As List(Of String), tableName As String,
+                   Optional schema As String = Nothing, Optional columnTypes As String() = Nothing)
         ' デザイナーで定義されたコンポーネントを初期化
         InitializeComponent()
 
@@ -85,6 +97,9 @@ Public Class TablePreview
         _columnNames = columnNames
         _filteredData = New List(Of String())(_tableData)
         _totalRows = _tableData.Count
+        _schema = If(schema, "")
+        _tableName = tableName
+        _columnTypes = columnTypes
 
         ' 列名→インデックス逆引きマップを構築（1回だけ、O(n)）
         _columnIndexMap = New Dictionary(Of String, Integer)(_columnNames.Count)
@@ -99,6 +114,59 @@ Public Class TablePreview
         _currentSearchCondition = Nothing
         _lastSearchCondition = Nothing
     End Sub
+
+#End Region
+
+#Region "Public プロパティ (エクスポート用)"
+
+    ''' <summary>スキーマ名</summary>
+    Public ReadOnly Property SchemaName As String
+        Get
+            Return _schema
+        End Get
+    End Property
+
+    ''' <summary>テーブル名</summary>
+    Public ReadOnly Property ExportTableName As String
+        Get
+            Return _tableName
+        End Get
+    End Property
+
+    ''' <summary>カラム名リスト</summary>
+    Public ReadOnly Property ExportColumnNames As List(Of String)
+        Get
+            Return _columnNames
+        End Get
+    End Property
+
+    ''' <summary>カラム型配列</summary>
+    Public ReadOnly Property ExportColumnTypes As String()
+        Get
+            Return _columnTypes
+        End Get
+    End Property
+
+    ''' <summary>フィルタ後のデータ</summary>
+    Public ReadOnly Property FilteredData As List(Of String())
+        Get
+            Return _filteredData
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' エクスポート用のテーブルコンテキストを取得
+    ''' </summary>
+    Public Function GetExportContext() As ExportHelper.TableExportContext
+        Return New ExportHelper.TableExportContext() With {
+            .Schema = _schema,
+            .TableName = _tableName,
+            .ColumnNames = _columnNames.ToArray(),
+            .ColumnTypes = _columnTypes,
+            .RowCount = _filteredData.Count,
+            .DataOffset = 0
+        }
+    End Function
 
 #End Region
 
@@ -422,6 +490,10 @@ Public Class TablePreview
         ' VirtualMode を有効化（大量データでも高速描画）
         dataGridViewData.VirtualMode = True
 
+        ' 行選択モード + 複数行選択を有効化
+        dataGridViewData.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dataGridViewData.MultiSelect = True
+
         ' 列を追加（ソートはプログラム制御で行うため Programmatic に設定）
         For Each colName In _columnNames
             Dim col = New DataGridViewTextBoxColumn()
@@ -544,6 +616,58 @@ Public Class TablePreview
             e.Value = If(row(e.ColumnIndex), String.Empty)
         Else
             e.Value = String.Empty
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Ctrl+C / Ctrl+A をフォームレベルで確実にキャプチャ
+    ''' MDI 子フォームではメニュー・ツールバーにキーが奪われるため ProcessCmdKey を使用
+    ''' </summary>
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If dataGridViewData.Focused Then
+            If keyData = (Keys.Control Or Keys.C) Then
+                CopySelectedRowsToClipboard()
+                Return True
+            ElseIf keyData = (Keys.Control Or Keys.A) Then
+                dataGridViewData.SelectAll()
+                Return True
+            End If
+        End If
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub CopySelectedRowsToClipboard()
+        If dataGridViewData.SelectedRows.Count = 0 Then Return
+
+        Dim sb As New System.Text.StringBuilder()
+
+        ' ヘッダー行
+        For i = 0 To _columnNames.Count - 1
+            If i > 0 Then sb.Append(vbTab)
+            sb.Append(_columnNames(i))
+        Next
+        sb.AppendLine()
+
+        ' 選択行をインデックス順にソート
+        Dim sortedRows = dataGridViewData.SelectedRows.Cast(Of DataGridViewRow)().
+            OrderBy(Function(r) r.Index).ToList()
+
+        For Each dgvRow In sortedRows
+            Dim dataIndex = _displayStartRow + dgvRow.Index
+            If dataIndex < 0 OrElse dataIndex >= _filteredData.Count Then Continue For
+
+            Dim row = _filteredData(dataIndex)
+            For i = 0 To _columnNames.Count - 1
+                If i > 0 Then sb.Append(vbTab)
+                If i < row.Length Then
+                    sb.Append(If(row(i), String.Empty))
+                End If
+            Next
+            sb.AppendLine()
+        Next
+
+        If sb.Length > 0 Then
+            Clipboard.SetText(sb.ToString())
         End If
     End Sub
 

@@ -11,7 +11,9 @@ Public Class TablePreviewLogic
     ''' <param name="columnNames">列名のリスト</param>
     ''' <param name="tableName">テーブル名</param>
     Public Shared Sub DisplayTableData(parentForm As Form, tableData As List(Of String()),
-                                       columnNames As List(Of String), tableName As String)
+                                       columnNames As List(Of String), tableName As String,
+                                       Optional schema As String = Nothing,
+                                       Optional columnTypes As String() = Nothing)
         Try
             ' 列名リストが空の場合はエラーダイアログを表示して終了
             If columnNames Is Nothing OrElse columnNames.Count = 0 Then
@@ -25,7 +27,7 @@ Public Class TablePreviewLogic
             End If
 
             ' TablePreviewフォームを作成し、MDI親フォームに表示
-            Dim previewForm As New TablePreview(tableData, columnNames, tableName)
+            Dim previewForm As New TablePreview(tableData, columnNames, tableName, schema, columnTypes)
             previewForm.MdiParent = parentForm
             previewForm.Show()
 

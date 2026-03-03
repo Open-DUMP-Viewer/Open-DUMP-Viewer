@@ -88,15 +88,15 @@ Partial Class OraDB_DUMP_Viewer
         ToolStripStatusLabel = New ToolStripStatusLabel()
         ToolExport = New ToolStrip()
         tolTablPproperty = New ToolStripButton()
-        ToolStripButton1 = New ToolStripButton()
+        btnExcludeTable = New ToolStripButton()
         ToolStripSeparator11 = New ToolStripSeparator()
-        ToolStripButton5 = New ToolStripButton()
-        ToolStripButton6 = New ToolStripButton()
+        btnExportSql = New ToolStripButton()
+        btnExportCsv = New ToolStripButton()
         ToolStripSeparator12 = New ToolStripSeparator()
-        ToolStripButton7 = New ToolStripButton()
-        ToolStripButton8 = New ToolStripButton()
-        ToolStripButton9 = New ToolStripButton()
-        ToolStripButton3 = New ToolStripButton()
+        btnExportExcel = New ToolStripButton()
+        btnExportAccess = New ToolStripButton()
+        btnExportSqlServer = New ToolStripButton()
+        btnExportOdbc = New ToolStripButton()
         MenuStrip.SuspendLayout()
         StatusStrip.SuspendLayout()
         ToolExport.SuspendLayout()
@@ -509,7 +509,7 @@ Partial Class OraDB_DUMP_Viewer
         ' ToolExport
         ' 
         ToolExport.ImageScalingSize = New Size(24, 24)
-        ToolExport.Items.AddRange(New ToolStripItem() {tolTablPproperty, ToolStripButton1, ToolStripSeparator11, ToolStripButton5, ToolStripButton6, ToolStripSeparator12, ToolStripButton7, ToolStripButton8, ToolStripButton9, ToolStripButton3})
+        ToolExport.Items.AddRange(New ToolStripItem() {tolTablPproperty, btnExcludeTable, ToolStripSeparator11, btnExportSql, btnExportCsv, ToolStripSeparator12, btnExportExcel, btnExportAccess, btnExportSqlServer, btnExportOdbc})
         ToolExport.Location = New Point(0, 24)
         ToolExport.Name = "ToolExport"
         ToolExport.Size = New Size(1125, 31)
@@ -525,78 +525,78 @@ Partial Class OraDB_DUMP_Viewer
         tolTablPproperty.Size = New Size(28, 28)
         tolTablPproperty.Text = "プロパティ"
         ' 
-        ' ToolStripButton1
+        ' btnExcludeTable
         ' 
-        ToolStripButton1.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton1.Image = CType(resources.GetObject("ToolStripButton1.Image"), Image)
-        ToolStripButton1.ImageTransparentColor = Color.Magenta
-        ToolStripButton1.Name = "ToolStripButton1"
-        ToolStripButton1.Size = New Size(28, 28)
-        ToolStripButton1.Text = "削除"
+        btnExcludeTable.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExcludeTable.Image = CType(resources.GetObject("btnExcludeTable.Image"), Image)
+        btnExcludeTable.ImageTransparentColor = Color.Magenta
+        btnExcludeTable.Name = "btnExcludeTable"
+        btnExcludeTable.Size = New Size(28, 28)
+        btnExcludeTable.Text = "削除"
         ' 
         ' ToolStripSeparator11
         ' 
         ToolStripSeparator11.Name = "ToolStripSeparator11"
         ToolStripSeparator11.Size = New Size(6, 31)
         ' 
-        ' ToolStripButton5
+        ' btnExportSql
         ' 
-        ToolStripButton5.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton5.Image = CType(resources.GetObject("ToolStripButton5.Image"), Image)
-        ToolStripButton5.ImageTransparentColor = Color.Magenta
-        ToolStripButton5.Name = "ToolStripButton5"
-        ToolStripButton5.Size = New Size(28, 28)
-        ToolStripButton5.Text = "SQL スクリプト"
+        btnExportSql.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportSql.Image = CType(resources.GetObject("btnExportSql.Image"), Image)
+        btnExportSql.ImageTransparentColor = Color.Magenta
+        btnExportSql.Name = "btnExportSql"
+        btnExportSql.Size = New Size(28, 28)
+        btnExportSql.Text = "SQL スクリプト"
         ' 
-        ' ToolStripButton6
+        ' btnExportCsv
         ' 
-        ToolStripButton6.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton6.Image = CType(resources.GetObject("ToolStripButton6.Image"), Image)
-        ToolStripButton6.ImageTransparentColor = Color.Magenta
-        ToolStripButton6.Name = "ToolStripButton6"
-        ToolStripButton6.Size = New Size(28, 28)
-        ToolStripButton6.Text = "CSV 出力"
+        btnExportCsv.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportCsv.Image = CType(resources.GetObject("btnExportCsv.Image"), Image)
+        btnExportCsv.ImageTransparentColor = Color.Magenta
+        btnExportCsv.Name = "btnExportCsv"
+        btnExportCsv.Size = New Size(28, 28)
+        btnExportCsv.Text = "CSV 出力"
         ' 
         ' ToolStripSeparator12
         ' 
         ToolStripSeparator12.Name = "ToolStripSeparator12"
         ToolStripSeparator12.Size = New Size(6, 31)
         ' 
-        ' ToolStripButton7
+        ' btnExportExcel
         ' 
-        ToolStripButton7.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton7.Image = CType(resources.GetObject("ToolStripButton7.Image"), Image)
-        ToolStripButton7.ImageTransparentColor = Color.Magenta
-        ToolStripButton7.Name = "ToolStripButton7"
-        ToolStripButton7.Size = New Size(28, 28)
-        ToolStripButton7.Text = "Excel 出力"
+        btnExportExcel.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportExcel.Image = CType(resources.GetObject("btnExportExcel.Image"), Image)
+        btnExportExcel.ImageTransparentColor = Color.Magenta
+        btnExportExcel.Name = "btnExportExcel"
+        btnExportExcel.Size = New Size(28, 28)
+        btnExportExcel.Text = "Excel 出力"
         ' 
-        ' ToolStripButton8
+        ' btnExportAccess
         ' 
-        ToolStripButton8.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton8.Image = CType(resources.GetObject("ToolStripButton8.Image"), Image)
-        ToolStripButton8.ImageTransparentColor = Color.Magenta
-        ToolStripButton8.Name = "ToolStripButton8"
-        ToolStripButton8.Size = New Size(28, 28)
-        ToolStripButton8.Text = "Access 出力"
+        btnExportAccess.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportAccess.Image = CType(resources.GetObject("btnExportAccess.Image"), Image)
+        btnExportAccess.ImageTransparentColor = Color.Magenta
+        btnExportAccess.Name = "btnExportAccess"
+        btnExportAccess.Size = New Size(28, 28)
+        btnExportAccess.Text = "Access 出力"
         '
-        ' ToolStripButton9
+        ' btnExportSqlServer
         ' 
-        ToolStripButton9.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton9.Image = CType(resources.GetObject("ToolStripButton9.Image"), Image)
-        ToolStripButton9.ImageTransparentColor = Color.Magenta
-        ToolStripButton9.Name = "ToolStripButton9"
-        ToolStripButton9.Size = New Size(28, 28)
-        ToolStripButton9.Text = "SQL Server"
+        btnExportSqlServer.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportSqlServer.Image = CType(resources.GetObject("btnExportSqlServer.Image"), Image)
+        btnExportSqlServer.ImageTransparentColor = Color.Magenta
+        btnExportSqlServer.Name = "btnExportSqlServer"
+        btnExportSqlServer.Size = New Size(28, 28)
+        btnExportSqlServer.Text = "SQL Server"
         ' 
-        ' ToolStripButton3
+        ' btnExportOdbc
         ' 
-        ToolStripButton3.DisplayStyle = ToolStripItemDisplayStyle.Image
-        ToolStripButton3.Image = CType(resources.GetObject("ToolStripButton3.Image"), Image)
-        ToolStripButton3.ImageTransparentColor = Color.Magenta
-        ToolStripButton3.Name = "ToolStripButton3"
-        ToolStripButton3.Size = New Size(28, 28)
-        ToolStripButton3.Text = "ODBC"
+        btnExportOdbc.DisplayStyle = ToolStripItemDisplayStyle.Image
+        btnExportOdbc.Image = CType(resources.GetObject("btnExportOdbc.Image"), Image)
+        btnExportOdbc.ImageTransparentColor = Color.Magenta
+        btnExportOdbc.Name = "btnExportOdbc"
+        btnExportOdbc.Size = New Size(28, 28)
+        btnExportOdbc.Text = "ODBC"
         '
         ' OraDB_DUMP_Viewer
         '
@@ -686,15 +686,15 @@ Partial Class OraDB_DUMP_Viewer
     Friend WithEvents ライセンス認証ToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolEdit As ToolStrip
     Friend WithEvents ToolExport As ToolStrip
-    Friend WithEvents ToolStripButton5 As ToolStripButton
-    Friend WithEvents ToolStripButton6 As ToolStripButton
+    Friend WithEvents btnExportSql As ToolStripButton
+    Friend WithEvents btnExportCsv As ToolStripButton
     Friend WithEvents ToolStripSeparator12 As ToolStripSeparator
-    Friend WithEvents ToolStripButton7 As ToolStripButton
-    Friend WithEvents ToolStripButton8 As ToolStripButton
-    Friend WithEvents ToolStripButton9 As ToolStripButton
+    Friend WithEvents btnExportExcel As ToolStripButton
+    Friend WithEvents btnExportAccess As ToolStripButton
+    Friend WithEvents btnExportSqlServer As ToolStripButton
     Friend WithEvents tolTablPproperty As ToolStripButton
-    Friend WithEvents ToolStripButton1 As ToolStripButton
+    Friend WithEvents btnExcludeTable As ToolStripButton
     Friend WithEvents ToolStripSeparator11 As ToolStripSeparator
-    Friend WithEvents ToolStripButton3 As ToolStripButton
+    Friend WithEvents btnExportOdbc As ToolStripButton
     Friend WithEvents ToolStripSeparator13 As ToolStripSeparator
 End Class

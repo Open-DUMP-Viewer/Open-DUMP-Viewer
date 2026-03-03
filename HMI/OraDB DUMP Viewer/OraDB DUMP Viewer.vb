@@ -438,7 +438,7 @@ Public Class OraDB_DUMP_Viewer
         ShowTableProperty()
     End Sub
 
-    Private Sub ToolStripButton2_Click(sender As Object, e As EventArgs) Handles tolTablPproperty.Click
+    Private Sub btnTableProperty_Click(sender As Object, e As EventArgs) Handles tolTablPproperty.Click
         ShowTableProperty()
     End Sub
 #End Region
@@ -508,11 +508,11 @@ Public Class OraDB_DUMP_Viewer
     End Sub
 
     Private Sub スクリプトWSToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles スクリプトWSToolStripMenuItem.Click
-        ToolStripButton5_Click(sender, e)
+        btnExportSql_Click(sender, e)
     End Sub
 
     Private Sub データDToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles データDToolStripMenuItem.Click
-        ToolStripButton6_Click(sender, e)
+        btnExportCsv_Click(sender, e)
     End Sub
 
     Private Sub オブジェクト一覧ToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles オブジェクト一覧ToolStripMenuItem.Click
@@ -582,7 +582,7 @@ Public Class OraDB_DUMP_Viewer
 #End Region
 
 #Region "ツールバーイベント: テーブル除外"
-    Private Sub ToolStripButton1_Click(sender As Object, e As EventArgs) Handles ToolStripButton1.Click
+    Private Sub btnExcludeTable_Click(sender As Object, e As EventArgs) Handles btnExcludeTable.Click
         Dim workspace = ExportHelper.GetActiveWorkspace()
         If workspace Is Nothing Then
             MessageBox.Show("ワークスペースを開いてください。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
@@ -599,6 +599,13 @@ Public Class OraDB_DUMP_Viewer
     ''' </summary>
     Private Function GetExportContext() As ExportHelper.TableExportContext
         Return ExportHelper.GetActiveTableContext()
+    End Function
+
+    ''' <summary>
+    ''' ActiveMdiChild が TablePreview の場合、そのインスタンスを返す
+    ''' </summary>
+    Private Function GetActiveTablePreview() As TablePreview
+        Return TryCast(Me.ActiveMdiChild, TablePreview)
     End Function
 
     ''' <summary>
@@ -619,7 +626,7 @@ Public Class OraDB_DUMP_Viewer
         Return contexts
     End Function
 
-    Private Sub ToolStripButton5_Click(sender As Object, e As EventArgs) Handles ToolStripButton5.Click
+    Private Sub btnExportSql_Click(sender As Object, e As EventArgs) Handles btnExportSql.Click
         Dim ctx = GetExportContext()
 
         ' DBMS 選択ダイアログ
@@ -633,10 +640,20 @@ Public Class OraDB_DUMP_Viewer
             Dim outputPath = ExportHelper.ShowSaveFileDialog("SQL ファイル|*.sql|すべてのファイル|*.*", defaultName)
             If outputPath Is Nothing Then Return
 
+            Dim preview = GetActiveTablePreview()
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
+                        Dim ok As Boolean
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータから出力
+                            ok = SqlExportLogic.ExportFromData(preview.FilteredData,
+                                    preview.ExportColumnNames, ctx.ColumnTypes,
+                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker)
+                        Else
+                            ' Workspace: DLLから再パース
+                            ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
+                        End If
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
@@ -670,7 +687,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub ToolStripButton6_Click(sender As Object, e As EventArgs) Handles ToolStripButton6.Click
+    Private Sub btnExportCsv_Click(sender As Object, e As EventArgs) Handles btnExportCsv.Click
         Dim ctx = GetExportContext()
 
         If ctx IsNot Nothing Then
@@ -679,10 +696,19 @@ Public Class OraDB_DUMP_Viewer
             Dim outputPath = ExportHelper.ShowSaveFileDialog("CSV ファイル|*.csv|すべてのファイル|*.*", defaultName)
             If outputPath Is Nothing Then Return
 
+            Dim preview = GetActiveTablePreview()
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = CsvExportLogic.ExportFromDump(ctx, outputPath)
+                        Dim ok As Boolean
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータから出力
+                            ok = CsvExportLogic.ExportFromData(preview.FilteredData,
+                                    preview.ExportColumnNames, outputPath, worker, ctx.TableName)
+                        Else
+                            ' Workspace: DLLから再パース
+                            ok = CsvExportLogic.ExportFromDump(ctx, outputPath)
+                        End If
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
@@ -716,7 +742,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub ToolStripButton7_Click(sender As Object, e As EventArgs) Handles ToolStripButton7.Click
+    Private Sub btnExportExcel_Click(sender As Object, e As EventArgs) Handles btnExportExcel.Click
         Dim ctx = GetExportContext()
 
         If ctx IsNot Nothing Then
@@ -728,18 +754,25 @@ Public Class OraDB_DUMP_Viewer
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
             Dim exportedRows As Long = 0
+            Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        ' データ取得もBackgroundWorker内で実行 (UIブロック防止)
-                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
-                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                         Dim rows As List(Of String()) = Nothing
-                        If tableData IsNot Nothing AndAlso
-                           tableData.ContainsKey(ctx.Schema) AndAlso
-                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                            rows = tableData(ctx.Schema)(ctx.TableName)
+
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータを使用
+                            rows = preview.FilteredData
+                        Else
+                            ' Workspace: DLLから再パース
+                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                            If tableData IsNot Nothing AndAlso
+                               tableData.ContainsKey(ctx.Schema) AndAlso
+                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                                rows = tableData(ctx.Schema)(ctx.TableName)
+                            End If
                         End If
                         If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
@@ -777,7 +810,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub ToolStripButton8_Click(sender As Object, e As EventArgs) Handles ToolStripButton8.Click
+    Private Sub btnExportAccess_Click(sender As Object, e As EventArgs) Handles btnExportAccess.Click
         Dim ctx = GetExportContext()
 
         If ctx IsNot Nothing Then
@@ -789,17 +822,25 @@ Public Class OraDB_DUMP_Viewer
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
             Dim exportedRows As Long = 0
+            Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
-                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                         Dim rows As List(Of String()) = Nothing
-                        If tableData IsNot Nothing AndAlso
-                           tableData.ContainsKey(ctx.Schema) AndAlso
-                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                            rows = tableData(ctx.Schema)(ctx.TableName)
+
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータを使用
+                            rows = preview.FilteredData
+                        Else
+                            ' Workspace: DLLから再パース
+                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                            If tableData IsNot Nothing AndAlso
+                               tableData.ContainsKey(ctx.Schema) AndAlso
+                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                                rows = tableData(ctx.Schema)(ctx.TableName)
+                            End If
                         End If
                         If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
@@ -837,7 +878,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub ToolStripButton9_Click(sender As Object, e As EventArgs) Handles ToolStripButton9.Click
+    Private Sub btnExportSqlServer_Click(sender As Object, e As EventArgs) Handles btnExportSqlServer.Click
         Dim ctx = GetExportContext()
 
         ' DB 接続ダイアログ (SQL Server タブ)
@@ -853,18 +894,26 @@ Public Class OraDB_DUMP_Viewer
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
             Dim exportedRows As Long = 0
+            Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connDlg.ConnectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
-                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                         Dim rows As List(Of String()) = Nothing
-                        If tableData IsNot Nothing AndAlso
-                           tableData.ContainsKey(ctx.Schema) AndAlso
-                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                            rows = tableData(ctx.Schema)(ctx.TableName)
+
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータを使用
+                            rows = preview.FilteredData
+                        Else
+                            ' Workspace: DLLから再パース
+                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                            If tableData IsNot Nothing AndAlso
+                               tableData.ContainsKey(ctx.Schema) AndAlso
+                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                                rows = tableData(ctx.Schema)(ctx.TableName)
+                            End If
                         End If
                         If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
@@ -900,7 +949,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub ToolStripButton3_Click(sender As Object, e As EventArgs) Handles ToolStripButton3.Click
+    Private Sub btnExportOdbc_Click(sender As Object, e As EventArgs) Handles btnExportOdbc.Click
         Dim ctx = GetExportContext()
 
         ' DB 接続ダイアログ (ODBC タブを初期選択)
@@ -916,18 +965,26 @@ Public Class OraDB_DUMP_Viewer
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
             Dim exportedRows As Long = 0
+            Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connDlg.ConnectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
-                            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                         Dim rows As List(Of String()) = Nothing
-                        If tableData IsNot Nothing AndAlso
-                           tableData.ContainsKey(ctx.Schema) AndAlso
-                           tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                            rows = tableData(ctx.Schema)(ctx.TableName)
+
+                        If preview IsNot Nothing Then
+                            ' TablePreview: インメモリデータを使用
+                            rows = preview.FilteredData
+                        Else
+                            ' Workspace: DLLから再パース
+                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                            If tableData IsNot Nothing AndAlso
+                               tableData.ContainsKey(ctx.Schema) AndAlso
+                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                                rows = tableData(ctx.Schema)(ctx.TableName)
+                            End If
                         End If
                         If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
@@ -988,9 +1045,9 @@ Public Class OraDB_DUMP_Viewer
         End If
 
         Dim hasLob = ctx.ColumnTypes.Any(Function(t)
-                                              Dim u = If(t, "").ToUpperInvariant()
-                                              Return u.Contains("BLOB") OrElse u.Contains("CLOB")
-                                          End Function)
+                                             Dim u = If(t, "").ToUpperInvariant()
+                                             Return u.Contains("BLOB") OrElse u.Contains("CLOB")
+                                         End Function)
         If Not hasLob Then
             MessageBox.Show("選択テーブルにLOBカラム (BLOB/CLOB/NCLOB) がありません。", "LOBファイル抽出",
                            MessageBoxButtons.OK, MessageBoxIcon.Information)

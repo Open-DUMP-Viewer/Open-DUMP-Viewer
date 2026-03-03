@@ -206,17 +206,26 @@ Public Module ExportHelper
     End Class
 
     ''' <summary>
-    ''' メインフォームのアクティブなワークスペースから選択中のテーブル情報を取得
+    ''' メインフォームのアクティブなワークスペースまたはTablePreviewから選択中のテーブル情報を取得
     ''' </summary>
     ''' <returns>テーブル情報。テーブル未選択時は Nothing</returns>
     Public Function GetActiveTableContext() As TableExportContext
         Dim mainForm = TryCast(Application.OpenForms(0), OraDB_DUMP_Viewer)
         If mainForm Is Nothing Then Return Nothing
 
+        ' まず Workspace をチェック
         Dim workspace = TryCast(mainForm.ActiveMdiChild, Workspace)
-        If workspace Is Nothing Then Return Nothing
+        If workspace IsNot Nothing Then
+            Return workspace.GetSelectedTableExportContext()
+        End If
 
-        Return workspace.GetSelectedTableExportContext()
+        ' 次に TablePreview をチェック
+        Dim preview = TryCast(mainForm.ActiveMdiChild, TablePreview)
+        If preview IsNot Nothing Then
+            Return preview.GetExportContext()
+        End If
+
+        Return Nothing
     End Function
 
     ''' <summary>

@@ -170,11 +170,17 @@ Public Class Workspace
                 Return
             End If
 
+            ' カラム型を取得
+            Dim columnTypes As String() = Nothing
+            If _columnTypesMap.ContainsKey(tableKey) Then
+                columnTypes = _columnTypesMap(tableKey)
+            End If
+
             ' TablePreview を表示（0行の場合も列ヘッダーは表示される）
             TablePreviewLogic.DisplayTableData(Me.MdiParent,
                                                If(tableData, New List(Of String())),
                                                columnNames,
-                                               $"{_currentSchema}.{tableName}")
+                                               tableName, _currentSchema, columnTypes)
 
         Catch ex As Exception
             MessageBox.Show($"テーブル表示エラー: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
