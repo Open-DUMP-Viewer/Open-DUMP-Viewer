@@ -127,6 +127,10 @@ ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int 
    create_table: 1=output CREATE TABLE DDL before INSERTs, 0=skip (default) */
 ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table);
 
+/* Set application version string (displayed in export comments).
+   ver: UTF-8 version string e.g. "1.1.0". Pass NULL to clear. */
+ODV_API int __stdcall odv_set_app_version(ODV_SESSION *s, const char *ver);
+
 /*---------------------------------------------------------------------------
     Operations
  ---------------------------------------------------------------------------*/

@@ -302,6 +302,9 @@ struct _odv_session {
     /* Progress tracking (file-position-based percentage with hysteresis) */
     int             last_progress_pct;  /* Last reported percentage (0-100) */
 
+    /* Application version (set by caller via odv_set_app_version) */
+    char            app_version[64];
+
     /* Export options */
     int             date_format;           /* 0=SLASH, 1=COMPACT, 2=FULL, 3=CUSTOM */
     char            custom_date_format[256]; /* Format string for DATE_FMT_CUSTOM */

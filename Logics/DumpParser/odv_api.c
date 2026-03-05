@@ -11,13 +11,9 @@
 #include "odv_api.h"
 
 /*---------------------------------------------------------------------------
-    Version (auto-generated from .vbproj by gen_version.cmd)
+    Version
  ---------------------------------------------------------------------------*/
-#include "odv_version_gen.h"
-
-#ifndef ODV_VERSION_STRING
-#define ODV_VERSION_STRING "0.0.0"
-#endif
+#define ODV_VERSION_STRING "1.1.0"
 
 /*---------------------------------------------------------------------------
     Internal helpers
@@ -198,6 +194,17 @@ ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->sql_create_table = create_table;
+    return ODV_OK;
+}
+
+ODV_API int __stdcall odv_set_app_version(ODV_SESSION *s, const char *ver)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    if (ver) {
+        odv_strcpy(s->app_version, ver, sizeof(s->app_version) - 1);
+    } else {
+        s->app_version[0] = '\0';
+    }
     return ODV_OK;
 }
 

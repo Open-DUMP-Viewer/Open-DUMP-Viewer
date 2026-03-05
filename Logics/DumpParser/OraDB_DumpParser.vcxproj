@@ -90,14 +90,6 @@
     </Link>
   </ItemDefinitionGroup>
 
-  <!-- Pre-build: generate version header from .vbproj -->
-  <ItemDefinitionGroup>
-    <PreBuildEvent>
-      <Command>call "$(ProjectDir)gen_version.cmd"</Command>
-      <Message>Generating version header from .vbproj</Message>
-    </PreBuildEvent>
-  </ItemDefinitionGroup>
-
   <!-- Source Files -->
   <ItemGroup>
     <ClCompile Include="odv_api.c" />

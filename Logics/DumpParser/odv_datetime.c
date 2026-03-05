@@ -193,11 +193,18 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
 
         if (out_size < 30) return ODV_ERROR_BUFFER_OVER;
 
-        /* Format nanoseconds, then trim trailing zeros */
+        /* Format nanoseconds with precision-aware trimming:
+           - Millisecond-aligned (us/ns part = 0): fixed 3 digits
+           - Otherwise: trim trailing zeros (minimum 1 digit) */
         snprintf(nano_str, sizeof(nano_str), "%09u", nano);
-        nano_len = 9;
-        while (nano_len > 1 && nano_str[nano_len - 1] == '0') {
-            nano_len--;
+        if (nano % 1000000 == 0) {
+            /* Exact milliseconds: use fixed 3-digit precision */
+            nano_len = 3;
+        } else {
+            nano_len = 9;
+            while (nano_len > 1 && nano_str[nano_len - 1] == '0') {
+                nano_len--;
+            }
         }
         nano_str[nano_len] = '\0';
 
@@ -263,7 +270,18 @@ int decode_binary_float(const unsigned char *buf, char *out, int out_size)
 
     /* Format and trim trailing zeros */
     if (out_size < 32) return ODV_ERROR_BUFFER_OVER;
-    snprintf(out, out_size, "%.10g", (double)fval);
+
+    /* IEEE 754 special values */
+    if (fval != fval) {
+        /* NaN: use uppercase representation */
+        odv_strcpy(out, "NaN", out_size - 1);
+    } else if (fval > 3.402823e+38f) {
+        odv_strcpy(out, "Inf", out_size - 1);
+    } else if (fval < -3.402823e+38f) {
+        odv_strcpy(out, "-Inf", out_size - 1);
+    } else {
+        snprintf(out, out_size, "%.10g", (double)fval);
+    }
 
     return ODV_OK;
 }
@@ -310,7 +328,17 @@ int decode_binary_double(const unsigned char *buf, char *out, int out_size)
 
     /* Format and trim trailing zeros */
     if (out_size < 32) return ODV_ERROR_BUFFER_OVER;
-    snprintf(out, out_size, "%.17g", dval);
+
+    /* IEEE 754 special values */
+    if (dval != dval) {
+        odv_strcpy(out, "NaN", out_size - 1);
+    } else if (dval > 1.7976931348623157e+308) {
+        odv_strcpy(out, "Inf", out_size - 1);
+    } else if (dval < -1.7976931348623157e+308) {
+        odv_strcpy(out, "-Inf", out_size - 1);
+    } else {
+        snprintf(out, out_size, "%.17g", dval);
+    }
 
     return ODV_OK;
 }

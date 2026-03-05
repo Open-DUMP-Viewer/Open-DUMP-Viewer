@@ -63,6 +63,24 @@ int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_s
         return ODV_OK;
     }
 
+    /*-----------------------------------------------------------------------
+        Oracle 12c+ extended precision: exponent 0xFF signals 39+ digit
+        precision with continuation encoding in bytes 1-2.
+        Seen in direct-path exports with extended NUMBER storage.
+     -----------------------------------------------------------------------*/
+    if (exp_byte == 0xFF && len >= 3 && buf[1] == 0xFE) {
+        /* Continuation marker: re-interpret byte 2 as actual exponent,
+           remaining bytes as standard mantissa */
+        exp_byte = buf[2];
+        buf += 2;
+        len -= 2;
+        if (len < 2) {
+            out[0] = '0';
+            out[1] = '\0';
+            return ODV_OK;
+        }
+    }
+
     int_len = 0;
     frac_len = 0;
     leading_frac_zeros = 0;
@@ -238,10 +256,19 @@ int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_s
 
     out[pos] = '\0';
 
-    /* Edge case: if result is just "-0", return "0" */
-    if (pos == 2 && out[0] == '-' && out[1] == '0') {
-        out[0] = '0';
-        out[1] = '\0';
+    /* Normalize negative zero variants: "-0", "-0.0", "-0.00" etc. → "0"
+       A negative number whose digits all resolved to zero should not
+       carry the sign. Check if the string matches -0[.0*] */
+    if (out[0] == '-' && out[1] == '0') {
+        int all_zero = 1;
+        int k;
+        for (k = 2; k < pos; k++) {
+            if (out[k] != '.' && out[k] != '0') { all_zero = 0; break; }
+        }
+        if (all_zero) {
+            out[0] = '0';
+            out[1] = '\0';
+        }
     }
 
     return ODV_OK;
