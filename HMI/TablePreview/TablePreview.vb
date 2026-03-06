@@ -29,6 +29,7 @@ Imports System.Collections.Generic
 ''' preview.ShowDialog()
 ''' </summary>
 Public Class TablePreview
+    Implements ILocalizable
 
 #Region "フィールド・コンストラクタ"
 
@@ -108,11 +109,14 @@ Public Class TablePreview
         Next
 
         ' フォームタイトルを設定
-        Me.Text = $"テーブルデータプレビュー - {tableName}"
+        Me.Text = Loc.SF("Preview_FormTitle", tableName)
 
         ' 検索条件を初期化
         _currentSearchCondition = Nothing
         _lastSearchCondition = Nothing
+
+        ' ローカライズ適用
+        ApplyLocalization()
     End Sub
 
 #End Region
@@ -594,8 +598,8 @@ Public Class TablePreview
         dataGridViewData.Invalidate()
 
         ' UI 要素を更新
-        labelPageInfo.Text = $"ページ: {_currentPage}/{totalPages}"
-        labelRowCount.Text = $"合計行数: {_tableData.Count} (表示行数: {_filteredData.Count})"
+        labelPageInfo.Text = Loc.SF("Preview_PageInfoLabel", _currentPage, totalPages)
+        labelRowCount.Text = Loc.SF("Preview_RowCountLabel", _tableData.Count, _filteredData.Count)
 
         ' ナビゲーションボタンの有効/無効を制御
         buttonPrev.Enabled = _currentPage > 1
@@ -671,6 +675,19 @@ Public Class TablePreview
         End If
     End Sub
 
+#End Region
+
+#Region "ローカライズ"
+    Public Sub ApplyLocalization() Implements ILocalizable.ApplyLocalization
+        labelSearch.Text = Loc.S("Preview_SearchValueLabel")
+        labelColumns.Text = Loc.S("Preview_ColumnNameLabel")
+        buttonSearch.Text = Loc.S("Button_Search")
+        buttonReset.Text = Loc.S("Button_Reset")
+        buttonAdvancedSearch.Text = Loc.S("Button_AdvancedSearch")
+        labelPageSize.Text = Loc.S("Preview_PageSizeLabel")
+        buttonPrev.Text = Loc.S("Button_Previous")
+        buttonNext.Text = Loc.S("Button_Next")
+    End Sub
 #End Region
 
 End Class

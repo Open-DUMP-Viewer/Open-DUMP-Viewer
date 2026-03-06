@@ -74,6 +74,19 @@ Public Class SearchConditionRow
             columnCombo.SelectedIndex = 0
         End If
 
+        ' 演算子コンボボックスをローカライズ済みテキストで再設定
+        operatorCombo.Items.Clear()
+        operatorCombo.Items.AddRange(New Object() {
+            Loc.S("Operator_Contains"), Loc.S("Operator_NotContains"),
+            Loc.S("Operator_Equals"), Loc.S("Operator_NotEquals"),
+            Loc.S("Operator_StartsWith"), Loc.S("Operator_EndsWith"),
+            ">", "<", ">=", "<=", "Null", "Not Null"})
+        operatorCombo.SelectedIndex = 0
+
+        ' チェックボックス・ボタンをローカライズ
+        caseSensitiveCheckBox.Text = Loc.S("Search_CaseSensitive")
+        btnDelete.Text = Loc.S("Button_Delete")
+
         ' 列が変更されたときに検索値をクリアするイベントハンドラーを追加
         ' 異なる列に変更した際に、前の列の値が残らないようにするため
         AddHandler columnCombo.SelectedIndexChanged, AddressOf ColumnCombo_SelectedIndexChanged

@@ -30,6 +30,7 @@ Imports System.Collections.Generic
 ''' </summary>
 
 Public Class AdvancedSearchForm
+    Implements ILocalizable
 
 #Region "フィールド・プロパティ"
 
@@ -87,6 +88,9 @@ Public Class AdvancedSearchForm
         ' これにより、デザイナーの定義を保持しながら、フォーム上には表示されない
         Me.Controls.Remove(templateConditionRow)
         Me.Controls.Remove(templateLogicalPanel)
+
+        ' ローカライズ適用
+        ApplyLocalization()
     End Sub
 #End Region
 
@@ -219,7 +223,7 @@ Public Class AdvancedSearchForm
 
         ' ラベルを作成（"条件:"）
         Dim logicalLabel As New Label()
-        logicalLabel.Text = "条件:"
+        logicalLabel.Text = Loc.S("AdvSearch_ConditionLabel")
         logicalLabel.Location = New Point(10, 8)
         logicalLabel.Width = 60
 
@@ -246,7 +250,7 @@ Public Class AdvancedSearchForm
     Private Sub RemoveSearchConditionRow(row As SearchConditionRow)
         ' 最低1つの条件は必要なため、条件数が1以下の場合は中止
         If _conditionRows.Count <= 1 Then
-            MessageBox.Show("最低1つの条件は必要です。", "警告", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show(Loc.S("AdvSearch_MinCondition"), Loc.S("Title_Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
 
@@ -301,7 +305,7 @@ Public Class AdvancedSearchForm
         For Each row In _conditionRows
             If Not row.IsValid() Then
                 ' 無効な条件がある場合はエラーメッセージを表示
-                MessageBox.Show("すべての条件を正しく入力してください。", "入力エラー", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                MessageBox.Show(Loc.S("AdvSearch_InvalidConditions"), Loc.S("Title_InputError"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 Return
             End If
         Next
@@ -453,6 +457,16 @@ Public Class AdvancedSearchForm
         End Select
     End Function
 
+#End Region
+
+#Region "ローカライズ"
+    Public Sub ApplyLocalization() Implements ILocalizable.ApplyLocalization
+        Me.Text = Loc.S("AdvSearch_FormTitle")
+        buttonAdd.Text = Loc.S("Button_AddCondition")
+        buttonClear.Text = Loc.S("Button_Clear")
+        buttonSearch.Text = Loc.S("Button_Search")
+        buttonCancel.Text = Loc.S("Button_Cancel")
+    End Sub
 #End Region
 
 End Class
