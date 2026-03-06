@@ -3,6 +3,7 @@ Imports System.ComponentModel
 
 Public Class Workspace
     Inherits Form
+    Implements ILocalizable
 
 #Region "フィールド・コンストラクタ"
     <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
@@ -28,8 +29,27 @@ Public Class Workspace
     ' 引数ありコンストラクタ
     Public Sub New(value1 As String, value2 As String)
         InitializeComponent()
+        ApplyLocalization()
         DumpFilePath = value1
         WorkspacePath = value2
+    End Sub
+#End Region
+
+#Region "ローカライズ"
+    Public Sub ApplyLocalization() Implements ILocalizable.ApplyLocalization
+        ' ListView 列ヘッダー
+        lstTableList.Columns(0).Text = Loc.S("Workspace_Column_Name")
+        lstTableList.Columns(1).Text = Loc.S("Workspace_Column_Owner")
+        lstTableList.Columns(2).Text = Loc.S("Workspace_Column_Type")
+        lstTableList.Columns(3).Text = Loc.S("Workspace_Column_RowCount")
+
+        ' コンテキストメニュー
+        mnuExclude.Text = Loc.S("Workspace_ContextMenu_Exclude")
+        mnuInvertExclusion.Text = Loc.S("Workspace_ContextMenu_InvertSelection")
+        mnuRestoreAll.Text = Loc.S("Workspace_ContextMenu_RestoreAll")
+
+        ' 検索ボタン
+        btnTableSearch.Text = Loc.S("Button_Search")
     End Sub
 #End Region
 
@@ -131,7 +151,7 @@ Public Class Workspace
     ''' </summary>
     Public Async Sub OpenSelectedTable()
         If lstTableList.SelectedItems.Count = 0 Then
-            MessageBox.Show("テーブルが選択されていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Loc.S("Workspace_TableNotSelected"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
 
@@ -140,7 +160,7 @@ Public Class Workspace
             Dim tableName As String = selectedItem.Text
 
             If String.IsNullOrEmpty(_currentSchema) Then
-                MessageBox.Show("スキーマが選択されていません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MessageBox.Show(Loc.S("Workspace_SchemaNotSelected"), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
@@ -166,7 +186,7 @@ Public Class Workspace
             End If
 
             If columnNames.Count = 0 Then
-                MessageBox.Show("テーブルに列情報がありません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                MessageBox.Show(Loc.S("Workspace_NoColumnInfo"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
                 Return
             End If
 
@@ -183,7 +203,7 @@ Public Class Workspace
                                                tableName, _currentSchema, columnTypes)
 
         Catch ex As Exception
-            MessageBox.Show($"テーブル表示エラー: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Workspace_TableDisplayError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 #End Region
@@ -195,7 +215,7 @@ Public Class Workspace
     ''' </summary>
     Public Sub ShowTableProperty()
         If lstTableList.SelectedItems.Count = 0 Then
-            MessageBox.Show("テーブルが選択されていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Loc.S("Workspace_TableNotSelected"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
 
@@ -203,7 +223,7 @@ Public Class Workspace
         Dim tableName As String = selectedItem.Text
 
         If String.IsNullOrEmpty(_currentSchema) Then
-            MessageBox.Show("スキーマが選択されていません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.S("Workspace_SchemaNotSelected"), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
         End If
 
@@ -239,7 +259,7 @@ Public Class Workspace
     ''' </summary>
     Public Sub ExcludeSelectedTable()
         If lstTableList.SelectedItems.Count = 0 Then
-            MessageBox.Show("テーブルが選択されていません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Loc.S("Workspace_TableNotSelected"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
         If String.IsNullOrEmpty(_currentSchema) Then Return
@@ -473,7 +493,7 @@ Public Class Workspace
         treeDBList.Nodes.Clear()
 
         If _tableList Is Nothing OrElse _tableList.Count = 0 Then
-            MessageBox.Show("データベースのスキーマが見つかりません。", "情報", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Loc.S("Workspace_NoSchema"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
             Return
         End If
 
@@ -504,7 +524,7 @@ Public Class Workspace
             End If
 
         Catch ex As Exception
-            MessageBox.Show($"スキーマツリーの作成に失敗しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Workspace_SchemaTreeError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
@@ -513,10 +533,10 @@ Public Class Workspace
     ''' </summary>
     Public Sub ExportTableListReport(outputPath As String)
         Using sw As New System.IO.StreamWriter(outputPath, False, System.Text.Encoding.UTF8)
-            sw.WriteLine($"オブジェクト一覧レポート: {System.IO.Path.GetFileName(DumpFilePath)}")
-            sw.WriteLine($"出力日時: {DateTime.Now:yyyy/MM/dd HH:mm:ss}")
+            sw.WriteLine(Loc.SF("Report_ObjectList_Title", System.IO.Path.GetFileName(DumpFilePath)))
+            sw.WriteLine(Loc.SF("Report_OutputDate", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")))
             sw.WriteLine(New String("-"c, 80))
-            sw.WriteLine($"{"スキーマ",-20} {"テーブル名",-30} {"行数",10}")
+            sw.WriteLine($"{Loc.S("Report_Column_Schema"),-20} {Loc.S("Report_Column_TableName"),-30} {Loc.S("Report_Column_RowCount"),10}")
             sw.WriteLine(New String("-"c, 80))
             For Each schemaKvp In _tableList
                 For Each t In schemaKvp.Value
@@ -532,21 +552,21 @@ Public Class Workspace
     Public Sub ExportTableDefinitionReport(outputPath As String)
         If lstTableList.SelectedItems.Count = 0 OrElse String.IsNullOrEmpty(_currentSchema) Then Return
         Using sw As New System.IO.StreamWriter(outputPath, False, System.Text.Encoding.UTF8)
-            sw.WriteLine($"テーブル定義レポート: {System.IO.Path.GetFileName(DumpFilePath)}")
-            sw.WriteLine($"出力日時: {DateTime.Now:yyyy/MM/dd HH:mm:ss}")
+            sw.WriteLine(Loc.SF("Report_TableDef_Title", System.IO.Path.GetFileName(DumpFilePath)))
+            sw.WriteLine(Loc.SF("Report_OutputDate", DateTime.Now.ToString("yyyy/MM/dd HH:mm:ss")))
             For Each selectedItem As ListViewItem In lstTableList.SelectedItems
                 Dim tableName = selectedItem.Text
                 Dim tableKey = $"{_currentSchema}.{tableName}"
                 sw.WriteLine()
                 sw.WriteLine(New String("="c, 60))
-                sw.WriteLine($"テーブル: {_currentSchema}.{tableName}")
+                sw.WriteLine(Loc.SF("Report_Table", $"{_currentSchema}.{tableName}"))
                 sw.WriteLine(New String("="c, 60))
                 Dim colNames As String() = Nothing
                 Dim colTypes As String() = Nothing
                 If _columnNamesMap.ContainsKey(tableKey) Then colNames = _columnNamesMap(tableKey)
                 If _columnTypesMap.ContainsKey(tableKey) Then colTypes = _columnTypesMap(tableKey)
                 If colNames IsNot Nothing Then
-                    sw.WriteLine($"{"#",4} {"カラム名",-30} {"型",-30}")
+                    sw.WriteLine($"{Loc.S("Report_Column_Number"),4} {Loc.S("Report_Column_ColumnName"),-30} {Loc.S("Report_Column_ColumnType"),-30}")
                     sw.WriteLine(New String("-"c, 60))
                     For i = 0 To colNames.Length - 1
                         Dim typeName = If(colTypes IsNot Nothing AndAlso i < colTypes.Length, colTypes(i), "")
@@ -567,7 +587,7 @@ Public Class Workspace
         End If
 
         If Not _tableList.ContainsKey(schemaName) Then
-            MessageBox.Show($"スキーマ '{schemaName}' が見つかりません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Workspace_SchemaNotFound", schemaName), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return
         End If
 
@@ -615,7 +635,7 @@ Public Class Workspace
             End Try
 
         Catch ex As Exception
-            MessageBox.Show($"テーブル一覧の表示に失敗しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Workspace_TableListError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 #End Region
