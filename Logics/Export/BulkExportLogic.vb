@@ -111,7 +111,7 @@ Public Class BulkExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"Excel 一括エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("BulkExcelExport_Error", ex.Message), ex)
         End Try
     End Function
 

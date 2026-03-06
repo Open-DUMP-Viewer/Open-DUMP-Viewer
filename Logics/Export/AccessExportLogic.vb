@@ -25,9 +25,7 @@ Public Class AccessExportLogic
         Try
             ' ACE ドライバチェック
             If Not IsAceDriverAvailable() Then
-                Throw New Exception("Microsoft Access Database Engine がインストールされていません。" & vbCrLf & vbCrLf &
-                                    "以下からダウンロードしてインストールしてください:" & vbCrLf &
-                                    "https://www.microsoft.com/ja-jp/download/details.aspx?id=54920")
+                Throw New Exception(Loc.S("AccessExport_AceNotInstalled"))
             End If
 
             ' 既存ファイルを削除 (新規作成のため)
@@ -94,7 +92,7 @@ Public Class AccessExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"Access エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("AccessExport_Error", ex.Message), ex)
         End Try
     End Function
 
@@ -121,7 +119,7 @@ Public Class AccessExportLogic
     Private Shared Sub CreateEmptyDatabase(connStr As String)
         Dim catType = Type.GetTypeFromProgID("ADOX.Catalog")
         If catType Is Nothing Then
-            Throw New Exception("ADOX.Catalog が利用できません。Microsoft Access Database Engine をインストールしてください。")
+            Throw New Exception(Loc.S("AccessExport_AdoxUnavailable"))
         End If
 
         Dim cat = Activator.CreateInstance(catType)

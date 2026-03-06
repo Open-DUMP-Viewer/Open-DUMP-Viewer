@@ -17,7 +17,7 @@ Public Class TablePreviewLogic
         Try
             ' 列名リストが空の場合はエラーダイアログを表示して終了
             If columnNames Is Nothing OrElse columnNames.Count = 0 Then
-                MessageBox.Show("列情報がありません。", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                MessageBox.Show(Loc.S("TablePreview_NoColumns"), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
                 Return
             End If
 
@@ -33,7 +33,7 @@ Public Class TablePreviewLogic
 
         Catch ex As Exception
             ' 例外発生時はエラーダイアログを表示
-            MessageBox.Show("データ表示中にエラーが発生しました: " & ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("TablePreview_DisplayError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 

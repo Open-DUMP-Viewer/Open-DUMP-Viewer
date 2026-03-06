@@ -32,7 +32,7 @@ Public Class ExcelExportLogic
 
             ' Excel 行上限チェック (ヘッダ1行 + データ行)
             If totalRows + 1 > EXCEL_MAX_ROWS Then
-                Throw New Exception($"データ行数 ({totalRows:#,0}) が Excel の上限 ({EXCEL_MAX_ROWS:#,0}) を超えています。CSV 出力をお勧めします。")
+                Throw New Exception(Loc.SF("ExcelExport_RowLimitExceeded", $"{totalRows:#,0}", $"{EXCEL_MAX_ROWS:#,0}"))
             End If
 
             Using wb As New XLWorkbook()
@@ -79,7 +79,7 @@ Public Class ExcelExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"Excel エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("ExcelExport_Error", ex.Message), ex)
         End Try
     End Function
 

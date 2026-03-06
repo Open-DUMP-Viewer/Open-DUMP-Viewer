@@ -79,7 +79,7 @@ Public Class SqlServerExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"SQL Server エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("SqlServerExport_Error", ex.Message), ex)
         End Try
     End Function
 

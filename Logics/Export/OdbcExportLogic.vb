@@ -75,7 +75,7 @@ Public Class OdbcExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"ODBC エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("OdbcExport_Error", ex.Message), ex)
         End Try
     End Function
 

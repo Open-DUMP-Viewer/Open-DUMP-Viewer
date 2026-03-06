@@ -19,7 +19,7 @@ Public Class SqlExportLogic
         Dim rc = OraDB_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType,
                                                ctx.Schema, ctx.DataOffset)
         If rc <> OraDB_NativeParser.ODV_OK Then
-            Throw New Exception($"SQL エクスポートエラー (rc={rc})")
+            Throw New Exception(Loc.SF("SqlExport_ErrorRc", rc))
         End If
         Return True
     End Function
@@ -92,7 +92,7 @@ Public Class SqlExportLogic
             Return True
 
         Catch ex As Exception
-            Throw New Exception($"SQL エクスポートエラー: {ex.Message}", ex)
+            Throw New Exception(Loc.SF("SqlExport_Error", ex.Message), ex)
         End Try
     End Function
 

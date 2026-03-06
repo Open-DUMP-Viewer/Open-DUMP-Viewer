@@ -417,8 +417,23 @@ Continue?</value></data>
   <data name="DbConn_EnterServerAndDb" xml:space="preserve"><value>Please enter server name and database name.</value></data>
   <data name="DbConn_EnterDsnOrConnStr" xml:space="preserve"><value>Please select a DSN or enter a connection string.</value></data>
 
-  <!-- ========== CSV Export Error ========== -->
+  <!-- ========== Export Logic Errors ========== -->
   <data name="CsvExport_Error" xml:space="preserve"><value>CSV export error: {0}</value></data>
   <data name="CsvExport_ErrorRc" xml:space="preserve"><value>CSV export error (rc={0})</value></data>
+  <data name="SqlExport_Error" xml:space="preserve"><value>SQL export error: {0}</value></data>
+  <data name="SqlExport_ErrorRc" xml:space="preserve"><value>SQL export error (rc={0})</value></data>
+  <data name="ExcelExport_Error" xml:space="preserve"><value>Excel export error: {0}</value></data>
+  <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Row count ({0}) exceeds Excel limit ({1}). Consider using CSV export instead.</value></data>
+  <data name="AccessExport_Error" xml:space="preserve"><value>Access export error: {0}</value></data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine is not installed.
+
+Please download and install it from:
+https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
+  <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog is not available. Please install Microsoft Access Database Engine.</value></data>
+  <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server export error: {0}</value></data>
+  <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC export error: {0}</value></data>
+  <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel bulk export error: {0}</value></data>
+  <data name="TablePreview_NoColumns" xml:space="preserve"><value>No column information available.</value></data>
+  <data name="TablePreview_DisplayError" xml:space="preserve"><value>An error occurred while displaying data: {0}</value></data>
 
 </root>
