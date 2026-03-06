@@ -57,9 +57,9 @@
         'ライセンス認証状態に応じてステータスラベルを更新
         Dim holder As String = LICENSE.GetLicenseHolder()
         If String.IsNullOrEmpty(holder) Then
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = "OraDB DUMP Viewer - ライセンス未認証"
+            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.S("Status_Unlicensed")
         Else
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = $"OraDB DUMP Viewer - {holder}"
+            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.SF("Status_Licensed", holder)
         End If
         Application.DoEvents() ' UIの更新を強制
     End Sub
@@ -124,22 +124,21 @@
             If pct > 0 AndAlso pct < 100 Then
                 Dim estimatedTotal As TimeSpan = TimeSpan.FromTicks(CLng(elapsed.Ticks * 100.0 / pct))
                 Dim remaining As TimeSpan = estimatedTotal - elapsed
-                remainingStr = $" | 残り: {FormatTimeSpan(remaining)}"
+                remainingStr = Loc.SF("Status_Remaining", FormatTimeSpan(remaining))
             End If
 
             Dim msg As String
             If rowsProcessed = 0 Then
                 ' DDLスキャン中（まだレコードが見つかっていない）
                 If String.IsNullOrEmpty(currentTable) Then
-                    msg = $"テーブル検索中... ({pct}%) | 経過: {FormatTimeSpan(elapsed)}{remainingStr}"
+                    msg = Loc.SF("Status_SearchingTables", pct, FormatTimeSpan(elapsed), remainingStr)
                 Else
-                    msg = $"テーブル検索中... ({pct}%) | {currentTable} | 経過: {FormatTimeSpan(elapsed)}{remainingStr}"
+                    msg = Loc.SF("Status_SearchingTablesWithName", pct, currentTable, FormatTimeSpan(elapsed), remainingStr)
                 End If
             Else
                 ' レコード読み取り中
                 Dim speed As Double = If(elapsed.TotalSeconds > 0, rowsProcessed / elapsed.TotalSeconds, 0)
-                msg = $"処理中... {rowsProcessed:N0}行 ({pct}%) | {currentTable} | " &
-                      $"経過: {FormatTimeSpan(elapsed)}{remainingStr} | {speed:N0}行/秒"
+                msg = Loc.SF("Status_Processing", $"{rowsProcessed:N0}", pct, currentTable, FormatTimeSpan(elapsed), remainingStr, $"{speed:N0}")
             End If
 
             COMMON.Set_StatusLavel(msg)
@@ -170,11 +169,11 @@
             If pct > 0 AndAlso pct < 100 Then
                 Dim estimatedTotal As TimeSpan = TimeSpan.FromTicks(CLng(elapsed.Ticks * 100.0 / pct))
                 Dim remaining As TimeSpan = estimatedTotal - elapsed
-                remainingStr = $" | 残り: {FormatTimeSpan(remaining)}"
+                remainingStr = Loc.SF("Status_Remaining", FormatTimeSpan(remaining))
             End If
 
             Dim tableStr As String = If(String.IsNullOrEmpty(currentTable), "", $" | {currentTable}")
-            Dim msg = $"テーブル一覧取得中... {tableCount}テーブル ({pct}%){tableStr} | 経過: {FormatTimeSpan(elapsed)}{remainingStr}"
+            Dim msg = Loc.SF("Status_ListingTables", tableCount, pct, tableStr, FormatTimeSpan(elapsed), remainingStr)
 
             COMMON.Set_StatusLavel(msg)
 
@@ -233,14 +232,14 @@
             Dim remainingStr As String = FormatTimeSpan(estimatedRemainingTime)
 
             ' ステータスメッセージを組み立て
-            Dim message As String = $"処理中... {currentLine:N0}/{totalLines:N0}行 ({completionPercentage:P1}) | " &
-                                   $"経過: {elapsedStr} | 残り: {remainingStr} | " &
-                                   $"速度: {linesPerSecond:N0}行/秒 | 完了予定: {estimatedCompletionTime:HH:mm:ss}"
+            Dim message As String = Loc.SF("Status_ProcessingFull",
+                                          $"{currentLine:N0}", $"{totalLines:N0}", $"{completionPercentage:P1}",
+                                          elapsedStr, remainingStr, $"{linesPerSecond:N0}", $"{estimatedCompletionTime:HH:mm:ss}")
 
             Return message
 
         Catch ex As Exception
-            Return $"処理中... {currentLine:N0}行目"
+            Return Loc.SF("Status_ProcessingSimple", $"{currentLine:N0}")
         End Try
     End Function
 
@@ -250,16 +249,16 @@
     Private Shared Function FormatTimeSpan(timeSpan As TimeSpan) As String
         Try
             If timeSpan.TotalDays >= 1 Then
-                Return $"{timeSpan.Days}日{timeSpan.Hours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}"
+                Return Loc.SF("Time_DayFormat", timeSpan.Days, $"{timeSpan.Hours:D2}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}")
             ElseIf timeSpan.TotalHours >= 1 Then
                 Return $"{timeSpan.Hours}:{timeSpan.Minutes:D2}:{timeSpan.Seconds:D2}"
             ElseIf timeSpan.TotalMinutes >= 1 Then
                 Return $"{timeSpan.Minutes}:{timeSpan.Seconds:D2}"
             Else
-                Return $"{timeSpan.Seconds}秒"
+                Return Loc.SF("Time_SecondFormat", timeSpan.Seconds)
             End If
         Catch
-            Return "計算中..."
+            Return Loc.S("Status_Calculating")
         End Try
     End Function
 #End Region

@@ -46,20 +46,19 @@ Public Class AnalyzeLogic
                     totalRows += table.Value.Count
                 Next
             Next
-            COMMON.Set_StatusLavel_AutoReset($"解析完了: {totalTables}テーブル, {totalRows:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_AnalysisComplete", totalTables, $"{totalRows:#,0}", $"{elapsed.TotalSeconds:F1}"))
 
             Return result
 
         Catch ex As DllNotFoundException
-            MessageBox.Show($"解析DLLが見つかりません: {ex.Message}" & vbCrLf &
-                           "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
-                           "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_DllNotFound", ex.Message),
+                           Loc.S("Title_DllError"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New Dictionary(Of String, Dictionary(Of String, List(Of String())))()
 
         Catch ex As Exception
-            MessageBox.Show($"ダンプファイル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_ParseError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New Dictionary(Of String, Dictionary(Of String, List(Of String())))()
@@ -79,27 +78,26 @@ Public Class AnalyzeLogic
             ValidateFilePath(filePath)
 
             COMMON.SetProgressBarMarquee()
-            COMMON.Set_StatusLavel("テーブル一覧を取得中...")
+            COMMON.Set_StatusLavel(Loc.S("Status_GettingTableList"))
 
             Dim startTime As DateTime = DateTime.Now
             Dim tables = OraDB_NativeParser.ListTables(filePath, columnNamesMap, columnTypesMap)
             Dim elapsed As TimeSpan = DateTime.Now - startTime
 
             COMMON.ResetProgressBar()
-            COMMON.Set_StatusLavel_AutoReset($"テーブル一覧取得完了: {tables.Count}テーブル ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableListComplete", tables.Count, $"{elapsed.TotalSeconds:F1}"))
 
             Return tables
 
         Catch ex As DllNotFoundException
-            MessageBox.Show($"解析DLLが見つかりません: {ex.Message}" & vbCrLf &
-                           "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
-                           "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_DllNotFound", ex.Message),
+                           Loc.S("Title_DllError"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of Tuple(Of String, String, Integer, Long, Long))()
 
         Catch ex As Exception
-            MessageBox.Show($"テーブル一覧取得中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_TableListError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of Tuple(Of String, String, Integer, Long, Long))()
@@ -135,23 +133,22 @@ Public Class AnalyzeLogic
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
                 Dim rows = result(schemaName)(tableName)
-                COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+                COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableAnalysisComplete", schemaName, tableName, $"{rows.Count:#,0}", $"{elapsed.TotalSeconds:F1}"))
                 Return rows
             End If
 
-            COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableAnalysisComplete", schemaName, tableName, "0", $"{elapsed.TotalSeconds:F1}"))
             Return New List(Of String())()
 
         Catch ex As DllNotFoundException
-            MessageBox.Show($"解析DLLが見つかりません: {ex.Message}" & vbCrLf &
-                           "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
-                           "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_DllNotFound", ex.Message),
+                           Loc.S("Title_DllError"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
 
         Catch ex As Exception
-            MessageBox.Show($"テーブル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_TableError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
@@ -192,23 +189,22 @@ Public Class AnalyzeLogic
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
                 Dim rows = result(schemaName)(tableName)
-                COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} {rows.Count:#,0}行 ({elapsed.TotalSeconds:F1}秒)")
+                COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableAnalysisComplete", schemaName, tableName, $"{rows.Count:#,0}", $"{elapsed.TotalSeconds:F1}"))
                 Return rows
             End If
 
-            COMMON.Set_StatusLavel_AutoReset($"解析完了: {schemaName}.{tableName} 0行 ({elapsed.TotalSeconds:F1}秒)")
+            COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableAnalysisComplete", schemaName, tableName, "0", $"{elapsed.TotalSeconds:F1}"))
             Return New List(Of String())()
 
         Catch ex As DllNotFoundException
-            MessageBox.Show($"解析DLLが見つかりません: {ex.Message}" & vbCrLf &
-                           "OraDB_DumpParser.dll が実行ファイルと同じフォルダにあることを確認してください。",
-                           "DLLエラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_DllNotFound", ex.Message),
+                           Loc.S("Title_DllError"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
 
         Catch ex As Exception
-            MessageBox.Show($"テーブル解析中にエラーが発生しました: {ex.Message}", "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            MessageBox.Show(Loc.SF("Analyze_TableError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
             Return New List(Of String())()
@@ -220,15 +216,15 @@ Public Class AnalyzeLogic
     ''' </summary>
     Private Shared Sub ValidateFilePath(filePath As String)
         If String.IsNullOrEmpty(filePath) Then
-            Throw New ArgumentException("ファイルパスが指定されていません。")
+            Throw New ArgumentException(Loc.S("Analyze_FilePathEmpty"))
         End If
 
         If Not File.Exists(filePath) Then
-            Throw New FileNotFoundException($"ファイルが見つかりません: {filePath}")
+            Throw New FileNotFoundException(Loc.SF("Analyze_FileNotFound", filePath))
         End If
 
         If Not filePath.EndsWith(".dmp", StringComparison.OrdinalIgnoreCase) Then
-            Throw New ArgumentException("ファイルは.dmp形式である必要があります。")
+            Throw New ArgumentException(Loc.S("Analyze_InvalidFormat"))
         End If
     End Sub
 
