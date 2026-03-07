@@ -381,6 +381,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     int over255_count = 0;
     int record_count = 0;
     int is_between_record = 0; /* 0=before first record, 1=after at least one record header */
+    int seg_remaining = -1;   /* bytes left in current 3c-segment (-1 = no limit) */
     int non_lob_cols;
     int rc;
     char decode_buf[ODV_VARCHAR_LEN + 4];
@@ -402,6 +403,29 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     }
 
     while (!s->cancelled) {
+        /* Segment boundary check: Oracle omits trailing NULL columns.
+         * When a 3c-segment is exhausted (seg_remaining==0) while we are
+         * still in step 2, treat every unread column as NULL and deliver
+         * the record.  The next byte belongs to the following segment. */
+        if (step == 2 && seg_remaining == 0 && data_step == 0) {
+            while (col_idx < non_lob_cols) {
+                if (col_idx < s->table.col_count)
+                    set_value_null(&s->record.values[col_idx]);
+                col_idx++;
+            }
+            s->record.col_count = col_idx;
+            if (!list_only) {
+                rc = deliver_row(s);
+                if (rc != ODV_OK) return rc;
+                odv_report_progress(s, fp);
+            }
+            record_count++;
+            s->table.record_count++;
+            step = 1;
+            seg_remaining = -1;
+            continue; /* next byte is the start of a new segment or padding */
+        }
+
         /* Refill buffer if needed */
         if (buf_pos >= buf_len) {
             buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
@@ -414,6 +438,10 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
         }
 
         unsigned char b = buf[buf_pos++];
+
+        /* Track bytes consumed inside a 3c segment */
+        if (step == 2 && seg_remaining > 0)
+            seg_remaining--;
 
         if (step == 1) {
             /* Expecting record header byte */
@@ -460,19 +488,30 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             case 0x3c: {
                 /* DataPump segment wrapper: 3c 00 NN
                  * NN = total segment length (including 3-byte header).
-                 * Skip the following 2 bytes and stay in step 1 so the
-                 * next byte (the real record header, e.g. 0x04) is processed
-                 * normally. */
-                int _skip;
-                for (_skip = 0; _skip < 2; _skip++) {
-                    if (buf_pos >= buf_len) {
-                        buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                        if (buf_len <= 0) return ODV_OK;
-                        buf_pos = 0;
-                        *address += buf_len;
-                    }
-                    buf_pos++;
+                 * The actual column data is (NN - 4) bytes:
+                 *   NN - 3 (header) - 1 (record header byte that follows).
+                 * Track this in seg_remaining so that trailing NULL columns
+                 * (which Oracle omits) are handled correctly. */
+                unsigned char _nn = 0;
+                /* skip the 0x00 byte */
+                if (buf_pos >= buf_len) {
+                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (buf_len <= 0) return ODV_OK;
+                    buf_pos = 0;
+                    *address += buf_len;
                 }
+                buf_pos++;
+                /* read NN */
+                if (buf_pos >= buf_len) {
+                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (buf_len <= 0) return ODV_OK;
+                    buf_pos = 0;
+                    *address += buf_len;
+                }
+                _nn = buf[buf_pos++];
+                /* column data bytes = NN - 3 (header) - 1 (record hdr) */
+                seg_remaining = (int)_nn - 4;
+                if (seg_remaining < 0) seg_remaining = 0;
                 /* step stays 1 — next byte is the real record header */
                 break;
             }
