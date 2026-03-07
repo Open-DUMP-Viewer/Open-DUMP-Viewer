@@ -83,23 +83,26 @@ static void ddl_xml_callback(const char *tag, const char *value,
 
     if (!tag || !tag[0]) return;
 
-    /* Opening tags */
+    /* Tags with empty value: could be opening OR closing (whitespace-only
+       content is trimmed to ""). Use state to distinguish:
+       - COL_LIST_ITEM: if in_col_list==0 → opening; if in_col_list==1 → closing
+       - ROW: always fall through to bottom for save/reset logic
+       - Others: treat as opening (no-op) */
     if (value[0] == '\0') {
         if (strcmp(tag, "COL_LIST_ITEM") == 0) {
-            dc->in_col_list = 1;
-            /* Prepare next column slot */
-            if (dc->col_idx < ODV_MAX_COLUMNS) {
-                memset(&s->table.columns[dc->col_idx], 0, sizeof(ODV_COLUMN));
+            if (!dc->in_col_list) {
+                /* Opening: prepare next column slot */
+                dc->in_col_list = 1;
+                if (dc->col_idx < ODV_MAX_COLUMNS) {
+                    memset(&s->table.columns[dc->col_idx], 0, sizeof(ODV_COLUMN));
+                }
+                return;
             }
-        } else if (strcmp(tag, "ROW") == 0) {
-            /* Reset for new table definition */
-            dc->col_idx = 0;
-            dc->in_col_list = 0;
-            dc->property = 0;
-            dc->cur_schema[0] = '\0';
-            dc->cur_table[0] = '\0';
+            /* Closing: fall through to column finalization at bottom */
+        } else if (strcmp(tag, "ROW") != 0) {
+            return;
         }
-        return;
+        /* ROW and COL_LIST_ITEM closing fall through */
     }
 
     /* Closing tags with values */
@@ -219,30 +222,52 @@ static void ddl_xml_callback(const char *tag, const char *value,
         }
     }
 
-    /* End of ROW = end of table definition */
+    /* ROW tag: save accumulated table info, then reset for next table.
+       Both <ROW> (opening) and </ROW> (closing with empty value) arrive here.
+       On first <ROW>, cur_table is empty so nothing is saved — just reset.
+       On </ROW>, accumulated table info is saved before reset. */
     if (strcmp(tag, "ROW") == 0) {
         if (dc->cur_table[0] != '\0') {
             odv_strcpy(s->table.schema, dc->cur_schema, ODV_OBJNAME_LEN);
             odv_strcpy(s->table.name, dc->cur_table, ODV_OBJNAME_LEN);
             s->table.col_count = dc->col_idx;
         }
+        dc->col_idx = 0;
+        dc->in_col_list = 0;
+        dc->property = 0;
+        dc->cur_schema[0] = '\0';
+        dc->cur_table[0] = '\0';
     }
 }
 
 /*---------------------------------------------------------------------------
-    Check if a table is the EXPDP dictionary table (system metadata)
-    Dictionary tables have columns like: SCN, SEED, OPERATION, etc.
+    Check if a table is an EXPDP system table (should be skipped).
+    Matches:
+      1. DataPump master table (SCN, SEED, OPERATION, etc.)
+      2. System tables (SYS_EXPORT_*, SYS_IMPORT_*, IMPDP_*)
+      3. Tables owned by SYS (system statistics tables)
  ---------------------------------------------------------------------------*/
-static int is_dictionary_table(ODV_TABLE *t)
+static int is_system_table(ODV_TABLE *t, const char *schema)
 {
-    int i, match = 0;
+    int i, match;
     static const char *dict_cols[] = {
         "SCN", "SEED", "OPERATION", "BASE_OBJECT_NAME",
-        "BASE_OBJECT_SCHEMA", "COMPLETED_ROWS", "PROCESS_ORDER", NULL
+        "BASE_OBJECT_SCHEMA", "BASE_OBJECT_TYPE", "PARTITION_NAME",
+        "SUBPARTITION_NAME", "COMPLETED_ROWS", "PROCESS_ORDER", NULL
     };
 
-    if (t->col_count < 5) return 0;
+    /* Skip SYS-owned tables */
+    if (schema[0] && _stricmp(schema, "SYS") == 0) return 1;
 
+    /* Skip DataPump job tables */
+    if (_strnicmp(t->name, "SYS_EXPORT_", 11) == 0) return 1;
+    if (_strnicmp(t->name, "SYS_IMPORT_", 11) == 0) return 1;
+    if (_strnicmp(t->name, "IMPDP_", 6) == 0) return 1;
+
+    /* Dictionary table check: 10 specific columns */
+    if (t->col_count < 10) return 0;
+
+    match = 0;
     for (i = 0; dict_cols[i]; i++) {
         int j;
         for (j = 0; j < t->col_count; j++) {
@@ -252,7 +277,7 @@ static int is_dictionary_table(ODV_TABLE *t)
             }
         }
     }
-    return (match >= 5);
+    return (match >= 10);
 }
 
 /*---------------------------------------------------------------------------
@@ -355,6 +380,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     int is_over255 = 0;
     int over255_count = 0;
     int record_count = 0;
+    int is_between_record = 0; /* 0=before first record, 1=after at least one record header */
     int non_lob_cols;
     int rc;
     char decode_buf[ODV_VARCHAR_LEN + 4];
@@ -393,11 +419,16 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             /* Expecting record header byte */
             switch (b) {
             case 0x00:
-                /* End of table data (if between records) */
-                return ODV_OK;
+                /* End of table data only if we've already seen records.
+                   Before the first record, 0x00 bytes are padding after </ROWSET>. */
+                if (is_between_record)
+                    return ODV_OK;
+                /* Padding byte before first record - skip */
+                break;
 
             case 0x01: case 0x04:
                 /* Normal record */
+                is_between_record = 1;
                 is_over255 = 0;
                 step = 2;
                 data_step = 0;
@@ -407,6 +438,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
             case 0x08: case 0x09:
                 /* LOB record */
+                is_between_record = 1;
                 is_over255 = 0;
                 step = 2;
                 data_step = 0;
@@ -416,6 +448,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
             case 0x18: case 0x19: case 0x1c: case 0x2c: case 0x3c:
                 /* >255 columns record */
+                is_between_record = 1;
                 is_over255 = 1;
                 over255_count = 0;
                 step = 2;
@@ -426,6 +459,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
             case 0x0c:
                 /* Single-chunk LOB */
+                is_between_record = 1;
                 is_over255 = 0;
                 step = 2;
                 data_step = 0;
@@ -802,8 +836,10 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
         /* Report progress during DDL scan so UI stays responsive */
         odv_report_progress(s, fp);
 
-        /* Search for XML marker in this block */
-        int xml_pos = find_pattern(block, n, "<?xml", 5);
+        /* Check for XML DDL marker at block offset 2 (per EXPDP format).
+           Offset 0 blocks contain statistics/metadata, not table DDL.
+           Table DDL blocks always start with 2-byte length prefix + "<?xml". */
+        int xml_pos = (n >= 7 && memcmp(block + 2, "<?xml", 5) == 0) ? 2 : -1;
 
         if (xml_pos >= 0 && !in_ddl) {
             /* Start of XML DDL block - record file position for caching */
@@ -855,19 +891,13 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                 /* Record DDL position for fast seek on next parse */
                 s->table.ddl_offset = cur_ddl_pos;
 
-                /* Skip dictionary tables */
-                if (s->table.name[0] != '\0' && !is_dictionary_table(&s->table)) {
-                    /* Calculate file position for record data */
-                    int64_t ddl_file_pos = odv_ftell(fp);
+                /* Seek to just after </ROWSET> for record data */
+                odv_fseek(fp, cur_ddl_pos + end_pos, SEEK_SET);
+                address = odv_ftell(fp);
 
-                    /* If there was data after </ROWSET> in the block, seek back */
-                    int data_offset = end_pos - (ddl_len - n);
-                    if (data_offset > 0 && data_offset < n) {
-                        /* Seek to start of record data */
-                        odv_fseek(fp, ddl_file_pos - n + data_offset, SEEK_SET);
-                    }
-
-                    address = odv_ftell(fp);
+                /* Skip dictionary tables and metadata-only XMLs (0 columns) */
+                if (s->table.name[0] != '\0' && s->table.col_count > 0
+                    && !is_system_table(&s->table, s->table.schema)) {
 
                     /* Table filter check */
                     if (s->filter_active) {
@@ -941,6 +971,14 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                         /* Filtered out in full parse: skip records */
                         notify_table(s, 0);
                     }
+                }
+
+                /* Seek to next block boundary (per EXPDP format) */
+                {
+                    int64_t cur = odv_ftell(fp);
+                    int64_t remainder = cur % ODV_DUMP_BLOCK_LEN;
+                    if (remainder != 0)
+                        odv_fseek(fp, cur + (ODV_DUMP_BLOCK_LEN - remainder), SEEK_SET);
                 }
 
                 in_ddl = 0;

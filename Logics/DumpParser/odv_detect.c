@@ -84,7 +84,7 @@ int detect_dump_kind(ODV_SESSION *s)
     FILE *fp;
     unsigned char header[ODV_DUMP_BLOCK_LEN];
     unsigned char block[ODV_DUMP_BLOCK_LEN];
-    int n, found_xml, found_kgc, found_hdr;
+    int n, found_xml, found_kgc;
     int64_t pos;
     char schema_buf[ODV_OBJNAME_LEN + 1];
     char charset_buf[64];
@@ -148,18 +148,20 @@ int detect_dump_kind(ODV_SESSION *s)
         }
     }
 
-    /* Scan file for "xml version" marker */
+    /*
+     * EXPDP format detection per block (fixed-offset checks).
+     *   Non-compressed: block offset 4 == "xml version"
+     *   Compressed:     block offset 0 == "KGC" AND offset 5 == "HDR"
+     */
     found_xml = 0;
     found_kgc = 0;
-    found_hdr = 0;
 
-    /* Check first block */
-    if (find_bytes(header, n, "xml version", 11) >= 0)
-        found_xml = 1;
-    if (find_bytes(header, n, "KGC", 3) >= 0)
+    /* Check first block at fixed offsets */
+    if (n >= 8 && memcmp(header, "KGC", 3) == 0
+               && memcmp(header + 5, "HDR", 3) == 0)
         found_kgc = 1;
-    if (find_bytes(header, n, "HDR", 3) >= 0)
-        found_hdr = 1;
+    if (n >= 5 && memcmp(header, "<?xml", 5) == 0)
+        found_xml = 1;
 
     /* If not found in first block, scan more blocks */
     if (!found_xml && !found_kgc) {
@@ -167,17 +169,17 @@ int detect_dump_kind(ODV_SESSION *s)
         while (pos < s->dump_size && pos < 1048576) { /* Scan up to 1MB */
             odv_fseek(fp, pos, SEEK_SET);
             n = (int)fread(block, 1, ODV_DUMP_BLOCK_LEN, fp);
-            if (n <= 0) break;
+            if (n < 8) break;
 
-            if (!found_xml && find_bytes(block, n, "xml version", 11) >= 0)
-                found_xml = 1;
-            if (!found_kgc && find_bytes(block, n, "KGC", 3) >= 0)
+            if (memcmp(block, "KGC", 3) == 0
+                && memcmp(block + 5, "HDR", 3) == 0) {
                 found_kgc = 1;
-            if (!found_hdr && find_bytes(block, n, "HDR", 3) >= 0)
-                found_hdr = 1;
-
-            if (found_xml || (found_kgc && found_hdr))
                 break;
+            }
+            if (memcmp(block, "<?xml", 5) == 0) {
+                found_xml = 1;
+                break;
+            }
 
             pos += ODV_DUMP_BLOCK_LEN;
         }
@@ -185,7 +187,7 @@ int detect_dump_kind(ODV_SESSION *s)
 
     fclose(fp);
 
-    if (found_kgc && found_hdr) {
+    if (found_kgc) {
         s->dump_type = DUMP_EXPDP_COMPRESS;
         s->dump_charset = get_charset_from_name(charset_buf);
         if (schema_buf[0])

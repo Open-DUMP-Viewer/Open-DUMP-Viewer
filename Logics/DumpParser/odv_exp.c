@@ -865,7 +865,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             continue;
         }
 
-        /* Handle large data: 0xFF00 means 4-byte length follows */
+            /* Handle large data: 0xFF00 means 4-byte length follows */
         if (col_len == 0xFF00) {
             unsigned char big_len[4];
             unsigned int ulen;
@@ -1042,11 +1042,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
         odv_fseek(fp, 0, SEEK_SET);
         step = 0;
 
-        /* RTABLES (single-table export) has no CONNECT statement,
-           so current_schema would stay empty.  Pre-set it from the
-           export user stored in the header (record 1). */
-        if (s->exp_state.exp_mode == EXP_MODE_TABLE &&
-            s->exp_state.export_user[0] != '\0') {
+        /* Pre-set current_schema from export user in the header.
+           RTABLES (single-table export) has no CONNECT statement.
+           RUSERS (schema export) may also have tables before the
+           first CONNECT statement.  The CONNECT statement will
+           override this when encountered. */
+        if (s->exp_state.export_user[0] != '\0') {
             odv_strcpy(current_schema, s->exp_state.export_user,
                        ODV_OBJNAME_LEN);
         }
@@ -1458,7 +1459,24 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     {
                         int64_t rec_start = odv_ftell(fp) - 1;
 
-                        if (list_only && s->filter_active && s->pass_flg) {
+                        if (s->table.lob_col_count > 0) {
+                            /* LOB tables use complex chunk-based record format.
+                               Skip record data to avoid misinterpreting LOB
+                               binary data as column lengths. Scan for 0xFFFF. */
+                            {
+                                int skip_ct = 0;
+                                while (!s->cancelled) {
+                                    unsigned char scan[2];
+                                    if (fread(scan, 1, 2, fp) != 2) goto done;
+                                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
+                                    odv_fseek(fp, -1, SEEK_CUR);
+                                    if ((++skip_ct & 0x7FFF) == 0)
+                                        odv_report_progress(s, fp);
+                                }
+                            }
+                            notify_exp_table(s, 0);
+                            pending_table = 0;
+                        } else if (list_only && s->filter_active && s->pass_flg) {
                             /* Filtered out in list_only: skip records entirely */
                             /* Scan forward to find 0xFFFF end marker */
                             {
