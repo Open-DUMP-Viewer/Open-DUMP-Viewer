@@ -20,6 +20,9 @@ Public Class OraDB_DUMP_Viewer
             Return
         End If
 
+        ' ライセンス使用状況をバックグラウンドで送信（1日1回、UIをブロックしない）
+        HeartbeatLogic.SendIfNeeded()
+
         COMMON.ReSet_StatusLavel()
 
         ' MRU メニュー構築
