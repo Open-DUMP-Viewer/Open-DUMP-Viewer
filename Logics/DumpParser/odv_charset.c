@@ -84,6 +84,28 @@ int convert_charset(const char *src, int src_len, int src_cs,
         return ODV_OK;
     }
 
+    /* Special: src is UTF-16BE — byte-swap to UTF-16LE, then convert */
+    if (src_cs == CHARSET_UTF16BE) {
+        int i, wlen_be = src_len / 2;
+        wchar_t *wbuf_be;
+        if (wlen_be <= 0) { dst[0] = '\0'; if (out_len) *out_len = 0; return ODV_OK; }
+        wbuf_be = (wchar_t *)malloc((wlen_be + 1) * sizeof(wchar_t));
+        if (!wbuf_be) return ODV_ERROR_MALLOC;
+        for (i = 0; i < wlen_be; i++) {
+            unsigned char hi = (unsigned char)src[i * 2];
+            unsigned char lo = (unsigned char)src[i * 2 + 1];
+            wbuf_be[i] = (wchar_t)((hi << 8) | lo);
+        }
+        wbuf_be[wlen_be] = L'\0';
+        result = WideCharToMultiByte(dst_cp, 0, wbuf_be, wlen_be,
+                    dst, dst_size - 1, NULL, NULL);
+        free(wbuf_be);
+        if (result <= 0) { dst[0] = '\0'; if (out_len) *out_len = 0; return ODV_ERROR; }
+        dst[result] = '\0';
+        if (out_len) *out_len = result;
+        return ODV_OK;
+    }
+
     /* General: src -> UTF-16 -> dst */
     wlen = MultiByteToWideChar(src_cp, 0, src, src_len, NULL, 0);
     if (wlen <= 0) {

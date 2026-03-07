@@ -159,8 +159,23 @@ static void ddl_xml_callback(const char *tag, const char *value,
             ODV_COLUMN *col = &s->table.columns[dc->col_idx];
             /* Only count non-system columns */
             if (col->type != -1 && col->name[0] != '\0') {
+                /* CHARSETID 2000 = AL16UTF16 (national charset, UTF-16BE).
+                 * Upgrade VARCHAR2→NVARCHAR2 and CHAR→NCHAR accordingly. */
+                if (col->charset == 2000) {
+                    if (col->type == COL_VARCHAR) col->type = COL_NVARCHAR;
+                    else if (col->type == COL_CHAR)    col->type = COL_NCHAR;
+                }
                 /* Build type string */
                 switch (col->type) {
+                case COL_NVARCHAR:
+                    /* length is in bytes (2 bytes/char in UTF-16) */
+                    snprintf(col->type_str, sizeof(col->type_str),
+                             "NVARCHAR2(%d)", col->length / 2);
+                    break;
+                case COL_NCHAR:
+                    snprintf(col->type_str, sizeof(col->type_str),
+                             "NCHAR(%d)", col->length / 2);
+                    break;
                 case COL_VARCHAR:
                     snprintf(col->type_str, sizeof(col->type_str),
                              "VARCHAR2(%d)", col->length);
@@ -454,8 +469,13 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 /* Padding byte before first record - skip */
                 break;
 
-            case 0x01: case 0x04:
-                /* Normal record */
+            case 0x01: case 0x02: case 0x03: case 0x04:
+            case 0x05: case 0x06: case 0x07:
+                /* Normal record (byte = non-LOB column count).
+                 * These only appear inside a 3C segment wrapper.
+                 * Outside segments (e.g. after a LOB record), the same
+                 * byte values can appear in LOB payload and must be skipped. */
+                if (seg_remaining < 0) break;
                 is_between_record = 1;
                 is_over255 = 0;
                 step = 2;
@@ -465,13 +485,22 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 break;
 
             case 0x08: case 0x09:
-                /* LOB record */
+                /* LOB record: a sub-byte (non-LOB column count) follows
+                 * the record header byte and must be consumed. */
                 is_between_record = 1;
                 is_over255 = 0;
                 step = 2;
                 data_step = 0;
                 col_idx = 0;
                 reset_record(&s->record);
+                /* Skip the non-LOB column count sub-byte */
+                if (buf_pos >= buf_len) {
+                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (buf_len <= 0) return ODV_OK;
+                    buf_pos = 0;
+                    *address += buf_len;
+                }
+                buf_pos++;
                 break;
 
             case 0x18: case 0x19: case 0x1c: case 0x2c:
@@ -749,10 +778,27 @@ END_LOB_PARSE:
                             break;
                         }
 
+                        case COL_NCHAR:
+                        case COL_NVARCHAR: {
+                            /* NCHAR/NVARCHAR2: Oracle stores in national charset
+                             * (AL16UTF16, big-endian). Convert UTF-16BE → UTF-8. */
+                            char conv_buf[ODV_VARCHAR_LEN];
+                            int conv_len = 0;
+                            if (v->data && v->data_len > 0 &&
+                                convert_charset((const char *)v->data, v->data_len,
+                                                CHARSET_UTF16BE,
+                                                conv_buf, sizeof(conv_buf),
+                                                CHARSET_UTF8, &conv_len) == ODV_OK) {
+                                set_value_string(v, conv_buf, conv_len);
+                            } else if (v->data) {
+                                v->data[v->data_len] = '\0';
+                            }
+                            v->type = col->type;
+                            break;
+                        }
+
                         case COL_CHAR:
                         case COL_VARCHAR:
-                        case COL_NCHAR:
-                        case COL_NVARCHAR:
                         default:
                             /* String data: ensure null-terminated */
                             if (v->data) v->data[v->data_len] = '\0';

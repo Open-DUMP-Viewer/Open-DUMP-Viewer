@@ -41,5 +41,10 @@ if %ERRORLEVEL% NEQ 0 (
 echo BUILD SUCCEEDED
 echo Output: %OUTDIR%\OraDB_DumpParser.dll
 
+REM Copy to Release directory as well
+set RELDIR=..\..\bin\Release\net10.0-windows7.0
+if not exist "%RELDIR%" mkdir "%RELDIR%"
+copy /y "%OUTDIR%\OraDB_DumpParser.dll" "%RELDIR%\OraDB_DumpParser.dll" >nul
+
 REM Cleanup intermediate files
 del /q *.obj *.exp *.lib 2>nul
