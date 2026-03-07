@@ -862,6 +862,22 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 set_value_null(&s->record.values[col_idx]);
             }
             col_idx++;
+            /* DIRECT=Y: check row completion after NULL column too */
+            if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count) {
+                s->record.col_count = col_idx;
+                if (!list_only) {
+                    deliver_row(s);
+                    odv_report_progress(s, fp);
+                }
+                row_count++;
+                s->table.record_count++;
+                if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                    int lrc = odv_lob_write_file(s);
+                    if (lrc != ODV_OK) { rc = lrc; goto rec_done; }
+                }
+                reset_record(&s->record);
+                col_idx = 0;
+            }
             continue;
         }
 
@@ -947,6 +963,25 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             decode_exp_column(s, col_idx, col_buf, col_len);
         }
         col_idx++;
+
+        /* DIRECT=Y: rows are concatenated without 00 00 end-of-row separator.
+           Deliver the row as soon as all columns have been read. */
+        if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count) {
+            s->record.col_count = col_idx;
+            if (!list_only) {
+                deliver_row(s);
+                odv_report_progress(s, fp);
+            }
+            row_count++;
+            s->table.record_count++;
+            if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                int lrc = odv_lob_write_file(s);
+                if (lrc != ODV_OK) { rc = lrc; break; }
+            }
+            reset_record(&s->record);
+            col_idx = 0;
+            continue;
+        }
 
         /* Safety check — too many columns means record structure is corrupt.
            Allow extra for LOB columns beyond regular col_count */
