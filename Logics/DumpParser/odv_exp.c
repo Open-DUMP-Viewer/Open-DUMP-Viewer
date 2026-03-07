@@ -1495,9 +1495,11 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         int64_t rec_start = odv_ftell(fp) - 1;
 
                         if (s->table.lob_col_count > 0) {
-                            /* LOB tables use complex chunk-based record format.
-                               Skip record data to avoid misinterpreting LOB
-                               binary data as column lengths. Scan for 0xFFFF. */
+                            /* EXP LOB tables use chunk-based binary format
+                               that is incompatible with parse_exp_records.
+                               Scan past the record data to the 0xFFFF table-end
+                               marker so that subsequent tables in the same dump
+                               are still correctly parsed. */
                             {
                                 int skip_ct = 0;
                                 while (!s->cancelled) {

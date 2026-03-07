@@ -446,7 +446,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 reset_record(&s->record);
                 break;
 
-            case 0x18: case 0x19: case 0x1c: case 0x2c: case 0x3c:
+            case 0x18: case 0x19: case 0x1c: case 0x2c:
                 /* >255 columns record */
                 is_between_record = 1;
                 is_over255 = 1;
@@ -456,6 +456,26 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 col_idx = 0;
                 reset_record(&s->record);
                 break;
+
+            case 0x3c: {
+                /* DataPump segment wrapper: 3c 00 NN
+                 * NN = total segment length (including 3-byte header).
+                 * Skip the following 2 bytes and stay in step 1 so the
+                 * next byte (the real record header, e.g. 0x04) is processed
+                 * normally. */
+                int _skip;
+                for (_skip = 0; _skip < 2; _skip++) {
+                    if (buf_pos >= buf_len) {
+                        buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                        if (buf_len <= 0) return ODV_OK;
+                        buf_pos = 0;
+                        *address += buf_len;
+                    }
+                    buf_pos++;
+                }
+                /* step stays 1 — next byte is the real record header */
+                break;
+            }
 
             case 0x0c:
                 /* Single-chunk LOB */
