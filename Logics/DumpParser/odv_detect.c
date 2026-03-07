@@ -156,27 +156,32 @@ int detect_dump_kind(ODV_SESSION *s)
     found_xml = 0;
     found_kgc = 0;
 
-    /* Check first block at fixed offsets */
+    /* Check first block.
+     * NOTE: Oracle DataPump files always use KGC block framing regardless of
+     * whether COMPRESSION=ALL is set.  KGC presence alone does NOT mean the
+     * data is compressed.  The real differentiator is whether readable XML
+     * metadata exists anywhere in the file.
+     *   XML found  → DUMP_EXPDP   (standard uncompressed DataPump)
+     *   KGC, no XML → DUMP_EXPDP_COMPRESS (Enterprise KGC-compressed) */
     if (n >= 8 && memcmp(header, "KGC", 3) == 0
                && memcmp(header + 5, "HDR", 3) == 0)
         found_kgc = 1;
-    if (n >= 5 && memcmp(header, "<?xml", 5) == 0)
+    if (find_bytes(header, n, "<?xml", 5) >= 0)
         found_xml = 1;
 
-    /* If not found in first block, scan more blocks */
-    if (!found_xml && !found_kgc) {
+    /* Scan subsequent blocks until XML is found (or 1 MB limit) */
+    if (!found_xml) {
         pos = ODV_DUMP_BLOCK_LEN;
-        while (pos < s->dump_size && pos < 1048576) { /* Scan up to 1MB */
+        while (pos < s->dump_size && pos < 1048576) {
             odv_fseek(fp, pos, SEEK_SET);
             n = (int)fread(block, 1, ODV_DUMP_BLOCK_LEN, fp);
             if (n < 8) break;
 
-            if (memcmp(block, "KGC", 3) == 0
-                && memcmp(block + 5, "HDR", 3) == 0) {
+            if (!found_kgc && memcmp(block, "KGC", 3) == 0
+                           && memcmp(block + 5, "HDR", 3) == 0)
                 found_kgc = 1;
-                break;
-            }
-            if (memcmp(block, "<?xml", 5) == 0) {
+
+            if (find_bytes(block, n, "<?xml", 5) >= 0) {
                 found_xml = 1;
                 break;
             }
@@ -187,16 +192,19 @@ int detect_dump_kind(ODV_SESSION *s)
 
     fclose(fp);
 
-    if (found_kgc) {
-        s->dump_type = DUMP_EXPDP_COMPRESS;
+    /* XML takes priority: uncompressed DataPump has KGC framing AND readable XML.
+     * Only classify as EXPDP_COMPRESS when KGC framing is present but no XML
+     * can be found (indicating the data blocks are actually compressed). */
+    if (found_xml) {
+        s->dump_type = DUMP_EXPDP;
         s->dump_charset = get_charset_from_name(charset_buf);
         if (schema_buf[0])
             odv_strcpy(s->table.schema, schema_buf, ODV_OBJNAME_LEN);
         return ODV_OK;
     }
 
-    if (found_xml) {
-        s->dump_type = DUMP_EXPDP;
+    if (found_kgc) {
+        s->dump_type = DUMP_EXPDP_COMPRESS;
         s->dump_charset = get_charset_from_name(charset_buf);
         if (schema_buf[0])
             odv_strcpy(s->table.schema, schema_buf, ODV_OBJNAME_LEN);
