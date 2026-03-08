@@ -378,6 +378,8 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
 int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt, int ts_precision);
 int decode_binary_float(const unsigned char *buf, char *out, int out_size);
 int decode_binary_double(const unsigned char *buf, char *out, int out_size);
+int decode_interval_ym(const unsigned char *buf, int len, char *out, int out_size);
+int decode_interval_ds(const unsigned char *buf, int len, char *out, int out_size);
 
 /* odv_charset.c */
 int convert_charset(const char *src, int src_len, int src_cs,

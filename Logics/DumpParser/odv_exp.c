@@ -625,6 +625,24 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
         }
         break;
 
+    case COL_INTERVAL_YM:
+        rc = decode_interval_ym(data, data_len, tmp, sizeof(tmp));
+        if (rc == ODV_OK) {
+            set_value_string(val, tmp, (int)strlen(tmp));
+        } else {
+            set_value_null(val);
+        }
+        break;
+
+    case COL_INTERVAL_DS:
+        rc = decode_interval_ds(data, data_len, tmp, sizeof(tmp));
+        if (rc == ODV_OK) {
+            set_value_string(val, tmp, (int)strlen(tmp));
+        } else {
+            set_value_null(val);
+        }
+        break;
+
     case COL_RAW:
     case COL_ROWID: {
         /* Hex output: "0x" + hex bytes */
@@ -730,8 +748,34 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
         break;
     }
 
+    case COL_NCHAR:
+    case COL_NVARCHAR: {
+        /* EXP stores NCHAR/NVARCHAR2 data in national charset (AL16UTF16 = UTF-16BE).
+           Convert UTF-16BE → UTF-8 for display. */
+        char conv_buf[ODV_VARCHAR_LEN];
+        int conv_len = 0;
+        if (data_len > 0 &&
+            convert_charset((const char *)data, data_len,
+                            CHARSET_UTF16BE,
+                            conv_buf, sizeof(conv_buf),
+                            CHARSET_UTF8, &conv_len) == ODV_OK) {
+            set_value_string(val, conv_buf, conv_len);
+            /* Trim trailing spaces for NCHAR */
+            if (col->type == COL_NCHAR && val->data && val->data_len > 0) {
+                while (val->data_len > 0 && val->data[val->data_len - 1] == ' ') {
+                    val->data_len--;
+                }
+                val->data[val->data_len] = '\0';
+            }
+        } else {
+            /* Fallback: copy raw */
+            set_value_string(val, (const char *)data, data_len);
+        }
+        break;
+    }
+
     default:
-        /* String types: CHAR, VARCHAR, NCHAR, NVARCHAR, etc. */
+        /* String types: CHAR, VARCHAR, etc. */
         if (s->table.dump_charset != s->out_charset &&
             s->table.dump_charset != CHARSET_UNKNOWN) {
             int out_len = 0;

@@ -1,4 +1,5 @@
 Imports System.IO
+Imports System.Net.Http
 Imports System.Security.Cryptography
 Imports System.Text
 Imports System.Text.Json
@@ -122,6 +123,52 @@ Public Class LICENSE
             End Select
         Next
         Return sb.ToString()
+    End Function
+#End Region
+
+#Region "オンラインライセンス検証"
+    Private Const CheckStatusEndpoint As String = "https://www.odv.dev/api/licenses/check/"
+
+    ''' <summary>
+    ''' サーバーにライセンスキーの有効性を問い合わせる（起動時チェック）。
+    ''' サーバーに到達できない場合はTrue（オフライン許容）。
+    ''' </summary>
+    ''' <param name="licenseKey">検証するライセンスキー</param>
+    ''' <returns>有効ならTrue、サーバーが無効と返した場合False、通信失敗時True</returns>
+    Public Shared Function VerifyOnline(licenseKey As String) As Boolean
+        Try
+            Using client As New HttpClient()
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+                client.Timeout = TimeSpan.FromSeconds(5)
+
+                Dim task = client.GetAsync(CheckStatusEndpoint & Uri.EscapeDataString(licenseKey))
+                task.Wait()
+                Dim response = task.Result
+
+                If Not response.IsSuccessStatusCode Then
+                    ' 404 = ライセンスが見つからない → 無効
+                    If response.StatusCode = Net.HttpStatusCode.NotFound Then Return False
+                    ' その他のエラー（500等）→ オフラインと同等に扱い許容
+                    Return True
+                End If
+
+                Dim bodyTask = response.Content.ReadAsStringAsync()
+                bodyTask.Wait()
+                Dim doc = JsonDocument.Parse(bodyTask.Result).RootElement
+
+                ' サーバーが valid: false を返した場合
+                Dim validProp As JsonElement
+                If doc.TryGetProperty("valid", validProp) Then
+                    Return validProp.GetBoolean()
+                End If
+
+                ' valid プロパティが無い場合は許容
+                Return True
+            End Using
+        Catch
+            ' ネットワークエラー・タイムアウト → オフライン環境として許容
+            Return True
+        End Try
     End Function
 #End Region
 

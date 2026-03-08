@@ -441,6 +441,8 @@ https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
   <data name="License_ExpiryParseFailed" xml:space="preserve"><value>Expiry date parse failed</value></data>
   <data name="License_Expired" xml:space="preserve"><value>License expired</value></data>
   <data name="License_VerifyError" xml:space="preserve"><value>Verification error: {0}</value></data>
+  <data name="License_RevokedByServer" xml:space="preserve"><value>This license has been revoked by the server. Please obtain a new license.
+Would you like to open the license activation dialog?</value></data>
 
   <!-- ========== DLL parser errors ========== -->
   <data name="Parser_SessionCreateFailed" xml:space="preserve"><value>Session creation failed (rc={0})</value></data>

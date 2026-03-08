@@ -197,7 +197,20 @@ Public Class OraDB_DUMP_Viewer
                 Dim holder As String = String.Empty
                 Dim errMsg As String = String.Empty
                 If LICENSE.VerifyLicenseFile(statusPath, licenseKey, expiryDate, holder, errMsg) Then
-                    Return True
+                    ' オンライン検証（サーバー到達不可時は許容）
+                    If Not LICENSE.VerifyOnline(licenseKey) Then
+                        ' サーバーが無効と返した → ライセンスファイルを削除して再認証へ
+                        Dim res = MessageBox.Show(Loc.S("License_RevokedByServer"), Loc.S("License_Required"),
+                                                  MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+                        If res = DialogResult.Yes Then
+                            Try : File.Delete(statusPath) : Catch : End Try
+                            ' 再認証ループへ落ちる
+                        Else
+                            Return False
+                        End If
+                    Else
+                        Return True
+                    End If
                 End If
             End If
 

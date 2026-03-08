@@ -336,3 +336,98 @@ int decode_binary_double(const unsigned char *buf, char *out, int out_size)
 
     return ODV_OK;
 }
+
+/*---------------------------------------------------------------------------
+    decode_interval_ym
+
+    Decodes Oracle INTERVAL YEAR TO MONTH binary format (5 bytes).
+      Bytes 0-3: Year  (big-endian, excess-0x80000000)
+      Byte  4  : Month (excess-60)
+
+    Output: "+YY-MM" or "-YY-MM"
+ ---------------------------------------------------------------------------*/
+int decode_interval_ym(const unsigned char *buf, int len, char *out, int out_size)
+{
+    int32_t year;
+    int month;
+    const char *sign;
+
+    if (!buf || !out || out_size < 16) return ODV_ERROR_INVALID_ARG;
+    if (len < 5) { out[0] = '\0'; return ODV_ERROR_FORMAT; }
+
+    year = (int32_t)(((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+                     ((uint32_t)buf[2] << 8) | (uint32_t)buf[3]) - (int32_t)0x80000000;
+    month = (int)buf[4] - 60;
+
+    /* Normalize sign: if year is negative, month is also negative */
+    if (year < 0 || (year == 0 && month < 0)) {
+        sign = "-";
+        if (year < 0) year = -year;
+        if (month < 0) month = -month;
+    } else {
+        sign = "+";
+    }
+
+    snprintf(out, out_size, "%s%d-%d", sign, year, month);
+    return ODV_OK;
+}
+
+/*---------------------------------------------------------------------------
+    decode_interval_ds
+
+    Decodes Oracle INTERVAL DAY TO SECOND binary format (11 bytes).
+      Bytes 0-3: Day          (big-endian, excess-0x80000000)
+      Byte  4  : Hour         (excess-60)
+      Byte  5  : Minute       (excess-60)
+      Byte  6  : Second       (excess-60)
+      Bytes 7-10: Frac second (big-endian, excess-0x80000000, in nanoseconds)
+
+    Output: "+DD HH:MI:SS.FFFFFFFFF" or "-DD HH:MI:SS.FFFFFFFFF"
+ ---------------------------------------------------------------------------*/
+int decode_interval_ds(const unsigned char *buf, int len, char *out, int out_size)
+{
+    int32_t day;
+    int hour, minute, second;
+    int32_t frac;
+    const char *sign;
+
+    if (!buf || !out || out_size < 40) return ODV_ERROR_INVALID_ARG;
+    if (len < 11) { out[0] = '\0'; return ODV_ERROR_FORMAT; }
+
+    day = (int32_t)(((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16) |
+                    ((uint32_t)buf[2] << 8) | (uint32_t)buf[3]) - (int32_t)0x80000000;
+    hour   = (int)buf[4] - 60;
+    minute = (int)buf[5] - 60;
+    second = (int)buf[6] - 60;
+    frac = (int32_t)(((uint32_t)buf[7] << 24) | ((uint32_t)buf[8] << 16) |
+                     ((uint32_t)buf[9] << 8) | (uint32_t)buf[10]) - (int32_t)0x80000000;
+
+    /* Normalize sign */
+    if (day < 0 || (day == 0 && (hour < 0 || minute < 0 || second < 0 || frac < 0))) {
+        sign = "-";
+        if (day < 0) day = -day;
+        if (hour < 0) hour = -hour;
+        if (minute < 0) minute = -minute;
+        if (second < 0) second = -second;
+        if (frac < 0) frac = -frac;
+    } else {
+        sign = "+";
+    }
+
+    if (frac > 0) {
+        snprintf(out, out_size, "%s%d %02d:%02d:%02d.%09d",
+                 sign, day, hour, minute, second, frac);
+        /* Trim trailing zeros from fractional part */
+        {
+            int p = (int)strlen(out);
+            while (p > 0 && out[p - 1] == '0') p--;
+            if (p > 0 && out[p - 1] == '.') p--;
+            out[p] = '\0';
+        }
+    } else {
+        snprintf(out, out_size, "%s%d %02d:%02d:%02d",
+                 sign, day, hour, minute, second);
+    }
+
+    return ODV_OK;
+}

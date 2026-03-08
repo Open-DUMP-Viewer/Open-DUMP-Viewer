@@ -448,6 +448,8 @@ https://www.microsoft.com/ja-jp/download/details.aspx?id=54920</value></data>
   <data name="License_ExpiryParseFailed" xml:space="preserve"><value>有効期限パース失敗</value></data>
   <data name="License_Expired" xml:space="preserve"><value>有効期限切れ</value></data>
   <data name="License_VerifyError" xml:space="preserve"><value>検証エラー: {0}</value></data>
+  <data name="License_RevokedByServer" xml:space="preserve"><value>このライセンスはサーバーにより無効化されています。新しいライセンスを取得してください。
+ライセンス認証画面を開きますか？</value></data>
 
   <!-- ========== DLLパーサーエラー ========== -->
   <data name="Parser_SessionCreateFailed" xml:space="preserve"><value>セッション作成に失敗しました (rc={0})</value></data>

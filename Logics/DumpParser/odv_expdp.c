@@ -67,6 +67,8 @@ static int type_num_to_col_type(int type_num, int length, int flags)
     case 113: return COL_BLOB;
     case 180: return COL_TIMESTAMP;
     case 181: return COL_TIMESTAMP_TZ;
+    case 182: return COL_INTERVAL_YM;
+    case 183: return COL_INTERVAL_DS;
     case 231: return COL_TIMESTAMP_LTZ;
     default:  return COL_VARCHAR;  /* fallback */
     }
@@ -220,6 +222,20 @@ static void ddl_xml_callback(const char *tag, const char *value,
                     break;
                 case COL_RAW:
                     snprintf(col->type_str, sizeof(col->type_str), "RAW(%d)", col->length);
+                    break;
+                case COL_INTERVAL_YM:
+                    snprintf(col->type_str, sizeof(col->type_str),
+                             "INTERVAL YEAR TO MONTH");
+                    break;
+                case COL_INTERVAL_DS:
+                    snprintf(col->type_str, sizeof(col->type_str),
+                             "INTERVAL DAY TO SECOND");
+                    break;
+                case COL_BIN_FLOAT:
+                    snprintf(col->type_str, sizeof(col->type_str), "BINARY_FLOAT");
+                    break;
+                case COL_BIN_DOUBLE:
+                    snprintf(col->type_str, sizeof(col->type_str), "BINARY_DOUBLE");
                     break;
                 default:
                     snprintf(col->type_str, sizeof(col->type_str), "VARCHAR2(%d)", col->length);
@@ -469,51 +485,6 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 /* Padding byte before first record - skip */
                 break;
 
-            case 0x01: case 0x02: case 0x03: case 0x04:
-            case 0x05: case 0x06: case 0x07:
-                /* Normal record (byte = non-LOB column count).
-                 * These only appear inside a 3C segment wrapper.
-                 * Outside segments (e.g. after a LOB record), the same
-                 * byte values can appear in LOB payload and must be skipped. */
-                if (seg_remaining < 0) break;
-                is_between_record = 1;
-                is_over255 = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
-                reset_record(&s->record);
-                break;
-
-            case 0x08: case 0x09:
-                /* LOB record: a sub-byte (non-LOB column count) follows
-                 * the record header byte and must be consumed. */
-                is_between_record = 1;
-                is_over255 = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
-                reset_record(&s->record);
-                /* Skip the non-LOB column count sub-byte */
-                if (buf_pos >= buf_len) {
-                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                    if (buf_len <= 0) return ODV_OK;
-                    buf_pos = 0;
-                    *address += buf_len;
-                }
-                buf_pos++;
-                break;
-
-            case 0x18: case 0x19: case 0x1c: case 0x2c:
-                /* >255 columns record */
-                is_between_record = 1;
-                is_over255 = 1;
-                over255_count = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
-                reset_record(&s->record);
-                break;
-
             case 0x3c: {
                 /* DataPump segment wrapper: 3c 00 NN
                  * NN = total segment length (including 3-byte header).
@@ -545,10 +516,55 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 break;
             }
 
-            case 0x0c:
-                /* Single-chunk LOB */
+            case 0x08: case 0x09:
+                /* LOB record (BLOB/CLOB): only valid OUTSIDE 3c segments.
+                 * Inside segments, 0x08/0x09 = column count (8 or 9).
+                 * A sub-byte (non-LOB column count) follows the header. */
+                if (seg_remaining >= 0) goto normal_record;
                 is_between_record = 1;
                 is_over255 = 0;
+                step = 2;
+                data_step = 0;
+                col_idx = 0;
+                reset_record(&s->record);
+                /* Skip the non-LOB column count sub-byte */
+                if (buf_pos >= buf_len) {
+                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (buf_len <= 0) return ODV_OK;
+                    buf_pos = 0;
+                    *address += buf_len;
+                }
+                buf_pos++;
+                break;
+
+            case 0x0c:
+                /* LONG column record: only valid OUTSIDE 3c segments.
+                 * Inside segments, 0x0c = column count (12).
+                 * A sub-byte (column count) follows the header. */
+                if (seg_remaining >= 0) goto normal_record;
+                is_between_record = 1;
+                is_over255 = 0;
+                step = 2;
+                data_step = 0;
+                col_idx = 0;
+                reset_record(&s->record);
+                /* Skip the column count sub-byte */
+                if (buf_pos >= buf_len) {
+                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (buf_len <= 0) return ODV_OK;
+                    buf_pos = 0;
+                    *address += buf_len;
+                }
+                buf_pos++;
+                break;
+
+            case 0x18: case 0x19: case 0x1c: case 0x2c:
+                /* Special record format (cluster/IOT/over-255 columns).
+                 * Inside 3c segments, these are column counts. */
+                if (seg_remaining >= 0) goto normal_record;
+                is_between_record = 1;
+                is_over255 = 1;
+                over255_count = 0;
                 step = 2;
                 data_step = 0;
                 col_idx = 0;
@@ -560,7 +576,23 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 return ODV_OK;
 
             default:
-                /* Unknown header - skip */
+                /* Inside a 3c segment, any byte value is a valid column
+                 * count for a normal record.  Outside segments, bytes
+                 * 0x01-0x07 are also normal records. */
+                if (seg_remaining >= 0 || (b >= 0x01 && b <= 0x07)) {
+            normal_record:
+                    if (seg_remaining < 0 && b >= 0x01 && b <= 0x07) {
+                        /* Outside segment: only 0x01-0x07 are valid.
+                         * Other values may be LOB payload — skip. */
+                    }
+                    is_between_record = 1;
+                    is_over255 = 0;
+                    step = 2;
+                    data_step = 0;
+                    col_idx = 0;
+                    reset_record(&s->record);
+                }
+                /* else: unknown header outside segment - skip */
                 break;
             }
 
@@ -762,6 +794,20 @@ END_LOB_PARSE:
                             v->type = col->type;
                             break;
 
+                        case COL_INTERVAL_YM:
+                            decode_interval_ym(v->data, v->data_len,
+                                               decode_buf, sizeof(decode_buf));
+                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
+                            v->type = col->type;
+                            break;
+
+                        case COL_INTERVAL_DS:
+                            decode_interval_ds(v->data, v->data_len,
+                                               decode_buf, sizeof(decode_buf));
+                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
+                            v->type = col->type;
+                            break;
+
                         case COL_RAW:
                         case COL_ROWID: {
                             /* Convert to hex string */
@@ -927,10 +973,14 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
     s->total_rows = 0;
 
     /* Fast seek: if seek_offset is set (from previous list_tables),
-       jump directly to the target DDL position instead of scanning from top */
+       jump directly to the target DDL position instead of scanning from top.
+       Align to block boundary because the main loop reads full blocks and
+       checks block[2] for "<?xml".  ddl_offset stores the <?xml position
+       (= block_start + 2), so we round down to the enclosing block. */
     if (s->seek_offset > 0 && s->filter_active) {
-        odv_fseek(fp, s->seek_offset, SEEK_SET);
-        address = s->seek_offset;
+        int64_t aligned = (s->seek_offset / ODV_DUMP_BLOCK_LEN) * ODV_DUMP_BLOCK_LEN;
+        odv_fseek(fp, aligned, SEEK_SET);
+        address = aligned;
     }
 
     /* Read blocks sequentially */
