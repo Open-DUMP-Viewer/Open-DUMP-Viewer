@@ -30,5 +30,11 @@ Namespace My
         Protected Overrides Sub OnCreateMainForm()
             Me.MainForm = OraDB_DUMP_Viewer
         End Sub
+
+        <Global.System.Diagnostics.DebuggerStepThroughAttribute()>
+        Protected Overrides Sub OnCreateSplashScreen()
+            Me.SplashScreen = New Global.OraDB_DUMP_Viewer.SplashScreen()
+            Me.MinimumSplashScreenDisplayTime = 0 ' メインフォーム準備完了次第すぐ閉じる
+        End Sub
     End Class
 End Namespace
