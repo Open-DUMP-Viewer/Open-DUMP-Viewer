@@ -65,14 +65,16 @@ Partial Public Class AboutDialog
                         Return
                     End If
 
-                    ' MSI ダウンロードURLを検索
+                    ' MSI ダウンロードURLを検索 (実行中のアーキテクチャに合致するものを選択)
+                    Dim archSuffix = If(Runtime.InteropServices.RuntimeInformation.OSArchitecture = Runtime.InteropServices.Architecture.Arm64,
+                                        "_arm64.msi", "_x64.msi")
                     Dim assetsProp As JsonElement
                     If root.TryGetProperty("assets", assetsProp) Then
                         For Each asset In assetsProp.EnumerateArray()
                             Dim nameProp As JsonElement
                             If asset.TryGetProperty("name", nameProp) Then
                                 Dim assetName = nameProp.GetString()
-                                If assetName IsNot Nothing AndAlso assetName.EndsWith(".msi", StringComparison.OrdinalIgnoreCase) Then
+                                If assetName IsNot Nothing AndAlso assetName.EndsWith(archSuffix, StringComparison.OrdinalIgnoreCase) Then
                                     Dim urlProp As JsonElement
                                     If asset.TryGetProperty("browser_download_url", urlProp) Then
                                         _msiDownloadUrl = urlProp.GetString()
