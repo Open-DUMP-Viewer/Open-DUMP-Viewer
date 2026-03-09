@@ -100,4 +100,9 @@
     <PackageReference Include="System.Data.OleDb" Version="10.0.3" />
   </ItemGroup>
 
+  <!-- WebView2 WPF DLL の WindowsBase バージョン競合警告を抑制 (WinForms アプリのため WPF DLL は不使用) -->
+  <PropertyGroup>
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
 </Project>
