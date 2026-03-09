@@ -19,6 +19,7 @@ Partial Class SqlExportDialog
     Private Sub InitializeComponent()
         lblDbms = New Label()
         cboDbms = New ComboBox()
+        chkCreateTable = New CheckBox()
         btnOK = New Button()
         btnCancel = New Button()
         SuspendLayout()
@@ -41,21 +42,30 @@ Partial Class SqlExportDialog
         cboDbms.Size = New Size(200, 23)
         cboDbms.TabIndex = 1
         '
+        ' chkCreateTable
+        '
+        chkCreateTable.AutoSize = True
+        chkCreateTable.Location = New Point(20, 60)
+        chkCreateTable.Name = "chkCreateTable"
+        chkCreateTable.Size = New Size(330, 19)
+        chkCreateTable.TabIndex = 2
+        chkCreateTable.Text = "DROP TABLE + CREATE TABLE を出力"
+        '
         ' btnOK
         '
-        btnOK.Location = New Point(150, 65)
+        btnOK.Location = New Point(150, 95)
         btnOK.Name = "btnOK"
         btnOK.Size = New Size(90, 30)
-        btnOK.TabIndex = 2
+        btnOK.TabIndex = 3
         btnOK.Text = "OK"
         btnOK.DialogResult = DialogResult.OK
         '
         ' btnCancel
         '
-        btnCancel.Location = New Point(260, 65)
+        btnCancel.Location = New Point(260, 95)
         btnCancel.Name = "btnCancel"
         btnCancel.Size = New Size(90, 30)
-        btnCancel.TabIndex = 3
+        btnCancel.TabIndex = 4
         btnCancel.Text = "キャンセル"
         btnCancel.DialogResult = DialogResult.Cancel
         '
@@ -65,9 +75,10 @@ Partial Class SqlExportDialog
         CancelButton = btnCancel
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(380, 110)
+        ClientSize = New Size(380, 140)
         Controls.Add(lblDbms)
         Controls.Add(cboDbms)
+        Controls.Add(chkCreateTable)
         Controls.Add(btnOK)
         Controls.Add(btnCancel)
         FormBorderStyle = FormBorderStyle.FixedDialog
@@ -82,6 +93,7 @@ Partial Class SqlExportDialog
 
     Friend WithEvents lblDbms As Label
     Friend WithEvents cboDbms As ComboBox
+    Friend WithEvents chkCreateTable As CheckBox
     Friend WithEvents btnOK As Button
     Friend WithEvents btnCancel As Button
 

@@ -20,6 +20,9 @@ Public Class SqlExportDialog
         cboDbms.Items.Add("MySQL")
         cboDbms.Items.Add("SQL Server")
         cboDbms.SelectedIndex = 0
+
+        ' ExportOptions の現在値を反映
+        chkCreateTable.Checked = ExportOptions.SqlCreateTable
     End Sub
 
     Private Sub btnOK_Click(sender As Object, e As EventArgs) Handles btnOK.Click
@@ -29,12 +32,17 @@ Public Class SqlExportDialog
             Case 2 : SelectedDbmsType = ExportHelper.DBMS_MYSQL
             Case 3 : SelectedDbmsType = ExportHelper.DBMS_SQLSERVER
         End Select
+
+        ' CREATE TABLE オプションを反映・保存
+        ExportOptions.SqlCreateTable = chkCreateTable.Checked
+        ExportOptions.Save()
     End Sub
 
 #Region "ローカライズ"
     Public Sub ApplyLocalization() Implements ILocalizable.ApplyLocalization
         Me.Text = Loc.S("SqlExport_FormTitle")
         lblDbms.Text = Loc.S("SqlExport_DatabaseLabel")
+        chkCreateTable.Text = Loc.S("ExportOptions_SqlCreateTable")
         btnOK.Text = Loc.S("Button_OK")
         btnCancel.Text = Loc.S("Button_Cancel")
     End Sub

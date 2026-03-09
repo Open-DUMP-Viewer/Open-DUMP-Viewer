@@ -26,6 +26,17 @@ Public Class OdbcExportLogic
             Using conn As New OdbcConnection(connectionString)
                 conn.Open()
 
+                ' DROP TABLE IF EXISTS
+                Dim safeName = tableName.Replace("""", """""")
+                Dim dropSql = $"DROP TABLE IF EXISTS ""{safeName}"""
+                Try
+                    Using cmd As New OdbcCommand(dropSql, conn)
+                        cmd.ExecuteNonQuery()
+                    End Using
+                Catch
+                    ' DROP TABLE IF EXISTS 未対応の ODBC ドライバでは無視
+                End Try
+
                 ' CREATE TABLE
                 Dim createSql = BuildCreateTableSql(tableName, columnNames, columnTypes)
                 Using cmd As New OdbcCommand(createSql, conn)
