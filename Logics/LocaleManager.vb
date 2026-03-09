@@ -51,10 +51,16 @@ Public Module LocaleManager
     End Function
 
     ''' <summary>
-    ''' 現在のUI言語のカルチャ名を返す (例: "ja", "en")。
+    ''' 現在のUI言語のカルチャ名を返す (例: "ja", "en", "pt-BR")。
+    ''' pt-BR のようにリージョン付きカルチャの場合はそのまま返す。
     ''' </summary>
     Public Function CurrentLanguage() As String
-        Return Thread.CurrentThread.CurrentUICulture.TwoLetterISOLanguageName
+        Dim culture = Thread.CurrentThread.CurrentUICulture
+        ' pt-BR はリージョン込みで識別する必要がある
+        If culture.Name.Equals("pt-BR", StringComparison.OrdinalIgnoreCase) Then
+            Return "pt-BR"
+        End If
+        Return culture.TwoLetterISOLanguageName
     End Function
 
 End Module

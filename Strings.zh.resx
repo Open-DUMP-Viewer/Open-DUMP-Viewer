@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ========== Main Menu ========== -->
+  <data name="Menu_File" xml:space="preserve"><value>文件(&amp;F)</value></data>
+  <data name="Menu_File_Open" xml:space="preserve"><value>打开(&amp;O)</value></data>
+  <data name="Menu_File_Open_Workspace" xml:space="preserve"><value>工作区(&amp;W)...</value></data>
+  <data name="Menu_File_Open_DumpFile" xml:space="preserve"><value>转储文件(&amp;D)...</value></data>
+  <data name="Menu_File_Close" xml:space="preserve"><value>关闭(&amp;C)</value></data>
+  <data name="Menu_File_SaveWorkspace" xml:space="preserve"><value>保存工作区(&amp;S)</value></data>
+  <data name="Menu_File_SaveWorkspaceAs" xml:space="preserve"><value>工作区另存为(&amp;A)...</value></data>
+  <data name="Menu_File_CloseWorkspace" xml:space="preserve"><value>关闭工作区(&amp;L)</value></data>
+  <data name="Menu_File_CreateDump" xml:space="preserve"><value>生成转储文件(&amp;G)...</value></data>
+  <data name="Menu_File_RecentWorkspaces" xml:space="preserve"><value>最近的工作区(&amp;W)</value></data>
+  <data name="Menu_File_RecentDumps" xml:space="preserve"><value>最近的转储文件(&amp;D)</value></data>
+  <data name="Menu_File_Exit" xml:space="preserve"><value>退出(&amp;X)</value></data>
+  <data name="Menu_Edit" xml:space="preserve"><value>编辑(&amp;E)</value></data>
+  <data name="Menu_Edit_Undo" xml:space="preserve"><value>撤销(&amp;U)</value></data>
+  <data name="Menu_Edit_Redo" xml:space="preserve"><value>重做(&amp;R)</value></data>
+  <data name="Menu_Edit_Cut" xml:space="preserve"><value>剪切(&amp;T)</value></data>
+  <data name="Menu_Edit_Copy" xml:space="preserve"><value>复制(&amp;C)</value></data>
+  <data name="Menu_Edit_Paste" xml:space="preserve"><value>粘贴(&amp;P)</value></data>
+  <data name="Menu_Edit_SelectAll" xml:space="preserve"><value>全选(&amp;A)</value></data>
+  <data name="Menu_View" xml:space="preserve"><value>视图(&amp;V)</value></data>
+  <data name="Menu_View_Toolbar" xml:space="preserve"><value>工具栏(&amp;T)</value></data>
+  <data name="Menu_View_Export" xml:space="preserve"><value>导出</value></data>
+  <data name="Menu_View_StatusBar" xml:space="preserve"><value>状态栏(&amp;S)</value></data>
+  <data name="Menu_Object" xml:space="preserve"><value>对象(&amp;O)</value></data>
+  <data name="Menu_Object_Open" xml:space="preserve"><value>打开(&amp;O)</value></data>
+  <data name="Menu_Object_ClearFilters" xml:space="preserve"><value>清除所有筛选(&amp;F)</value></data>
+  <data name="Menu_Object_Delete" xml:space="preserve"><value>删除(&amp;D)</value></data>
+  <data name="Menu_Object_UndoChanges" xml:space="preserve"><value>取消更改(&amp;C)</value></data>
+  <data name="Menu_Object_Property" xml:space="preserve"><value>属性(&amp;P)</value></data>
+  <data name="Menu_Object_Export" xml:space="preserve"><value>导出(&amp;E)</value></data>
+  <data name="Menu_Object_ExportScript" xml:space="preserve"><value>脚本(&amp;S)</value></data>
+  <data name="Menu_Object_ExportData" xml:space="preserve"><value>数据(&amp;D)</value></data>
+  <data name="Menu_Object_Report" xml:space="preserve"><value>报表(&amp;R)</value></data>
+  <data name="Menu_Object_ReportObjectList" xml:space="preserve"><value>对象列表</value></data>
+  <data name="Menu_Object_ReportTableDef" xml:space="preserve"><value>表定义</value></data>
+  <data name="Menu_Tools" xml:space="preserve"><value>工具(&amp;T)</value></data>
+  <data name="Menu_Tools_ExtractFile" xml:space="preserve"><value>提取文件(&amp;F)</value></data>
+  <data name="Menu_Tools_Options" xml:space="preserve"><value>选项(&amp;O)</value></data>
+  <data name="Menu_Window" xml:space="preserve"><value>窗口(&amp;W)</value></data>
+  <data name="Menu_Window_Cascade" xml:space="preserve"><value>层叠(&amp;C)</value></data>
+  <data name="Menu_Window_Tile" xml:space="preserve"><value>平铺(&amp;T)</value></data>
+  <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>排列图标(&amp;I)</value></data>
+  <data name="Menu_Help" xml:space="preserve"><value>帮助(&amp;H)</value></data>
+  <data name="Menu_Help_Contents" xml:space="preserve"><value>目录(&amp;C)</value></data>
+  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>错误报告(&amp;R)</value></data>
+  <data name="Menu_Help_License" xml:space="preserve"><value>许可证激活(&amp;L)</value></data>
+  <data name="Menu_Help_About" xml:space="preserve"><value>关于(&amp;A)</value></data>
+  <data name="Menu_Help_Language" xml:space="preserve"><value>语言</value></data>
+  <data name="Menu_Help_Language_Japanese" xml:space="preserve"><value>日本語</value></data>
+  <data name="Menu_Help_Language_English" xml:space="preserve"><value>English</value></data>
+
+  <!-- ========== Toolbar ========== -->
+  <data name="Toolbar_Property" xml:space="preserve"><value>属性</value></data>
+  <data name="Toolbar_Delete" xml:space="preserve"><value>删除</value></data>
+  <data name="Toolbar_SqlScript" xml:space="preserve"><value>SQL 脚本</value></data>
+  <data name="Toolbar_CsvExport" xml:space="preserve"><value>CSV 导出</value></data>
+  <data name="Toolbar_ExcelExport" xml:space="preserve"><value>Excel 导出</value></data>
+  <data name="Toolbar_AccessExport" xml:space="preserve"><value>Access 导出</value></data>
+  <data name="Toolbar_SqlServer" xml:space="preserve"><value>SQL Server</value></data>
+  <data name="Toolbar_Odbc" xml:space="preserve"><value>ODBC</value></data>
+
+  <!-- ========== Common Buttons ========== -->
+  <data name="Button_Search" xml:space="preserve"><value>搜索</value></data>
+  <data name="Button_Reset" xml:space="preserve"><value>重置</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="Button_Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="Button_OK" xml:space="preserve"><value>确定</value></data>
+  <data name="Button_Submit" xml:space="preserve"><value>提交</value></data>
+  <data name="Button_Extract" xml:space="preserve"><value>提取</value></data>
+  <data name="Button_ConnectionTest" xml:space="preserve"><value>测试连接</value></data>
+  <data name="Button_AddCondition" xml:space="preserve"><value>添加条件</value></data>
+  <data name="Button_Clear" xml:space="preserve"><value>清除</value></data>
+  <data name="Button_AdvancedSearch" xml:space="preserve"><value>高级搜索</value></data>
+  <data name="Button_Previous" xml:space="preserve"><value>&lt; 上一页</value></data>
+  <data name="Button_Next" xml:space="preserve"><value>下一页 &gt;</value></data>
+  <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
+  <data name="Button_Update" xml:space="preserve"><value>更新到最新版本</value></data>
+
+  <!-- ========== Common Dialog Titles ========== -->
+  <data name="Title_Error" xml:space="preserve"><value>错误</value></data>
+  <data name="Title_Info" xml:space="preserve"><value>信息</value></data>
+  <data name="Title_Complete" xml:space="preserve"><value>完成</value></data>
+  <data name="Title_Confirm" xml:space="preserve"><value>确认</value></data>
+  <data name="Title_Warning" xml:space="preserve"><value>警告</value></data>
+  <data name="Title_InputError" xml:space="preserve"><value>输入错误</value></data>
+  <data name="Title_DllError" xml:space="preserve"><value>DLL 错误</value></data>
+  <data name="Title_Help" xml:space="preserve"><value>帮助</value></data>
+  <data name="Title_AuthFailed" xml:space="preserve"><value>认证失败</value></data>
+  <data name="Title_AuthSuccess" xml:space="preserve"><value>认证成功</value></data>
+  <data name="Title_LobExtract" xml:space="preserve"><value>LOB 文件提取</value></data>
+  <data name="Title_BulkExport" xml:space="preserve"><value>批量导出</value></data>
+
+  <!-- ========== Status Bar ========== -->
+  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - 未授权</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_SelectDumpFile" xml:space="preserve"><value>请选择转储文件路径...</value></data>
+  <data name="Status_GettingTableList" xml:space="preserve"><value>正在获取表列表...</value></data>
+  <data name="Status_SearchingTables" xml:space="preserve"><value>正在搜索表... ({0}%) | 已用时间: {1}{2}</value></data>
+  <data name="Status_SearchingTablesWithName" xml:space="preserve"><value>正在搜索表... ({0}%) | {1} | 已用时间: {2}{3}</value></data>
+  <data name="Status_Processing" xml:space="preserve"><value>处理中... {0} 行 ({1}%) | {2} | 已用时间: {3}{4} | {5} 行/秒</value></data>
+  <data name="Status_ProcessingFull" xml:space="preserve"><value>处理中... {0}/{1} 行 ({2}) | 已用时间: {3} | 剩余时间: {4} | 速度: {5} 行/秒 | 预计完成: {6}</value></data>
+  <data name="Status_ProcessingSimple" xml:space="preserve"><value>处理中... 第 {0} 行</value></data>
+  <data name="Status_ListingTables" xml:space="preserve"><value>正在获取表列表... {0} 个表 ({1}%){2} | 已用时间: {3}{4}</value></data>
+  <data name="Status_Remaining" xml:space="preserve"><value> | 剩余时间: {0}</value></data>
+  <data name="Status_Calculating" xml:space="preserve"><value>正在计算...</value></data>
+  <data name="Status_AnalysisComplete" xml:space="preserve"><value>分析完成: {0} 个表, {1} 行 ({2}秒)</value></data>
+  <data name="Status_TableAnalysisComplete" xml:space="preserve"><value>分析完成: {0}.{1} {2} 行 ({3}秒)</value></data>
+  <data name="Status_TableListComplete" xml:space="preserve"><value>表列表完成: {0} 个表 ({1}秒)</value></data>
+  <data name="Time_DayFormat" xml:space="preserve"><value>{0}天 {1}</value></data>
+  <data name="Time_SecondFormat" xml:space="preserve"><value>{0}秒</value></data>
+
+  <!-- ========== License ========== -->
+  <data name="License_NotRegistered" xml:space="preserve"><value>未注册许可证。
+
+您可以从以下地址获取许可证:
+https://www.odv.dev/
+
+是否要选择许可证文件 (.lic.json) 进行激活?</value></data>
+  <data name="License_VerifyFailed" xml:space="preserve"><value>许可证验证失败: {0}
+
+是否要选择新的许可证文件进行激活?</value></data>
+  <data name="License_Required" xml:space="preserve"><value>需要激活许可证</value></data>
+  <data name="License_Success" xml:space="preserve"><value>许可证激活成功。</value></data>
+  <data name="License_CheckError" xml:space="preserve"><value>许可证检查时发生错误: {0}</value></data>
+  <data name="License_AuthError" xml:space="preserve"><value>许可证激活时发生错误: {0}</value></data>
+  <data name="License_FileDialogTitle" xml:space="preserve"><value>选择许可证文件 (*.lic.json)</value></data>
+  <data name="License_FileFilter" xml:space="preserve"><value>许可证文件 (*.lic.json)|*.lic.json|所有文件 (*.*)|*.*</value></data>
+
+  <!-- ========== Main Form Messages ========== -->
+  <data name="Msg_WorkspaceNotOpen" xml:space="preserve"><value>没有打开的工作区。</value></data>
+  <data name="Msg_OpenWorkspacePlease" xml:space="preserve"><value>请打开一个工作区。</value></data>
+  <data name="Msg_FileNotFound" xml:space="preserve"><value>未找到文件。</value></data>
+  <data name="Msg_DumpFileNotFound" xml:space="preserve"><value>未找到工作区中指定的转储文件。</value></data>
+  <data name="Msg_WorkspaceLoadFailed" xml:space="preserve"><value>工作区加载失败。</value></data>
+  <data name="Msg_WorkspaceSaved" xml:space="preserve"><value>工作区已保存。</value></data>
+  <data name="Msg_WorkspaceSaveFailed" xml:space="preserve"><value>工作区保存失败。</value></data>
+  <data name="Msg_CloseWorkspaceConfirm" xml:space="preserve"><value>关闭前是否保存工作区?</value></data>
+  <data name="Msg_HelpNotFound" xml:space="preserve"><value>未找到帮助文件。</value></data>
+  <data name="Msg_NoExportTables" xml:space="preserve"><value>工作区中没有可导出的表。</value></data>
+  <data name="Msg_BulkExportConfirm" xml:space="preserve"><value>是否批量导出 {0} 个表?</value></data>
+  <data name="Msg_ConnectViaSqlServer" xml:space="preserve"><value>请通过 SQL Server 选项卡进行连接。</value></data>
+  <data name="Msg_ConnectViaOdbc" xml:space="preserve"><value>请通过 ODBC 选项卡进行连接。</value></data>
+  <data name="Msg_SelectTableForLob" xml:space="preserve"><value>请选择一个表。</value></data>
+  <data name="Msg_NoColumnTypeInfo" xml:space="preserve"><value>没有可用的列类型信息。</value></data>
+  <data name="Msg_NoLobColumns" xml:space="preserve"><value>所选表没有 LOB 列 (BLOB/CLOB/NCLOB)。</value></data>
+
+  <!-- ========== Export Complete Messages ========== -->
+  <data name="Msg_SqlExportComplete" xml:space="preserve"><value>SQL 脚本导出完成。</value></data>
+  <data name="Msg_CsvExportComplete" xml:space="preserve"><value>CSV 导出完成。</value></data>
+  <data name="Msg_ExcelExportComplete" xml:space="preserve"><value>Excel 导出完成。</value></data>
+  <data name="Msg_AccessExportComplete" xml:space="preserve"><value>Access 导出完成。</value></data>
+  <data name="Msg_SqlServerExportComplete" xml:space="preserve"><value>导出到 SQL Server 完成。</value></data>
+  <data name="Msg_OdbcExportComplete" xml:space="preserve"><value>ODBC 导出完成。</value></data>
+  <data name="Msg_RowsExported" xml:space="preserve"><value>已导出 {0} 行。</value></data>
+  <data name="Msg_BulkSqlExportComplete" xml:space="preserve"><value>SQL 批量导出完成。</value></data>
+  <data name="Msg_BulkCsvExportComplete" xml:space="preserve"><value>CSV 批量导出完成。</value></data>
+  <data name="Msg_BulkExcelExportComplete" xml:space="preserve"><value>Excel 批量导出完成。</value></data>
+  <data name="Msg_BulkAccessExportComplete" xml:space="preserve"><value>Access 批量导出完成。</value></data>
+  <data name="Msg_BulkSqlServerExportComplete" xml:space="preserve"><value>SQL Server 批量导出完成。</value></data>
+  <data name="Msg_BulkOdbcExportComplete" xml:space="preserve"><value>ODBC 批量导出完成。</value></data>
+  <data name="Msg_TablesExported" xml:space="preserve"><value>已导出 {0} 个表。</value></data>
+  <data name="Msg_ObjectListExported" xml:space="preserve"><value>对象列表已导出。</value></data>
+  <data name="Msg_TableDefExported" xml:space="preserve"><value>表定义已导出。</value></data>
+
+  <!-- ========== File Dialogs ========== -->
+  <data name="Dialog_OpenDumpTitle" xml:space="preserve"><value>选择 Oracle 转储文件</value></data>
+  <data name="Dialog_DumpFilter" xml:space="preserve"><value>Oracle 转储文件 (*.dmp)|*.dmp|所有文件 (*.*)|*.*</value></data>
+  <data name="Dialog_OpenWorkspaceTitle" xml:space="preserve"><value>打开工作区</value></data>
+  <data name="Dialog_WorkspaceFilter" xml:space="preserve"><value>工作区文件 (*.odvw)|*.odvw|所有文件 (*.*)|*.*</value></data>
+  <data name="Dialog_SaveWorkspaceTitle" xml:space="preserve"><value>保存工作区</value></data>
+  <data name="Dialog_FileSelectionError" xml:space="preserve"><value>文件选择时发生错误: {0}</value></data>
+  <data name="Dialog_SqlFilter" xml:space="preserve"><value>SQL 文件|*.sql|所有文件|*.*</value></data>
+  <data name="Dialog_CsvFilter" xml:space="preserve"><value>CSV 文件|*.csv|所有文件|*.*</value></data>
+  <data name="Dialog_ExcelFilter" xml:space="preserve"><value>Excel 文件|*.xlsx|所有文件|*.*</value></data>
+  <data name="Dialog_AccessFilter" xml:space="preserve"><value>Access 数据库|*.accdb|所有文件|*.*</value></data>
+  <data name="Dialog_TextFilter" xml:space="preserve"><value>文本文件|*.txt|所有文件|*.*</value></data>
+  <data name="Dialog_SqlFolderBrowse" xml:space="preserve"><value>选择 SQL 文件的输出文件夹</value></data>
+  <data name="Dialog_CsvFolderBrowse" xml:space="preserve"><value>选择 CSV 文件的输出文件夹</value></data>
+
+  <!-- ========== Analysis Errors ========== -->
+  <data name="Analyze_DllNotFound" xml:space="preserve"><value>未找到分析 DLL: {0}
+请确保 OraDB_DumpParser.dll 与可执行文件位于同一文件夹中。</value></data>
+  <data name="Analyze_ParseError" xml:space="preserve"><value>转储文件分析时发生错误: {0}</value></data>
+  <data name="Analyze_TableListError" xml:space="preserve"><value>获取表列表时发生错误: {0}</value></data>
+  <data name="Analyze_TableError" xml:space="preserve"><value>表分析时发生错误: {0}</value></data>
+  <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>未指定文件路径。</value></data>
+  <data name="Analyze_FileNotFound" xml:space="preserve"><value>未找到文件: {0}</value></data>
+  <data name="Analyze_InvalidFormat" xml:space="preserve"><value>文件必须为 .dmp 格式。</value></data>
+
+  <!-- ========== Workspace ========== -->
+  <data name="Workspace_Column_Name" xml:space="preserve"><value>名称</value></data>
+  <data name="Workspace_Column_Owner" xml:space="preserve"><value>所有者</value></data>
+  <data name="Workspace_Column_Type" xml:space="preserve"><value>类型</value></data>
+  <data name="Workspace_Column_RowCount" xml:space="preserve"><value>行数</value></data>
+  <data name="Workspace_ContextMenu_Exclude" xml:space="preserve"><value>排除</value></data>
+  <data name="Workspace_ContextMenu_InvertSelection" xml:space="preserve"><value>反选</value></data>
+  <data name="Workspace_ContextMenu_RestoreAll" xml:space="preserve"><value>恢复所有已排除项</value></data>
+  <data name="Workspace_TableNotSelected" xml:space="preserve"><value>未选择表。</value></data>
+  <data name="Workspace_SchemaNotSelected" xml:space="preserve"><value>未选择架构。</value></data>
+  <data name="Workspace_NoColumnInfo" xml:space="preserve"><value>表没有列信息。</value></data>
+  <data name="Workspace_TableDisplayError" xml:space="preserve"><value>表显示错误: {0}</value></data>
+  <data name="Workspace_NoSchema" xml:space="preserve"><value>未找到数据库架构。</value></data>
+  <data name="Workspace_SchemaTreeError" xml:space="preserve"><value>创建架构树失败: {0}</value></data>
+  <data name="Workspace_SchemaNotFound" xml:space="preserve"><value>未找到架构 '{0}'。</value></data>
+  <data name="Workspace_TableListError" xml:space="preserve"><value>显示表列表失败: {0}</value></data>
+
+  <!-- ========== Reports ========== -->
+  <data name="Report_ObjectList_Title" xml:space="preserve"><value>对象列表报表: {0}</value></data>
+  <data name="Report_OutputDate" xml:space="preserve"><value>输出日期: {0}</value></data>
+  <data name="Report_Column_Schema" xml:space="preserve"><value>架构</value></data>
+  <data name="Report_Column_TableName" xml:space="preserve"><value>表名</value></data>
+  <data name="Report_Column_RowCount" xml:space="preserve"><value>行数</value></data>
+  <data name="Report_TableDef_Title" xml:space="preserve"><value>表定义报表: {0}</value></data>
+  <data name="Report_Table" xml:space="preserve"><value>表: {0}</value></data>
+  <data name="Report_Column_Number" xml:space="preserve"><value>#</value></data>
+  <data name="Report_Column_ColumnName" xml:space="preserve"><value>列名</value></data>
+  <data name="Report_Column_ColumnType" xml:space="preserve"><value>类型</value></data>
+  <data name="Report_DefaultObjectList" xml:space="preserve"><value>ObjectList.txt</value></data>
+  <data name="Report_DefaultTableDef" xml:space="preserve"><value>TableDefinition.txt</value></data>
+
+  <!-- ========== About Dialog ========== -->
+  <data name="About_FormTitle" xml:space="preserve"><value>关于</value></data>
+  <data name="About_VersionLabel" xml:space="preserve"><value>版本:</value></data>
+  <data name="About_LatestVersionLabel" xml:space="preserve"><value>最新版本:</value></data>
+  <data name="About_Checking" xml:space="preserve"><value>正在检查...</value></data>
+  <data name="About_CheckFailed" xml:space="preserve"><value>无法验证</value></data>
+  <data name="About_CheckFailedOffline" xml:space="preserve"><value>无法验证 (离线)</value></data>
+  <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (有新版本可用)</value></data>
+  <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (已是最新版本)</value></data>
+  <data name="About_OpenReleasePage" xml:space="preserve"><value>打开发布页面</value></data>
+  <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>将下载并运行最新版本的安装程序。
+应用程序将自动退出。
+
+是否继续?</value></data>
+  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>更新确认</value></data>
+  <data name="About_Downloading" xml:space="preserve"><value>正在下载...</value></data>
+  <data name="About_LaunchingInstaller" xml:space="preserve"><value>正在启动安装程序...</value></data>
+  <data name="About_DownloadFailed" xml:space="preserve"><value>下载失败: {0}</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo 正在更新 OraDB DUMP Viewer...</value></data>
+
+  <!-- ========== Error Report Dialog ========== -->
+  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>错误报告</value></data>
+  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>主题:</value></data>
+  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>描述:</value></data>
+  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>联系方式:</value></data>
+  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(可选) 输入您的电子邮件或联系方式以便回复</value></data>
+  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── 以下环境信息将自动发送 (不包含个人数据) ──</value></data>
+  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>应用:</value></data>
+  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
+  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>操作系统:</value></data>
+  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
+  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU:</value></data>
+  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>区域设置:</value></data>
+  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
+  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>内存:</value></data>
+  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>屏幕:</value></data>
+  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>转储:</value></data>
+  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>请输入主题。</value></data>
+  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>请输入描述。</value></data>
+  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>报告已提交。感谢您的反馈。</value></data>
+  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>查看问题 #{0}</value></data>
+  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>提交失败: {0}</value></data>
+  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>提交错误: {0}</value></data>
+  <data name="ErrorReport_Submitting" xml:space="preserve"><value>正在提交...</value></data>
+
+  <!-- ========== Table Properties Dialog ========== -->
+  <data name="TableProp_FormTitle" xml:space="preserve"><value>表属性 - {0}.{1}</value></data>
+  <data name="TableProp_SchemaLabel" xml:space="preserve"><value>架构:</value></data>
+  <data name="TableProp_TableNameLabel" xml:space="preserve"><value>表名:</value></data>
+  <data name="TableProp_ColumnCountLabel" xml:space="preserve"><value>列数:</value></data>
+  <data name="TableProp_RowCountLabel" xml:space="preserve"><value>行数:</value></data>
+  <data name="TableProp_ColumnListLabel" xml:space="preserve"><value>列列表:</value></data>
+  <data name="TableProp_ColumnNameHeader" xml:space="preserve"><value>列名</value></data>
+  <data name="TableProp_TypeHeader" xml:space="preserve"><value>类型</value></data>
+  <data name="TableProp_FormTitleBase" xml:space="preserve"><value>表属性</value></data>
+
+  <!-- ========== Table Preview ========== -->
+  <data name="Preview_FormTitle" xml:space="preserve"><value>表数据预览 - {0}</value></data>
+  <data name="Preview_SearchValueLabel" xml:space="preserve"><value>搜索值:</value></data>
+  <data name="Preview_ColumnNameLabel" xml:space="preserve"><value>列名:</value></data>
+  <data name="Preview_RowCountLabel" xml:space="preserve"><value>总行数: {0} (已显示: {1})</value></data>
+  <data name="Preview_RowCountDefault" xml:space="preserve"><value>总行数: 0 (已显示: 0)</value></data>
+  <data name="Preview_PageSizeLabel" xml:space="preserve"><value>每页行数:</value></data>
+  <data name="Preview_PageInfoLabel" xml:space="preserve"><value>页码: {0}/{1}</value></data>
+  <data name="Preview_FormTitleBase" xml:space="preserve"><value>表数据预览</value></data>
+  <data name="Preview_NoColumnInfo" xml:space="preserve"><value>没有列信息。</value></data>
+  <data name="Preview_DataDisplayError" xml:space="preserve"><value>显示数据时发生错误: {0}</value></data>
+
+  <!-- ========== Advanced Search ========== -->
+  <data name="AdvSearch_FormTitle" xml:space="preserve"><value>高级搜索</value></data>
+  <data name="AdvSearch_ConditionLabel" xml:space="preserve"><value>条件:</value></data>
+  <data name="AdvSearch_MinCondition" xml:space="preserve"><value>至少需要一个条件。</value></data>
+  <data name="AdvSearch_InvalidConditions" xml:space="preserve"><value>请正确输入所有条件。</value></data>
+
+  <!-- ========== Search Operators ========== -->
+  <data name="Operator_Contains" xml:space="preserve"><value>包含</value></data>
+  <data name="Operator_NotContains" xml:space="preserve"><value>不包含</value></data>
+  <data name="Operator_Equals" xml:space="preserve"><value>等于</value></data>
+  <data name="Operator_NotEquals" xml:space="preserve"><value>不等于</value></data>
+  <data name="Operator_StartsWith" xml:space="preserve"><value>开头为</value></data>
+  <data name="Operator_EndsWith" xml:space="preserve"><value>结尾为</value></data>
+  <data name="Search_CaseSensitive" xml:space="preserve"><value>区分大小写</value></data>
+
+  <!-- ========== Export Progress Dialog ========== -->
+  <data name="ExportProgress_FormTitle" xml:space="preserve"><value>正在导出...</value></data>
+  <data name="ExportProgress_Exporting" xml:space="preserve"><value>正在导出...</value></data>
+  <data name="ExportProgress_Cancelling" xml:space="preserve"><value>正在取消...</value></data>
+  <data name="ExportProgress_Table" xml:space="preserve"><value>表 {0}/{1}: {2}</value></data>
+  <data name="ExportProgress_TableName" xml:space="preserve"><value>表: {0}</value></data>
+  <data name="ExportProgress_RowsProcessed" xml:space="preserve"><value>已处理行数: {0} / {1}</value></data>
+  <data name="ExportProgress_RowsProcessedOnly" xml:space="preserve"><value>已处理行数: {0}</value></data>
+  <data name="ExportProgress_Elapsed" xml:space="preserve"><value>已用时间: {0}</value></data>
+  <data name="ExportProgress_ExportError" xml:space="preserve"><value>导出错误: {0}</value></data>
+
+  <!-- ========== Export Options Dialog ========== -->
+  <data name="ExportOptions_FormTitle" xml:space="preserve"><value>导出选项</value></data>
+  <data name="ExportOptions_DateFormat" xml:space="preserve"><value>日期格式</value></data>
+  <data name="ExportOptions_DateSlash" xml:space="preserve"><value>YYYY/MM/DD HH:MI:SS (默认)</value></data>
+  <data name="ExportOptions_DateCustom" xml:space="preserve"><value>自定义:</value></data>
+  <data name="ExportOptions_CsvOptions" xml:space="preserve"><value>CSV 选项</value></data>
+  <data name="ExportOptions_CsvWriteHeader" xml:space="preserve"><value>输出列名标题行</value></data>
+  <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>输出列类型行</value></data>
+  <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>SQL 脚本选项</value></data>
+  <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>输出 DROP TABLE + CREATE TABLE</value></data>
+
+  <!-- ========== SQL Export Dialog ========== -->
+  <data name="SqlExport_FormTitle" xml:space="preserve"><value>SQL 脚本导出</value></data>
+  <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>目标数据库:</value></data>
+
+  <!-- ========== LOB Extraction Dialog ========== -->
+  <data name="LobExtract_FormTitle" xml:space="preserve"><value>LOB 文件提取 - {0}</value></data>
+  <data name="LobExtract_LobColumnLabel" xml:space="preserve"><value>LOB 列:</value></data>
+  <data name="LobExtract_OutputFolderLabel" xml:space="preserve"><value>输出文件夹:</value></data>
+  <data name="LobExtract_FilenameLabel" xml:space="preserve"><value>文件名:</value></data>
+  <data name="LobExtract_ExtensionLabel" xml:space="preserve"><value>扩展名:</value></data>
+  <data name="LobExtract_SettingsGroup" xml:space="preserve"><value>提取设置</value></data>
+  <data name="LobExtract_Sequential" xml:space="preserve"><value>顺序编号</value></data>
+  <data name="LobExtract_ColumnValue" xml:space="preserve"><value>列值</value></data>
+  <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>选择 LOB 文件的输出文件夹</value></data>
+  <data name="LobExtract_ExtractComplete" xml:space="preserve"><value>LOB 文件提取完成。输出文件数: {0}</value></data>
+  <data name="LobExtract_ExtractError" xml:space="preserve"><value>LOB 提取处理时发生错误</value></data>
+  <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>请选择 LOB 列。</value></data>
+  <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>请指定输出文件夹。</value></data>
+  <data name="LobExtract_CreateFolderError" xml:space="preserve"><value>创建输出文件夹失败:
+{0}</value></data>
+
+  <!-- ========== Database Connection Dialog ========== -->
+  <data name="DbConn_FormTitle" xml:space="preserve"><value>数据库连接</value></data>
+  <data name="DbConn_ServerNameLabel" xml:space="preserve"><value>服务器名称:</value></data>
+  <data name="DbConn_AuthLabel" xml:space="preserve"><value>身份验证:</value></data>
+  <data name="DbConn_UserNameLabel" xml:space="preserve"><value>用户名:</value></data>
+  <data name="DbConn_PasswordLabel" xml:space="preserve"><value>密码:</value></data>
+  <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>数据库名称:</value></data>
+  <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>系统 DSN:</value></data>
+  <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>连接字符串 (直接输入):</value></data>
+  <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows 身份验证</value></data>
+  <data name="DbConn_AuthSqlServer" xml:space="preserve"><value>SQL Server 身份验证</value></data>
+  <data name="DbConn_Connecting" xml:space="preserve"><value>正在连接...</value></data>
+  <data name="DbConn_Success" xml:space="preserve"><value>连接成功</value></data>
+  <data name="DbConn_Failed" xml:space="preserve"><value>连接失败: {0}</value></data>
+  <data name="DbConn_EnterServerAndDb" xml:space="preserve"><value>请输入服务器名称和数据库名称。</value></data>
+  <data name="DbConn_EnterDsnOrConnStr" xml:space="preserve"><value>请选择 DSN 或输入连接字符串。</value></data>
+
+  <!-- ========== Export Logic Errors ========== -->
+  <data name="CsvExport_Error" xml:space="preserve"><value>CSV 导出错误: {0}</value></data>
+  <data name="CsvExport_ErrorRc" xml:space="preserve"><value>CSV 导出错误 (rc={0})</value></data>
+  <data name="SqlExport_Error" xml:space="preserve"><value>SQL 导出错误: {0}</value></data>
+  <data name="SqlExport_ErrorRc" xml:space="preserve"><value>SQL 导出错误 (rc={0})</value></data>
+  <data name="ExcelExport_Error" xml:space="preserve"><value>Excel 导出错误: {0}</value></data>
+  <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>行数 ({0}) 超过 Excel 限制 ({1})。建议改用 CSV 导出。</value></data>
+  <data name="AccessExport_Error" xml:space="preserve"><value>Access 导出错误: {0}</value></data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>未安装 Microsoft Access Database Engine。
+
+请从以下地址下载并安装:
+https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
+  <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog 不可用。请安装 Microsoft Access Database Engine。</value></data>
+  <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server 导出错误: {0}</value></data>
+  <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC 导出错误: {0}</value></data>
+  <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel 批量导出错误: {0}</value></data>
+  <data name="TablePreview_NoColumns" xml:space="preserve"><value>没有可用的列信息。</value></data>
+  <data name="TablePreview_DisplayError" xml:space="preserve"><value>显示数据时发生错误: {0}</value></data>
+
+  <!-- ========== License verification errors ========== -->
+  <data name="License_SignatureVerifyFailed" xml:space="preserve"><value>签名验证失败</value></data>
+  <data name="License_ExpiryParseFailed" xml:space="preserve"><value>到期日期解析失败</value></data>
+  <data name="License_Expired" xml:space="preserve"><value>许可证已过期</value></data>
+  <data name="License_VerifyError" xml:space="preserve"><value>验证错误: {0}</value></data>
+  <data name="License_RevokedByServer" xml:space="preserve"><value>此许可证已被服务器吊销。请获取新的许可证。
+是否要打开许可证激活对话框?</value></data>
+
+  <!-- ========== Help Viewer ========== -->
+  <data name="Help_FormTitle" xml:space="preserve"><value>帮助 - OraDB DUMP Viewer</value></data>
+  <data name="Help_Back" xml:space="preserve"><value>后退</value></data>
+  <data name="Help_Forward" xml:space="preserve"><value>前进</value></data>
+  <data name="Help_Home" xml:space="preserve"><value>目录</value></data>
+  <data name="Help_Search" xml:space="preserve"><value>查找</value></data>
+  <data name="Help_SearchPlaceholder" xml:space="preserve"><value>在页面中查找...</value></data>
+  <data name="Help_WebView2NotAvailable" xml:space="preserve"><value>显示帮助所需的 WebView2 运行时未安装。
+请安装 Microsoft Edge WebView2 Runtime。</value></data>
+  <data name="Help_TOC_GettingStarted" xml:space="preserve"><value>入门指南</value></data>
+  <data name="Help_TOC_OpenDump" xml:space="preserve"><value>打开转储文件</value></data>
+  <data name="Help_TOC_Workspace" xml:space="preserve"><value>工作区</value></data>
+  <data name="Help_TOC_TablePreview" xml:space="preserve"><value>表预览</value></data>
+  <data name="Help_TOC_Search" xml:space="preserve"><value>搜索和筛选</value></data>
+  <data name="Help_TOC_Export" xml:space="preserve"><value>导出</value></data>
+  <data name="Help_TOC_ExportCsv" xml:space="preserve"><value>CSV 导出</value></data>
+  <data name="Help_TOC_ExportSql" xml:space="preserve"><value>SQL 导出</value></data>
+  <data name="Help_TOC_ExportBatch" xml:space="preserve"><value>批量导出</value></data>
+  <data name="Help_TOC_ExportOptions" xml:space="preserve"><value>导出选项</value></data>
+  <data name="Help_TOC_LobExtract" xml:space="preserve"><value>LOB 文件提取</value></data>
+  <data name="Help_TOC_ShortcutKeys" xml:space="preserve"><value>快捷键</value></data>
+  <data name="Help_TOC_SupportedFormats" xml:space="preserve"><value>支持的格式</value></data>
+  <data name="Help_TOC_About" xml:space="preserve"><value>关于</value></data>
+
+  <!-- ========== DLL parser errors ========== -->
+  <data name="Parser_SessionCreateFailed" xml:space="preserve"><value>会话创建失败 (rc={0})</value></data>
+  <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>转储文件设置错误: {0}</value></data>
+  <data name="Parser_DumpParseError" xml:space="preserve"><value>转储解析错误: {0}</value></data>
+
+  <!-- ========== Error report logic ========== -->
+  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>获取失败</value></data>
+  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>未打开</value></data>
+  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (已压缩)</value></data>
+  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>未知</value></data>
+  <data name="ErrorReport_ServerError" xml:space="preserve"><value>服务器错误 (HTTP {0})</value></data>
+  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>提交频率超出限制。请稍后重试。</value></data>
+  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>请求格式无效。</value></data>
+  <data name="ErrorReport_InternalError" xml:space="preserve"><value>内部服务器错误。请稍后重试。</value></data>
+  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>发生未知错误 (HTTP {0})</value></data>
+  <data name="ErrorReport_Process" xml:space="preserve"><value>进程:</value></data>
+  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>附加转储文件 ({0} MB)</value></data>
+  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>转储文件过大 (超过 50 MB)</value></data>
+  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>未打开转储文件</value></data>
+
+</root>

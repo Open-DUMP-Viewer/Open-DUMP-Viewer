@@ -110,6 +110,14 @@
   <data name="Menu_Help_Language" xml:space="preserve"><value>言語 / Language</value></data>
   <data name="Menu_Help_Language_Japanese" xml:space="preserve"><value>日本語</value></data>
   <data name="Menu_Help_Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Menu_Help_Language_Chinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Menu_Help_Language_Korean" xml:space="preserve"><value>한국어</value></data>
+  <data name="Menu_Help_Language_German" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="Menu_Help_Language_French" xml:space="preserve"><value>Français</value></data>
+  <data name="Menu_Help_Language_Spanish" xml:space="preserve"><value>Español</value></data>
+  <data name="Menu_Help_Language_Italian" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu_Help_Language_Russian" xml:space="preserve"><value>Русский</value></data>
+  <data name="Menu_Help_Language_Portuguese" xml:space="preserve"><value>Português (BR)</value></data>
 
   <!-- ========== ツールバー ========== -->
   <data name="Toolbar_Property" xml:space="preserve"><value>プロパティ</value></data>

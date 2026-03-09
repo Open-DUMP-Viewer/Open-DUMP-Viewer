@@ -169,13 +169,30 @@ Public Class OraDB_DUMP_Viewer
         End If
         langMenu.Text = Loc.S("Menu_Help_Language")
         langMenu.DropDownItems.Clear()
-        Dim jaItem As New ToolStripMenuItem(Loc.S("Menu_Help_Language_Japanese"))
-        Dim enItem As New ToolStripMenuItem(Loc.S("Menu_Help_Language_English"))
-        jaItem.Checked = LocaleManager.IsJapanese()
-        enItem.Checked = Not LocaleManager.IsJapanese()
-        AddHandler jaItem.Click, Sub() LocaleManager.SetLanguage("ja")
-        AddHandler enItem.Click, Sub() LocaleManager.SetLanguage("en")
-        langMenu.DropDownItems.AddRange({jaItem, enItem})
+
+        ' 言語定義: (カルチャ名, リソースキー)
+        Dim languages() As (cultureName As String, resourceKey As String) = {
+            ("ja", "Menu_Help_Language_Japanese"),
+            ("en", "Menu_Help_Language_English"),
+            ("zh", "Menu_Help_Language_Chinese"),
+            ("ko", "Menu_Help_Language_Korean"),
+            ("de", "Menu_Help_Language_German"),
+            ("fr", "Menu_Help_Language_French"),
+            ("es", "Menu_Help_Language_Spanish"),
+            ("it", "Menu_Help_Language_Italian"),
+            ("ru", "Menu_Help_Language_Russian"),
+            ("pt-BR", "Menu_Help_Language_Portuguese")
+        }
+
+        Dim currentLang = LocaleManager.CurrentLanguage()
+        For Each lang In languages
+            Dim item As New ToolStripMenuItem(Loc.S(lang.resourceKey))
+            item.Checked = (currentLang = lang.cultureName) OrElse
+                           (lang.cultureName = "pt-BR" AndAlso currentLang = "pt")
+            Dim culture = lang.cultureName  ' ラムダ用キャプチャ
+            AddHandler item.Click, Sub() LocaleManager.SetLanguage(culture)
+            langMenu.DropDownItems.Add(item)
+        Next
     End Sub
 #End Region
 
