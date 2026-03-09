@@ -29,9 +29,13 @@
 </table>
 
 <h2>オプション</h2>
+<p>SQL ボタンをクリックすると、エクスポート前にダイアログが表示されます。
+ダイアログでは以下のオプションを設定できます:</p>
 <ul>
+    <li><strong>DBMS 種別</strong> &mdash; Oracle / PostgreSQL / MySQL / SQL Server から選択</li>
     <li><strong>DROP TABLE + CREATE TABLE 出力</strong> (デフォルト: ON) &mdash;
-        INSERT 文の前に <code>DROP TABLE IF EXISTS</code> と <code>CREATE TABLE</code> DDL を出力します。
+        チェックボックスで ON/OFF を切り替えられます。
+        ON の場合、INSERT 文の前に <code>DROP TABLE IF EXISTS</code> と <code>CREATE TABLE</code> DDL を出力します。
         対象データベースに同名テーブルが既に存在する場合、削除してから再作成されます。</li>
     <li><strong>日付書式</strong> &mdash; リテラル形式またはファンクション呼び出し</li>
 </ul>
