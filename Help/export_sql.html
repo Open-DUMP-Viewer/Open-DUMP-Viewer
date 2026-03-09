@@ -30,9 +30,19 @@
 
 <h2>オプション</h2>
 <ul>
-    <li><strong>CREATE TABLE 出力</strong> &mdash; INSERT 文の前に CREATE TABLE DDL を出力</li>
+    <li><strong>DROP TABLE + CREATE TABLE 出力</strong> (デフォルト: ON) &mdash;
+        INSERT 文の前に <code>DROP TABLE IF EXISTS</code> と <code>CREATE TABLE</code> DDL を出力します。
+        対象データベースに同名テーブルが既に存在する場合、削除してから再作成されます。</li>
     <li><strong>日付書式</strong> &mdash; リテラル形式またはファンクション呼び出し</li>
 </ul>
+
+<h3>DROP TABLE の DBMS 別構文</h3>
+<table>
+<tr><th>DBMS</th><th>構文</th></tr>
+<tr><td>Oracle / PostgreSQL</td><td><code>DROP TABLE IF EXISTS "テーブル名" CASCADE;</code></td></tr>
+<tr><td>MySQL</td><td><code>DROP TABLE IF EXISTS `テーブル名`;</code></td></tr>
+<tr><td>SQL Server</td><td><code>IF OBJECT_ID('テーブル名', 'U') IS NOT NULL DROP TABLE [テーブル名];</code></td></tr>
+</table>
 
 <div class="note">
 <strong>注意:</strong> LOB データ (BLOB/CLOB) は SQL エクスポートに含まれません。

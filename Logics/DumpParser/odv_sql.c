@@ -223,6 +223,39 @@ static void write_create_table(SQL_CONTEXT *ctx, const char *schema,
 
     if (!ctx->session) return;
 
+    /* DROP TABLE IF EXISTS */
+    switch (dbms) {
+    case DBMS_MYSQL:
+        fprintf(fp, "DROP TABLE IF EXISTS ");
+        if (schema && schema[0] != '\0') {
+            sql_write_identifier(fp, schema, dbms);
+            fputc('.', fp);
+        }
+        sql_write_identifier(fp, table, dbms);
+        fprintf(fp, ";\n\n");
+        break;
+    case DBMS_SQLSERVER:
+        fprintf(fp, "IF OBJECT_ID('");
+        if (schema && schema[0] != '\0') fprintf(fp, "%s.", schema);
+        fprintf(fp, "%s', 'U') IS NOT NULL DROP TABLE ", table);
+        if (schema && schema[0] != '\0') {
+            sql_write_identifier(fp, schema, dbms);
+            fputc('.', fp);
+        }
+        sql_write_identifier(fp, table, dbms);
+        fprintf(fp, ";\n\n");
+        break;
+    default: /* Oracle, PostgreSQL */
+        fprintf(fp, "DROP TABLE IF EXISTS ");
+        if (schema && schema[0] != '\0') {
+            sql_write_identifier(fp, schema, dbms);
+            fputc('.', fp);
+        }
+        sql_write_identifier(fp, table, dbms);
+        fprintf(fp, " CASCADE;\n\n");
+        break;
+    }
+
     fprintf(fp, "CREATE TABLE ");
 
     if (schema && schema[0] != '\0') {

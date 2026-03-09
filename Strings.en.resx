@@ -383,7 +383,7 @@ Continue?</value></data>
   <data name="ExportOptions_CsvWriteHeader" xml:space="preserve"><value>Output column name header</value></data>
   <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>Output column type row</value></data>
   <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>SQL Script Options</value></data>
-  <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Output CREATE TABLE</value></data>
+  <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Output DROP TABLE + CREATE TABLE</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>SQL Script Export</value></data>

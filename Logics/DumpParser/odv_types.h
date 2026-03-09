@@ -310,7 +310,7 @@ struct _odv_session {
     char            custom_date_format[256]; /* Format string for DATE_FMT_CUSTOM */
     int             csv_write_header;      /* 1=write column header row (default:1) */
     int             csv_write_types;       /* 1=write column type row (default:0) */
-    int             sql_create_table;      /* 1=output CREATE TABLE DDL (default:0) */
+    int             sql_create_table;      /* 1=output DROP+CREATE TABLE DDL (default:1) */
 
     /* LOB extraction options */
     int             lob_extract_mode;      /* 1=extracting LOB files */

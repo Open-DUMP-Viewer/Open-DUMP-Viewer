@@ -32,12 +32,12 @@
 <h2>SQL オプション</h2>
 <table>
 <tr><th>設定</th><th>デフォルト</th><th>説明</th></tr>
-<tr><td>CREATE TABLE を出力</td><td>OFF</td><td>INSERT 文の前に DDL を出力</td></tr>
+<tr><td>DROP TABLE + CREATE TABLE を出力</td><td>ON</td><td>INSERT 文の前に DROP TABLE IF EXISTS と CREATE TABLE DDL を出力。既存テーブルを削除してから再作成</td></tr>
 <tr><td>DBMS 種別</td><td>Oracle</td><td>Oracle / PostgreSQL / MySQL / SQL Server</td></tr>
 </table>
 
 <div class="note">
-<strong>注意:</strong> オプション設定はアプリケーション終了時にリセットされます。
+<strong>注意:</strong> オプション設定はアプリケーション設定に保存され、次回起動時にも保持されます。
 </div>
 
 <p><a href="toc.html">目次に戻る</a></p>

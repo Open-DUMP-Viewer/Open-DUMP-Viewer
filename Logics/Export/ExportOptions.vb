@@ -17,8 +17,8 @@ Public Module ExportOptions
     ''' <summary>CSV: カラム型行を出力するか</summary>
     Public Property CsvWriteTypes As Boolean = False
 
-    ''' <summary>SQL: CREATE TABLE DDL を出力するか</summary>
-    Public Property SqlCreateTable As Boolean = False
+    ''' <summary>SQL: DROP TABLE + CREATE TABLE DDL を出力するか</summary>
+    Public Property SqlCreateTable As Boolean = True
 
     ''' <summary>
     ''' My.Settings から設定を読み込み

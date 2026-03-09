@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.11] - 2026-03-09
+
+### 改善
+- **SQL エクスポートに DROP TABLE IF EXISTS を追加**: CREATE TABLE の前に DROP TABLE IF EXISTS を出力し、既存テーブルがあれば自動削除。Oracle/PostgreSQL/MySQL/SQL Server 各 DBMS の構文に対応
+- **SQL エクスポートの CREATE TABLE デフォルトを ON に変更**: DROP TABLE + CREATE TABLE + INSERT INTO を標準出力に
+
+---
+
 ## [1.2.10] - 2026-03-09
 
 ### 新機能
