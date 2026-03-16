@@ -1,9 +1,12 @@
 # Changelog
 
-## [1.3.2] - 2026-03-16
+## [1.3.3] - 2026-03-16
 
 ### バグ修正
 - **NUMBER型の末尾ゼロ欠落を修正**: Oracle NUMBER のバイナリデコードで、末尾がゼロの整数値（例: 2700, 40000, 100）が正しく表示されない問題を修正。Oracle NUMBER は base-100 可変長形式で末尾のゼロペアを省略して格納するが、省略分の補完処理が欠落していた。正・負の両方で修正
+
+### 改善
+- **GitHub Actions を Node.js 24 対応に更新**: Node.js 20 非推奨化に伴い、CI/CD ワークフローの全アクションを Node.js 24 対応版に更新。ilammy/msvc-dev-cmd → vcvarsall.bat 直接呼出し、softprops/action-gh-release → gh CLI に置換
 
 ## [1.3.1] - 2026-03-09
 
