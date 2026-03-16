@@ -163,7 +163,7 @@ jobs:
                      Scope="perMachine"
                      Language="1041">
 
-              <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)" />
+              <MajorUpgrade DowngradeErrorMessage="新しいバージョンが既にインストールされています。A newer version is already installed." />
               <MediaTemplate EmbedCab="yes" />
 
               <ui:WixUI Id="WixUI_InstallDir" />
@@ -236,21 +236,10 @@ jobs:
         shell: pwsh
         run: |
           $fileVer = "${{ steps.get_version.outputs.FILE_VERSION }}"
-          $locDir = "$env:GITHUB_WORKSPACE/installer/locales"
           wix build installer.wxs `
             -ext WixToolset.UI.wixext `
             -arch ${{ matrix.wix_arch }} `
             -culture "ja-JP;en-US;de-DE;es-ES;fr-FR;it-IT;ko-KR;pt-BR;ru-RU;zh-CN" `
-            -loc "$locDir/ja-JP.wxl" `
-            -loc "$locDir/en-US.wxl" `
-            -loc "$locDir/de-DE.wxl" `
-            -loc "$locDir/es-ES.wxl" `
-            -loc "$locDir/fr-FR.wxl" `
-            -loc "$locDir/it-IT.wxl" `
-            -loc "$locDir/ko-KR.wxl" `
-            -loc "$locDir/pt-BR.wxl" `
-            -loc "$locDir/ru-RU.wxl" `
-            -loc "$locDir/zh-CN.wxl" `
             -o "./publish/OraDBDumpViewer_${fileVer}_installer_${{ matrix.arch }}.msi"
 
       # ─────────────────────────────────────
