@@ -125,7 +125,7 @@ chinesesimplified.VisitReleasePage=打开最新版本页面
 ; [Tasks] - インストールオプション
 ; ============================================================
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 ; ============================================================
 ; [Files] - インストールするファイル
