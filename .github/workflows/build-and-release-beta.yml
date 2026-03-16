@@ -34,13 +34,13 @@ jobs:
       # 1. ソースコードをチェックアウト
       # ─────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # ─────────────────────────────────────
       # 2. .NET SDK のセットアップ (.NET 10)
       # ─────────────────────────────────────
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -250,7 +250,7 @@ jobs:
       # 14. ビルドアーティファクトをアップロード
       # ─────────────────────────────────────
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: beta-build-${{ matrix.arch }}
           path: |
@@ -264,7 +264,7 @@ jobs:
           "${{ steps.get_version.outputs.FILE_VERSION }}" | Set-Content -Path "./publish/file_version.txt" -NoNewline
 
       - name: Upload version info
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: beta-version-info-${{ matrix.arch }}
           path: |
@@ -288,25 +288,25 @@ jobs:
       #    (CHANGELOG.md 読み取り用)
       # ─────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # ─────────────────────────────────────
       # 2. 全アーキテクチャのアーティファクトをダウンロード
       # ─────────────────────────────────────
       - name: Download x64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: beta-build-x64
           path: ./artifacts
 
       - name: Download arm64 artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: beta-build-arm64
           path: ./artifacts
 
       - name: Download version info
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: beta-version-info-x64
           path: ./meta
