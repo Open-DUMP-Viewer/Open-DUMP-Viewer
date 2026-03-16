@@ -7,7 +7,7 @@
     <StartupObject>Sub Main</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
-    <Version>1.3.1</Version>
+    <Version>1.3.2</Version>
     <Authors>YANAI Taketo</Authors>
     <Company>YANAI Taketo</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>

@@ -121,6 +121,19 @@ int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_s
             }
         }
 
+        /* Pad missing integer pairs with "00"
+           Oracle omits trailing zero base-100 pairs from the mantissa.
+           e.g. 2700 is stored as exp=0xC2 (2 pairs) with only [28] (=27),
+           the second pair (00) is not stored and must be inferred. */
+        {
+            int pairs_seen = (len - 1 < num_int_pairs) ? len - 1 : num_int_pairs;
+            int missing_pairs = num_int_pairs - pairs_seen;
+            for (i = 0; i < missing_pairs; i++) {
+                int_buf[int_len++] = '0';
+                int_buf[int_len++] = '0';
+            }
+        }
+
         /* If no integer digits produced, it's 0 */
         if (int_len == 0 || num_int_pairs == 0) {
             int_len = 0;
@@ -185,6 +198,23 @@ int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_s
                 /* Fractional part */
                 frac_buf[frac_len++] = '0' + (digit / 10);
                 frac_buf[frac_len++] = '0' + (digit % 10);
+            }
+        }
+
+        /* Pad missing integer pairs with "00" (same as positive case) */
+        {
+            int data_bytes = 0;
+            for (i = 1; i < len; i++) {
+                if (buf[i] == 0x66) break;
+                data_bytes++;
+            }
+            {
+                int pairs_seen = (data_bytes < num_int_pairs) ? data_bytes : num_int_pairs;
+                int missing_pairs = num_int_pairs - pairs_seen;
+                for (i = 0; i < missing_pairs; i++) {
+                    int_buf[int_len++] = '0';
+                    int_buf[int_len++] = '0';
+                }
             }
         }
 
