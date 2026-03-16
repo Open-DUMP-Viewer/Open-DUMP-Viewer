@@ -60,17 +60,30 @@ static int type_num_to_col_type(int type_num, int length, int flags)
     case 1:   return COL_VARCHAR;
     case 2:   return COL_NUMBER;
     case 8:   return COL_LONG;
+    case 11:  return COL_ROWID;
     case 12:  return COL_DATE;
     case 23:  return (length > 8000 || flags > 0) ? COL_BLOB : COL_RAW;
+    case 24:  return COL_LONG_RAW;
+    case 58:  return COL_LONG_RAW;
+    case 69:  return COL_ROWID;
     case 96:  return COL_CHAR;
+    case 100: return COL_BIN_FLOAT;
+    case 101: return COL_BIN_DOUBLE;
+    case 109: return COL_USER_DEFINE;   /* XMLTYPE (object) / user-defined types */
+    case 111: return COL_RAW;           /* REF (object ref) */
     case 112: return COL_CLOB;
     case 113: return COL_BLOB;
+    case 114: return COL_BFILE;
+    case 121: return COL_RAW;           /* ROWID-like (internal) */
+    case 122: return COL_RAW;
+    case 123: return (length > 8000 || flags > 0) ? COL_BLOB : COL_RAW;
     case 180: return COL_TIMESTAMP;
     case 181: return COL_TIMESTAMP_TZ;
     case 182: return COL_INTERVAL_YM;
     case 183: return COL_INTERVAL_DS;
+    case 208: return COL_ROWID;         /* UROWID */
     case 231: return COL_TIMESTAMP_LTZ;
-    default:  return COL_VARCHAR;  /* fallback */
+    default:  return COL_VARCHAR;       /* fallback for unknown types */
     }
 }
 
@@ -237,6 +250,27 @@ static void ddl_xml_callback(const char *tag, const char *value,
                 case COL_BIN_DOUBLE:
                     snprintf(col->type_str, sizeof(col->type_str), "BINARY_DOUBLE");
                     break;
+                case COL_LONG:
+                    snprintf(col->type_str, sizeof(col->type_str), "LONG");
+                    break;
+                case COL_LONG_RAW:
+                    snprintf(col->type_str, sizeof(col->type_str), "LONG RAW");
+                    break;
+                case COL_BFILE:
+                    snprintf(col->type_str, sizeof(col->type_str), "BFILE");
+                    break;
+                case COL_XMLTYPE:
+                    snprintf(col->type_str, sizeof(col->type_str), "XMLTYPE");
+                    break;
+                case COL_NCLOB:
+                    snprintf(col->type_str, sizeof(col->type_str), "NCLOB");
+                    break;
+                case COL_ROWID:
+                    snprintf(col->type_str, sizeof(col->type_str), "ROWID");
+                    break;
+                case COL_USER_DEFINE:
+                    snprintf(col->type_str, sizeof(col->type_str), "USER_DEFINED");
+                    break;
                 default:
                     snprintf(col->type_str, sizeof(col->type_str), "VARCHAR2(%d)", col->length);
                     break;
@@ -244,7 +278,8 @@ static void ddl_xml_callback(const char *tag, const char *value,
 
                 /* Count LOB columns */
                 if (col->type == COL_BLOB || col->type == COL_CLOB ||
-                    col->type == COL_NCLOB || col->type == COL_LONG_RAW) {
+                    col->type == COL_NCLOB || col->type == COL_LONG_RAW ||
+                    col->type == COL_BFILE || col->type == COL_USER_DEFINE) {
                     s->table.lob_col_count++;
                 }
 
@@ -369,19 +404,6 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
 }
 
 /*---------------------------------------------------------------------------
-    Search for a byte pattern in buffer
- ---------------------------------------------------------------------------*/
-static int find_pattern(const unsigned char *buf, int buf_len,
-                        const char *pat, int pat_len)
-{
-    int i;
-    for (i = 0; i <= buf_len - pat_len; i++) {
-        if (memcmp(buf + i, pat, pat_len) == 0) return i;
-    }
-    return -1;
-}
-
-/*---------------------------------------------------------------------------
     Parse EXPDP binary records for one table
 
     Record header byte values:
@@ -401,8 +423,7 @@ static int find_pattern(const unsigned char *buf, int buf_len,
 static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                                int list_only)
 {
-    unsigned char buf[ODV_DUMP_BLOCK_LEN];
-    int buf_pos = 0, buf_len = 0;
+    unsigned char b;
     int step = 1;       /* 1=expect header, 2=reading columns */
     int data_step = 0;
     int col_idx = 0;
@@ -415,6 +436,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     int seg_remaining = -1;   /* bytes left in current 3c-segment (-1 = no limit) */
     int non_lob_cols;
     int rc;
+    int progress_counter = 0; /* throttle progress reporting */
     char decode_buf[ODV_VARCHAR_LEN + 4];
 
     non_lob_cols = s->table.col_count - s->table.lob_col_count;
@@ -457,18 +479,33 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             continue; /* next byte is the start of a new segment or padding */
         }
 
-        /* Refill buffer if needed */
-        if (buf_pos >= buf_len) {
-            buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-            if (buf_len <= 0) break;
-            buf_pos = 0;
-            *address += buf_len;
+        /* Read one byte */
+        if (fread(&b, 1, 1, fp) != 1) break;
+        (*address)++;
 
-            /* Report progress on each buffer refill so UI stays responsive */
-            odv_report_progress(s, fp);
+        /* Safety check: if we've just read byte at block offset 2 and
+         * it's '<', peek ahead to see if this is "<?xml" — the start of
+         * the next table's DDL.  If so, seek back and stop.  This prevents
+         * record parsing bugs from overrunning into adjacent DDL blocks. */
+        if (b == '<' && (*address % ODV_DUMP_BLOCK_LEN) == 3) {
+            unsigned char peek[4];
+            if (fread(peek, 1, 4, fp) == 4) {
+                if (memcmp(peek, "?xml", 4) == 0) {
+                    /* Overrun detected — rewind to block offset 0 */
+                    odv_fseek(fp, *address - 3, SEEK_SET);
+                    *address -= 3;
+                    break;
+                }
+                /* Not XML — rewind the peek bytes */
+                odv_fseek(fp, -4, SEEK_CUR);
+            }
         }
 
-        unsigned char b = buf[buf_pos++];
+        /* Throttled progress reporting */
+        if (++progress_counter >= 1000) {
+            progress_counter = 0;
+            odv_report_progress(s, fp);
+        }
 
         /* Track bytes consumed inside a 3c segment */
         if (step == 2 && seg_remaining > 0)
@@ -480,8 +517,9 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             case 0x00:
                 /* End of table data only if we've already seen records.
                    Before the first record, 0x00 bytes are padding after </ROWSET>. */
-                if (is_between_record)
+                if (is_between_record) {
                     return ODV_OK;
+                }
                 /* Padding byte before first record - skip */
                 break;
 
@@ -494,21 +532,12 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                  * (which Oracle omits) are handled correctly. */
                 unsigned char _nn = 0;
                 /* skip the 0x00 byte */
-                if (buf_pos >= buf_len) {
-                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                    if (buf_len <= 0) return ODV_OK;
-                    buf_pos = 0;
-                    *address += buf_len;
-                }
-                buf_pos++;
+                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                (*address)++;
                 /* read NN */
-                if (buf_pos >= buf_len) {
-                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                    if (buf_len <= 0) return ODV_OK;
-                    buf_pos = 0;
-                    *address += buf_len;
-                }
-                _nn = buf[buf_pos++];
+                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                (*address)++;
+                _nn = b;
                 /* column data bytes = NN - 3 (header) - 1 (record hdr) */
                 seg_remaining = (int)_nn - 4;
                 if (seg_remaining < 0) seg_remaining = 0;
@@ -528,13 +557,8 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 col_idx = 0;
                 reset_record(&s->record);
                 /* Skip the non-LOB column count sub-byte */
-                if (buf_pos >= buf_len) {
-                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                    if (buf_len <= 0) return ODV_OK;
-                    buf_pos = 0;
-                    *address += buf_len;
-                }
-                buf_pos++;
+                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                (*address)++;
                 break;
 
             case 0x0c:
@@ -549,13 +573,8 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 col_idx = 0;
                 reset_record(&s->record);
                 /* Skip the column count sub-byte */
-                if (buf_pos >= buf_len) {
-                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                    if (buf_len <= 0) return ODV_OK;
-                    buf_pos = 0;
-                    *address += buf_len;
-                }
-                buf_pos++;
+                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                (*address)++;
                 break;
 
             case 0x18: case 0x19: case 0x1c: case 0x2c:
@@ -656,33 +675,23 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
                         int lob_i;
                         for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
-                            /* Read LOB column length */
+                            /* Read LOB column length byte */
                             int lb;
                             int lob_len = 0;
-                            while (buf_pos >= buf_len) {
-                                buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                                if (buf_len <= 0) goto END_LOB_PARSE;
-                                buf_pos = 0;
-                                *address += buf_len;
-                            }
-                            lb = buf[buf_pos++];
+                            if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                            (*address)++;
+                            lb = b;
                             if (lb == 0xff) {
                                 /* NULL LOB */
                                 continue;
                             } else if (lb == 0xfe) {
                                 /* 2-byte length */
-                                while (buf_pos >= buf_len) {
-                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                                    if (buf_len <= 0) goto END_LOB_PARSE;
-                                    buf_pos = 0; *address += buf_len;
-                                }
-                                lob_len = buf[buf_pos++];
-                                while (buf_pos >= buf_len) {
-                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                                    if (buf_len <= 0) goto END_LOB_PARSE;
-                                    buf_pos = 0; *address += buf_len;
-                                }
-                                lob_len |= (buf[buf_pos++] << 8);
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                                (*address)++;
+                                lob_len = b;
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                                (*address)++;
+                                lob_len |= (b << 8);
                             } else if (lb == 0x00) {
                                 /* Empty LOB */
                                 continue;
@@ -690,24 +699,19 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                                 lob_len = lb;
                             }
 
-                            /* Read lob_len bytes of LOB data */
+                            /* Read lob_len bytes of LOB data (bulk fread) */
                             {
+                                unsigned char lob_tmp[4096];
                                 int lob_read = 0;
                                 while (lob_read < lob_len && !s->cancelled) {
-                                    int avail = buf_len - buf_pos;
                                     int need = lob_len - lob_read;
-                                    int chunk = (avail < need) ? avail : need;
-                                    if (chunk > 0) {
-                                        rc = odv_lob_accumulate(s, lob_i, buf + buf_pos, chunk);
-                                        if (rc != ODV_OK) return rc;
-                                        buf_pos += chunk;
-                                        lob_read += chunk;
-                                    }
-                                    if (buf_pos >= buf_len) {
-                                        buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                                        if (buf_len <= 0) goto END_LOB_PARSE;
-                                        buf_pos = 0; *address += buf_len;
-                                    }
+                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
+                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
+                                    if (got <= 0) goto END_LOB_PARSE;
+                                    *address += got;
+                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
+                                    if (rc != ODV_OK) return rc;
+                                    lob_read += got;
                                 }
                             }
                         }
@@ -885,26 +889,31 @@ END_LOB_PARSE:
                             int lob_i;
                             for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
                                 int lb, lob_len = 0;
-                                while (buf_pos >= buf_len) {
-                                    buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp);
-                                    if (buf_len <= 0) goto END_LOB_PARSE2;
-                                    buf_pos = 0; *address += buf_len;
-                                }
-                                lb = buf[buf_pos++];
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                (*address)++;
+                                lb = b;
                                 if (lb == 0xff) continue; /* NULL */
                                 else if (lb == 0xfe) {
-                                    while (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
-                                    lob_len = buf[buf_pos++];
-                                    while (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
-                                    lob_len |= (buf[buf_pos++] << 8);
+                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                    (*address)++;
+                                    lob_len = b;
+                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                    (*address)++;
+                                    lob_len |= (b << 8);
                                 } else if (lb == 0x00) continue; /* empty */
                                 else lob_len = lb;
 
-                                { int lr = 0;
+                                { unsigned char lob_tmp[4096];
+                                int lr = 0;
                                 while (lr < lob_len && !s->cancelled) {
-                                    int avail = buf_len - buf_pos, need = lob_len - lr, chunk = (avail < need) ? avail : need;
-                                    if (chunk > 0) { rc = odv_lob_accumulate(s, lob_i, buf + buf_pos, chunk); if (rc != ODV_OK) return rc; buf_pos += chunk; lr += chunk; }
-                                    if (buf_pos >= buf_len) { buf_len = (int)fread(buf, 1, ODV_DUMP_BLOCK_LEN, fp); if (buf_len <= 0) goto END_LOB_PARSE2; buf_pos = 0; *address += buf_len; }
+                                    int need = lob_len - lr;
+                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
+                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
+                                    if (got <= 0) goto END_LOB_PARSE2;
+                                    *address += got;
+                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
+                                    if (rc != ODV_OK) return rc;
+                                    lr += got;
                                 } }
                             }
                             rc = odv_lob_write_file(s);
@@ -946,6 +955,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
     int64_t address = 0;
     int64_t cur_ddl_pos = 0;    /* File position of current XML DDL block */
     int n, rc;
+    unsigned char skip_blk[ODV_DUMP_BLOCK_LEN];  /* buffer for skipping record data */
 
     if (!s) return ODV_ERROR_INVALID_ARG;
 
@@ -1128,12 +1138,26 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                     }
                 }
 
-                /* Seek to next block boundary (per EXPDP format) */
+                /* After DDL+records processing (or skipping), scan forward
+                 * to find the next <?xml DDL block.  This is the safest
+                 * approach: even if parse_expdp_records over-reads or
+                 * under-reads, we always re-sync to the correct position.
+                 * First, align to the next block boundary. */
                 {
                     int64_t cur = odv_ftell(fp);
-                    int64_t remainder = cur % ODV_DUMP_BLOCK_LEN;
-                    if (remainder != 0)
-                        odv_fseek(fp, cur + (ODV_DUMP_BLOCK_LEN - remainder), SEEK_SET);
+                    int64_t rem = cur % ODV_DUMP_BLOCK_LEN;
+                    if (rem != 0)
+                        odv_fseek(fp, cur + (ODV_DUMP_BLOCK_LEN - rem), SEEK_SET);
+                }
+                /* Then scan block-by-block until we find <?xml or EOF */
+                while (!s->cancelled) {
+                    int nr = (int)fread(skip_blk, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    if (nr < 7) break;  /* EOF */
+                    if (memcmp(skip_blk + 2, "<?xml", 5) == 0) {
+                        /* Found next DDL block — seek back so main loop reads it */
+                        odv_fseek(fp, odv_ftell(fp) - nr, SEEK_SET);
+                        break;
+                    }
                 }
 
                 in_ddl = 0;
