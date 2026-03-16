@@ -6,7 +6,7 @@ Imports System.Text.Json
 ''' <summary>
 ''' バージョン情報ダイアログ
 ''' 現在のバージョンを表示し、GitHubの最新リリースと比較する
-''' 新バージョンがある場合はMSIインストーラーをダウンロードして更新できる
+''' 新バージョンがある場合はインストーラーをダウンロードして更新できる
 ''' </summary>
 Partial Public Class AboutDialog
     Implements ILocalizable
@@ -14,8 +14,8 @@ Partial Public Class AboutDialog
     Private Const GitHubApiUrl As String = "https://api.github.com/repos/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
     Private Const ReleasesPageUrl As String = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
 
-    ''' <summary>最新リリースのMSIダウンロードURL（更新ボタン押下時に使用）</summary>
-    Private _msiDownloadUrl As String = Nothing
+    ''' <summary>最新リリースのインストーラーダウンロードURL（更新ボタン押下時に使用）</summary>
+    Private _installerDownloadUrl As String = Nothing
 
     Public Sub New()
         InitializeComponent()
@@ -65,19 +65,21 @@ Partial Public Class AboutDialog
                         Return
                     End If
 
-                    ' MSI ダウンロードURLを検索 (実行中のアーキテクチャに合致するものを選択)
+                    ' インストーラーダウンロードURLを検索 (実行中のアーキテクチャに合致するものを選択)
                     Dim archSuffix = If(Runtime.InteropServices.RuntimeInformation.OSArchitecture = Runtime.InteropServices.Architecture.Arm64,
-                                        "_arm64.msi", "_x64.msi")
+                                        "_arm64.exe", "_x64.exe")
                     Dim assetsProp As JsonElement
                     If root.TryGetProperty("assets", assetsProp) Then
                         For Each asset In assetsProp.EnumerateArray()
                             Dim nameProp As JsonElement
                             If asset.TryGetProperty("name", nameProp) Then
                                 Dim assetName = nameProp.GetString()
-                                If assetName IsNot Nothing AndAlso assetName.EndsWith(archSuffix, StringComparison.OrdinalIgnoreCase) Then
+                                If assetName IsNot Nothing AndAlso
+                                   assetName.Contains("installer", StringComparison.OrdinalIgnoreCase) AndAlso
+                                   assetName.EndsWith(archSuffix, StringComparison.OrdinalIgnoreCase) Then
                                     Dim urlProp As JsonElement
                                     If asset.TryGetProperty("browser_download_url", urlProp) Then
-                                        _msiDownloadUrl = urlProp.GetString()
+                                        _installerDownloadUrl = urlProp.GetString()
                                     End If
                                     Exit For
                                 End If
@@ -100,8 +102,8 @@ Partial Public Class AboutDialog
                             lblLatestVersion.Text = Loc.SF("About_NewVersionAvailable", latestVersion)
                             lblLatestVersion.ForeColor = Color.OrangeRed
 
-                            ' 更新ボタンを表示（MSI URLがある場合のみ）
-                            If _msiDownloadUrl IsNot Nothing Then
+                            ' 更新ボタンを表示（インストーラーURLがある場合のみ）
+                            If _installerDownloadUrl IsNot Nothing Then
                                 btnUpdate.Visible = True
                             End If
 
@@ -127,7 +129,7 @@ Partial Public Class AboutDialog
     ''' 更新ボタンクリック: MSIをダウンロードしてインストーラーを起動する
     ''' </summary>
     Private Async Sub btnUpdate_Click(sender As Object, e As EventArgs) Handles btnUpdate.Click
-        If _msiDownloadUrl Is Nothing Then Return
+        If _installerDownloadUrl Is Nothing Then Return
 
         ' 確認ダイアログ
         Dim res = MessageBox.Show(
@@ -142,17 +144,17 @@ Partial Public Class AboutDialog
         prgDownload.Style = ProgressBarStyle.Marquee
 
         Try
-            ' 一時フォルダにMSIをダウンロード
+            ' 一時フォルダにインストーラーをダウンロード
             Dim tempDir = Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_Update")
             Directory.CreateDirectory(tempDir)
-            Dim msiFileName = Path.GetFileName(New Uri(_msiDownloadUrl).LocalPath)
-            Dim msiPath = Path.Combine(tempDir, msiFileName)
+            Dim installerFileName = Path.GetFileName(New Uri(_installerDownloadUrl).LocalPath)
+            Dim installerPath = Path.Combine(tempDir, installerFileName)
 
             Using client As New HttpClient()
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
                 client.Timeout = TimeSpan.FromMinutes(5)
 
-                Using response = Await client.GetAsync(_msiDownloadUrl, HttpCompletionOption.ResponseHeadersRead)
+                Using response = Await client.GetAsync(_installerDownloadUrl, HttpCompletionOption.ResponseHeadersRead)
                     response.EnsureSuccessStatusCode()
 
                     Dim totalBytes = response.Content.Headers.ContentLength
@@ -162,7 +164,7 @@ Partial Public Class AboutDialog
                     End If
 
                     Using contentStream = Await response.Content.ReadAsStreamAsync()
-                        Using fileStream As New FileStream(msiPath, FileMode.Create, FileAccess.Write, FileShare.None)
+                        Using fileStream As New FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None)
                             Dim buffer(8191) As Byte
                             Dim totalRead As Long = 0
                             Dim bytesRead As Integer
@@ -185,8 +187,8 @@ Partial Public Class AboutDialog
             prgDownload.Value = 100
             btnUpdate.Text = Loc.S("About_LaunchingInstaller")
 
-            ' バッチファイルでアプリ終了後にMSIを実行
-            LaunchInstallerAndExit(msiPath)
+            ' バッチファイルでアプリ終了後にインストーラーを実行
+            LaunchInstallerAndExit(installerPath)
 
         Catch ex As Exception
             prgDownload.Visible = False
@@ -198,15 +200,15 @@ Partial Public Class AboutDialog
     End Sub
 
     ''' <summary>
-    ''' バッチファイルを作成し、アプリ終了後にMSIインストーラーを起動する
+    ''' バッチファイルを作成し、アプリ終了後にインストーラーを起動する
     ''' </summary>
-    Private Sub LaunchInstallerAndExit(msiPath As String)
+    Private Sub LaunchInstallerAndExit(installerPath As String)
         Dim batPath = Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_Update", "update.bat")
         Dim batContent =
             "@echo off" & vbCrLf &
             Loc.S("About_UpdateBatchMessage") & vbCrLf &
             "timeout /t 2 /nobreak >nul" & vbCrLf &
-            $"start """" ""{msiPath}""" & vbCrLf &
+            $"start """" ""{installerPath}""" & vbCrLf &
             "exit"
 
         File.WriteAllText(batPath, batContent, New System.Text.UTF8Encoding(False))

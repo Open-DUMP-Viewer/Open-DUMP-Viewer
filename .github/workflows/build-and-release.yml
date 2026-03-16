@@ -22,11 +22,9 @@ jobs:
           - arch: x64
             rid: win-x64
             msvc_arch: x64
-            wix_arch: x64
           - arch: arm64
             rid: win-arm64
             msvc_arch: amd64_arm64
-            wix_arch: arm64
 
     steps:
       # ─────────────────────────────────────
@@ -87,7 +85,7 @@ jobs:
       # ─────────────────────────────────────
       # 7. アプリビルド (Self-contained)
       #    .NET ランタイム同梱
-      #    ポータブル版 (ZIP) と MSI で共用
+      #    ポータブル版 (ZIP) と インストーラーで共用
       # ─────────────────────────────────────
       - name: Build application (self-contained)
         run: |
@@ -97,13 +95,13 @@ jobs:
             --self-contained true `
             --output ./publish/app
 
-      - name: Copy build output for portable and MSI
+      - name: Copy build output for portable and installer
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "./publish/portable" -Force | Out-Null
-          New-Item -ItemType Directory -Path "./publish/msi" -Force | Out-Null
+          New-Item -ItemType Directory -Path "./publish/installer-src" -Force | Out-Null
           Copy-Item -Path "./publish/app/*" -Destination "./publish/portable" -Recurse -Force
-          Copy-Item -Path "./publish/app/*" -Destination "./publish/msi" -Recurse -Force
+          Copy-Item -Path "./publish/app/*" -Destination "./publish/installer-src" -Recurse -Force
 
       # ─────────────────────────────────────
       # 8. DLL が出力に含まれていることを検証
@@ -129,120 +127,38 @@ jobs:
             -DestinationPath "./publish/OraDBDumpViewer_v${version}_portable_${{ matrix.arch }}.zip"
 
       # ─────────────────────────────────────
-      # 10. WiX Toolset v5.0.2 のインストール
+      # 10. Inno Setup のインストール
       # ─────────────────────────────────────
-      - name: Install WiX Toolset
-        run: dotnet tool install --global wix --version 5.0.2
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
 
       # ─────────────────────────────────────
-      # 11. WiX UI 拡張を追加
+      # 11. 中国語簡体字の言語ファイルをダウンロード
       # ─────────────────────────────────────
-      - name: Add WiX UI extension
-        run: wix extension add WixToolset.UI.wixext/5.0.2
+      - name: Download Chinese Simplified language file
+        shell: pwsh
+        run: |
+          Invoke-WebRequest `
+            -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" `
+            -OutFile "installer/ChineseSimplified.isl"
 
       # ─────────────────────────────────────
-      # 12. WiX ソースファイルの生成
+      # 12. Inno Setup でインストーラーをビルド
       # ─────────────────────────────────────
-      - name: Generate WiX source file
+      - name: Build EXE installer
         shell: pwsh
         run: |
           $version = "${{ steps.get_version.outputs.VERSION }}"
-          $exeDir = "$env:GITHUB_WORKSPACE\publish\msi"
-
-          $wxs = @"
-          <?xml version="1.0" encoding="UTF-8"?>
-          <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-               xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-
-            <Package Name="OraDB DUMP Viewer"
-                     Version="${version}"
-                     Manufacturer="YANAI Taketo"
-                     UpgradeCode="cd3b541d-5df6-4737-9bcc-16a4329a8a54"
-                     Codepage="65001"
-                     Scope="perMachine"
-                     Language="1041">
-
-              <MajorUpgrade DowngradeErrorMessage="新しいバージョンが既にインストールされています。A newer version is already installed." />
-              <MediaTemplate EmbedCab="yes" />
-
-              <ui:WixUI Id="WixUI_InstallDir" />
-              <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-
-              <Feature Id="ProductFeature" Title="OraDB DUMP Viewer" Level="1">
-                <ComponentGroupRef Id="ProductComponents" />
-                <ComponentRef Id="DesktopShortcut" />
-                <ComponentRef Id="StartMenuShortcut" />
-              </Feature>
-
-              <!-- インストール先フォルダ -->
-              <StandardDirectory Id="ProgramFiles64Folder">
-                <Directory Id="INSTALLFOLDER" Name="OraDB DUMP Viewer" />
-              </StandardDirectory>
-
-              <!-- デスクトップ -->
-              <StandardDirectory Id="DesktopFolder">
-                <Component Id="DesktopShortcut" Guid="*">
-                  <Shortcut Id="DesktopShortcutLink"
-                            Name="OraDB DUMP Viewer"
-                            Description="OraDB DUMP Viewer"
-                            Target="[INSTALLFOLDER]OraDB DUMP Viewer.exe"
-                            WorkingDirectory="INSTALLFOLDER" />
-                  <RegistryValue Root="HKCU"
-                                 Key="Software\YANAI Taketo\OraDB DUMP Viewer"
-                                 Name="DesktopShortcut"
-                                 Type="integer"
-                                 Value="1"
-                                 KeyPath="yes" />
-                </Component>
-              </StandardDirectory>
-
-              <!-- スタートメニュー -->
-              <StandardDirectory Id="ProgramMenuFolder">
-                <Directory Id="AppStartMenuFolder" Name="OraDB DUMP Viewer">
-                  <Component Id="StartMenuShortcut" Guid="*">
-                    <Shortcut Id="StartMenuShortcutLink"
-                              Name="OraDB DUMP Viewer"
-                              Description="OraDB DUMP Viewer"
-                              Target="[INSTALLFOLDER]OraDB DUMP Viewer.exe"
-                              WorkingDirectory="INSTALLFOLDER" />
-                    <RemoveFolder Id="RemoveStartMenuFolder"
-                                  Directory="AppStartMenuFolder"
-                                  On="uninstall" />
-                    <RegistryValue Root="HKCU"
-                                   Key="Software\YANAI Taketo\OraDB DUMP Viewer"
-                                   Name="StartMenuShortcut"
-                                   Type="integer"
-                                   Value="1"
-                                   KeyPath="yes" />
-                  </Component>
-                </Directory>
-              </StandardDirectory>
-
-              <!-- アプリ本体ファイル -->
-              <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
-                <Files Include="${exeDir}\**" />
-              </ComponentGroup>
-
-            </Package>
-          </Wix>
-          "@
-          $wxs | Set-Content -Path installer.wxs -Encoding UTF8
+          $sourceDir = "$env:GITHUB_WORKSPACE\publish\installer-src"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /DMyAppVersion=$version `
+            /DMyAppFileVersion=v$version `
+            /DMyAppArch=${{ matrix.arch }} `
+            /DMySourceDir=$sourceDir `
+            installer\setup.iss
 
       # ─────────────────────────────────────
-      # 13. .msi インストーラーのビルド
-      # ─────────────────────────────────────
-      - name: Build MSI installer
-        shell: pwsh
-        run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          wix build installer.wxs `
-            -ext WixToolset.UI.wixext `
-            -arch ${{ matrix.wix_arch }} `
-            -culture ja-JP `
-            -o "./publish/OraDBDumpViewer_v${version}_installer_${{ matrix.arch }}.msi"
-
-      # ─────────────────────────────────────
-      # 14. ビルドアーティファクトをアップロード
+      # 13. ビルドアーティファクトをアップロード
       # ─────────────────────────────────────
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -250,7 +166,7 @@ jobs:
           name: build-${{ matrix.arch }}
           path: |
             ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_portable_${{ matrix.arch }}.zip
-            ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer_${{ matrix.arch }}.msi
+            ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer_${{ matrix.arch }}.exe
 
       - name: Save version info
         shell: pwsh
@@ -351,7 +267,6 @@ jobs:
 
       # ─────────────────────────────────────
       # 5. GitHub Release の作成 & アップロード
-      #    gh CLI で Node.js 依存なしにリリース作成
       # ─────────────────────────────────────
       - name: Create GitHub Release
         shell: pwsh
@@ -372,9 +287,9 @@ jobs:
             --title "Release $tag" `
             --notes-file $notesFile `
             "./artifacts/OraDBDumpViewer_v${version}_portable_x64.zip" `
-            "./artifacts/OraDBDumpViewer_v${version}_installer_x64.msi" `
+            "./artifacts/OraDBDumpViewer_v${version}_installer_x64.exe" `
             "./artifacts/OraDBDumpViewer_v${version}_portable_arm64.zip" `
-            "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.msi"
+            "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.exe"
 
           Remove-Item $notesFile
 
@@ -389,11 +304,11 @@ jobs:
           $version = "${{ steps.get_version.outputs.VERSION }}"
           $baseUrl = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/download/v${version}"
 
-          # 各アーキテクチャの MSI ハッシュを取得
-          $msiX64 = "./artifacts/OraDBDumpViewer_v${version}_installer_x64.msi"
-          $msiArm64 = "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.msi"
-          $hashX64 = (Get-FileHash $msiX64 -Algorithm SHA256).Hash
-          $hashArm64 = (Get-FileHash $msiArm64 -Algorithm SHA256).Hash
+          # 各アーキテクチャの EXE ハッシュを取得
+          $exeX64 = "./artifacts/OraDBDumpViewer_v${version}_installer_x64.exe"
+          $exeArm64 = "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.exe"
+          $hashX64 = (Get-FileHash $exeX64 -Algorithm SHA256).Hash
+          $hashArm64 = (Get-FileHash $exeArm64 -Algorithm SHA256).Hash
 
           # マニフェストディレクトリ作成
           $dir = "manifests/o/OraDBDumpViewer/OraDBDumpViewer/$version"
@@ -415,7 +330,7 @@ jobs:
           Platform:
           - Windows.Desktop
           MinimumOSVersion: 10.0.17763.0
-          InstallerType: msi
+          InstallerType: inno
           Scope: machine
           InstallModes:
           - interactive
@@ -423,10 +338,10 @@ jobs:
           - silentWithProgress
           Installers:
           - Architecture: x64
-            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_x64.msi
+            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_x64.exe
             InstallerSha256: $hashX64
           - Architecture: arm64
-            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_arm64.msi
+            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_arm64.exe
             InstallerSha256: $hashArm64
           ManifestType: installer
           ManifestVersion: 1.6.0
