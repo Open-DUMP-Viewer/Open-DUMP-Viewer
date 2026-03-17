@@ -94,13 +94,43 @@ static int is_numeric_value(const char *val)
 }
 
 /*---------------------------------------------------------------------------
+    Helper: parse precision and scale from parenthesized portion
+    e.g. "(10,2)" → prec=10, scale=2;  "(126)" → prec=126, scale=0
+    Returns 1 if parsed successfully, 0 otherwise.
+ ---------------------------------------------------------------------------*/
+static int parse_number_prec_scale(const char *paren, int *prec, int *scale)
+{
+    *prec = 0;
+    *scale = 0;
+    if (!paren || *paren != '(') return 0;
+
+    /* Skip spaces after '(' and parse first number with optional sign */
+    const char *p = paren + 1;
+    while (*p == ' ') p++;
+    *prec = atoi(p);
+
+    /* Look for comma (scale) */
+    const char *comma = strchr(p, ',');
+    if (comma) {
+        const char *q = comma + 1;
+        while (*q == ' ') q++;
+        *scale = atoi(q);
+    }
+    return 1;
+}
+
+/*---------------------------------------------------------------------------
     map_oracle_to_target_type
 
     Maps an Oracle type string to the equivalent type for the target DBMS.
+    Handles:
+    - NUMBER(p>38) → FLOAT equivalent (EXPDP encodes FLOAT as NUMBER)
+    - NUMBER(p, negative_scale) → adjusted NUMERIC for non-Oracle targets
+    - FLOAT(n) → binary precision to IEEE float mapping
+    - INTERVAL, LONG RAW, XMLTYPE, ROWID, BFILE, etc.
  ---------------------------------------------------------------------------*/
 static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
 {
-    /* Extract base name (before parenthesis) */
     static char result[256];
     char base[64];
     const char *paren;
@@ -118,7 +148,6 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
                      ? oracle_type[i] - 32 : oracle_type[i];
         }
         base[len] = '\0';
-        /* Trim trailing spaces */
         while (len > 0 && base[len-1] == ' ') base[--len] = '\0';
     } else {
         int len = (int)strlen(oracle_type);
@@ -131,66 +160,190 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
         while (len > 0 && base[len-1] == ' ') base[--len] = '\0';
     }
 
+    /* --- Oracle: return as-is, but fix NUMBER(>38) back to FLOAT --- */
     if (dbms == DBMS_ORACLE) {
-        /* Oracle: return as-is */
+        if (strcmp(base, "NUMBER") == 0 && paren) {
+            int prec, scale;
+            parse_number_prec_scale(paren, &prec, &scale);
+            if (prec > 38 && scale == 0) {
+                /* This was originally FLOAT(n) encoded as NUMBER(n) by EXPDP */
+                snprintf(result, sizeof(result), "FLOAT(%d)", prec);
+                return result;
+            }
+        }
         snprintf(result, sizeof(result), "%s", oracle_type);
         return result;
     }
 
+    /* --- Helper variables for NUMBER precision/scale --- */
+    int prec = 0, scale = 0;
+    int has_prec = 0;
+    if (strcmp(base, "NUMBER") == 0 && paren) {
+        has_prec = parse_number_prec_scale(paren, &prec, &scale);
+    }
+
+    /* =================================================================
+       PostgreSQL
+       ================================================================= */
     if (dbms == DBMS_POSTGRES) {
+        /* VARCHAR2 / NVARCHAR2 → VARCHAR */
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
             if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
             return "VARCHAR(255)";
         }
+        /* NUMBER */
         if (strcmp(base, "NUMBER") == 0) {
+            if (has_prec && prec > 38 && scale == 0) return "DOUBLE PRECISION"; /* FLOAT */
+            if (has_prec && scale < 0) {
+                snprintf(result, sizeof(result), "NUMERIC(%d,0)", prec + (-scale));
+                return result;
+            }
             if (paren) { snprintf(result, sizeof(result), "NUMERIC%s", paren); return result; }
             return "NUMERIC";
         }
-        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "TIMESTAMP";
+        /* FLOAT (from EXP parser) — binary precision */
+        if (strcmp(base, "FLOAT") == 0) {
+            if (paren) {
+                int bp = atoi(paren + 1);
+                return (bp <= 24) ? "REAL" : "DOUBLE PRECISION";
+            }
+            return "DOUBLE PRECISION";
+        }
+        /* DATE / TIMESTAMP */
+        if (strcmp(base, "DATE") == 0) return "TIMESTAMP";
+        if (strcmp(base, "TIMESTAMP") == 0) {
+            /* Extract precision from paren, e.g. "(6)" → 6 */
+            int ts_prec = paren ? atoi(paren + 1) : 6;
+            if (strstr(oracle_type, "WITH TIME ZONE") ||
+                strstr(oracle_type, "WITH LOCAL TIME ZONE")) {
+                /* PG: WITH LOCAL TIME ZONE → WITH TIME ZONE */
+                snprintf(result, sizeof(result), "TIMESTAMP(%d) WITH TIME ZONE", ts_prec);
+            } else {
+                snprintf(result, sizeof(result), "TIMESTAMP(%d)", ts_prec);
+            }
+            return result;
+        }
+        /* LOB / LONG */
         if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "TEXT";
-        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "BYTEA";
+        if (strcmp(base, "BLOB") == 0) return "BYTEA";
+        if (strcmp(base, "RAW") == 0 || strcmp(base, "LONG RAW") == 0) return "BYTEA";
+        /* BINARY_FLOAT / BINARY_DOUBLE */
         if (strcmp(base, "BINARY_FLOAT") == 0) return "REAL";
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE PRECISION";
+        /* CHAR / NCHAR */
         if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
             if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
+        /* INTERVAL */
+        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
+            strcmp(base, "INTERVAL") == 0) return "INTERVAL";
+        if (strcmp(base, "INTERVAL DAY TO SECOND") == 0) return "INTERVAL";
+        /* XMLTYPE / ROWID / BFILE / USER_DEFINED */
+        if (strcmp(base, "XMLTYPE") == 0) return "XML";
+        if (strcmp(base, "ROWID") == 0) return "VARCHAR(18)";
+        if (strcmp(base, "BFILE") == 0) return "VARCHAR(530)";
+        if (strcmp(base, "USER_DEFINED") == 0) return "TEXT";
         return "TEXT";
     }
 
+    /* =================================================================
+       MySQL
+       ================================================================= */
     if (dbms == DBMS_MYSQL) {
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
             if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
             return "VARCHAR(255)";
         }
         if (strcmp(base, "NUMBER") == 0) {
+            if (has_prec && prec > 38 && scale == 0) return "DOUBLE";
+            if (has_prec && scale < 0) {
+                snprintf(result, sizeof(result), "DECIMAL(%d,0)", prec + (-scale));
+                return result;
+            }
             if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
             return "DECIMAL(38,10)";
         }
-        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "DATETIME";
+        if (strcmp(base, "FLOAT") == 0) {
+            if (paren) {
+                int bp = atoi(paren + 1);
+                return (bp <= 24) ? "FLOAT" : "DOUBLE";
+            }
+            return "DOUBLE";
+        }
+        if (strcmp(base, "DATE") == 0) return "DATETIME";
+        if (strcmp(base, "TIMESTAMP") == 0) {
+            /* MySQL DATETIME supports (0-6) fractional seconds, max 6 */
+            int ts_prec = paren ? atoi(paren + 1) : 0;
+            if (ts_prec > 6) ts_prec = 6;
+            if (ts_prec > 0) {
+                snprintf(result, sizeof(result), "DATETIME(%d)", ts_prec);
+            } else {
+                snprintf(result, sizeof(result), "DATETIME");
+            }
+            return result;
+        }
         if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "LONGTEXT";
-        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "LONGBLOB";
+        if (strcmp(base, "BLOB") == 0 || strcmp(base, "LONG RAW") == 0) return "LONGBLOB";
+        if (strcmp(base, "RAW") == 0) return "VARBINARY(2000)";
         if (strcmp(base, "BINARY_FLOAT") == 0) return "FLOAT";
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE";
         if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
             if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
+        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
+            strcmp(base, "INTERVAL DAY TO SECOND") == 0 ||
+            strcmp(base, "INTERVAL") == 0) return "VARCHAR(64)";
+        if (strcmp(base, "XMLTYPE") == 0) return "LONGTEXT";
+        if (strcmp(base, "ROWID") == 0) return "VARCHAR(18)";
+        if (strcmp(base, "BFILE") == 0) return "VARCHAR(530)";
+        if (strcmp(base, "USER_DEFINED") == 0) return "LONGTEXT";
         return "TEXT";
     }
 
+    /* =================================================================
+       SQL Server
+       ================================================================= */
     if (dbms == DBMS_SQLSERVER) {
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
             if (paren) { snprintf(result, sizeof(result), "NVARCHAR%s", paren); return result; }
             return "NVARCHAR(255)";
         }
         if (strcmp(base, "NUMBER") == 0) {
+            if (has_prec && prec > 38 && scale == 0) return "FLOAT";  /* FLOAT(53) */
+            if (has_prec && scale < 0) {
+                snprintf(result, sizeof(result), "DECIMAL(%d,0)", prec + (-scale));
+                return result;
+            }
             if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
             return "DECIMAL(38,10)";
         }
-        if (strcmp(base, "DATE") == 0 || strcmp(base, "TIMESTAMP") == 0) return "DATETIME2";
+        if (strcmp(base, "FLOAT") == 0) {
+            if (paren) {
+                int bp = atoi(paren + 1);
+                snprintf(result, sizeof(result), "FLOAT(%d)", bp <= 24 ? 24 : 53);
+                return result;
+            }
+            return "FLOAT";
+        }
+        if (strcmp(base, "DATE") == 0) return "DATETIME2";
+        if (strcmp(base, "TIMESTAMP") == 0) {
+            int ts_prec = paren ? atoi(paren + 1) : 7;
+            if (ts_prec > 7) ts_prec = 7; /* SQL Server max = 7 */
+            if (strstr(oracle_type, "WITH TIME ZONE")) {
+                snprintf(result, sizeof(result), "DATETIMEOFFSET(%d)", ts_prec);
+            } else {
+                snprintf(result, sizeof(result), "DATETIME2(%d)", ts_prec);
+            }
+            return result;
+        }
         if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "NVARCHAR(MAX)";
-        if (strcmp(base, "BLOB") == 0 || strcmp(base, "RAW") == 0) return "VARBINARY(MAX)";
+        if (strcmp(base, "BLOB") == 0 || strcmp(base, "LONG RAW") == 0) return "VARBINARY(MAX)";
+        if (strcmp(base, "RAW") == 0) {
+            if (paren) { snprintf(result, sizeof(result), "VARBINARY%s", paren); return result; }
+            return "VARBINARY(MAX)";
+        }
         if (strcmp(base, "BINARY_FLOAT") == 0) return "REAL";
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "FLOAT";
         if (strcmp(base, "CHAR") == 0) {
@@ -201,6 +354,13 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             snprintf(result, sizeof(result), "%s", oracle_type);
             return result;
         }
+        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
+            strcmp(base, "INTERVAL DAY TO SECOND") == 0 ||
+            strcmp(base, "INTERVAL") == 0) return "NVARCHAR(64)";
+        if (strcmp(base, "XMLTYPE") == 0) return "XML";
+        if (strcmp(base, "ROWID") == 0) return "NVARCHAR(18)";
+        if (strcmp(base, "BFILE") == 0) return "NVARCHAR(530)";
+        if (strcmp(base, "USER_DEFINED") == 0) return "NVARCHAR(MAX)";
         return "NVARCHAR(MAX)";
     }
 
@@ -225,6 +385,13 @@ static void write_create_table(SQL_CONTEXT *ctx, const char *schema,
 
     /* DROP TABLE IF EXISTS */
     switch (dbms) {
+    case DBMS_ORACLE:
+        /* Oracle: PL/SQL anonymous block (IF EXISTS not supported before 23c) */
+        fprintf(fp, "BEGIN EXECUTE IMMEDIATE 'DROP TABLE ");
+        if (schema && schema[0] != '\0') fprintf(fp, "\"%s\".", schema);
+        fprintf(fp, "\"%s\" CASCADE CONSTRAINTS PURGE'", table);
+        fprintf(fp, "; EXCEPTION WHEN OTHERS THEN NULL; END;\n/\n\n");
+        break;
     case DBMS_MYSQL:
         fprintf(fp, "DROP TABLE IF EXISTS ");
         if (schema && schema[0] != '\0') {
@@ -245,7 +412,7 @@ static void write_create_table(SQL_CONTEXT *ctx, const char *schema,
         sql_write_identifier(fp, table, dbms);
         fprintf(fp, ";\n\n");
         break;
-    default: /* Oracle, PostgreSQL */
+    default: /* PostgreSQL */
         fprintf(fp, "DROP TABLE IF EXISTS ");
         if (schema && schema[0] != '\0') {
             sql_write_identifier(fp, schema, dbms);
@@ -394,6 +561,35 @@ static void __stdcall sql_row_callback(
 
         if (!col_values[i] || col_values[i][0] == '\0') {
             fputs("NULL", ctx->fp);
+        } else if (ctx->session && i < ctx->session->table.col_count &&
+                   (ctx->session->table.columns[i].type == COL_BIN_FLOAT ||
+                    ctx->session->table.columns[i].type == COL_BIN_DOUBLE) &&
+                   (strcmp(col_values[i], "NaN") == 0 ||
+                    strcmp(col_values[i], "Inf") == 0 ||
+                    strcmp(col_values[i], "-Inf") == 0)) {
+            /* Special IEEE 754 values: NaN, Inf, -Inf */
+            int is_float = (ctx->session->table.columns[i].type == COL_BIN_FLOAT);
+            const char *val = col_values[i];
+            switch (ctx->dbms_type) {
+            case DBMS_ORACLE:
+                if (strcmp(val, "NaN") == 0)
+                    fputs(is_float ? "BINARY_FLOAT_NAN" : "BINARY_DOUBLE_NAN", ctx->fp);
+                else if (strcmp(val, "Inf") == 0)
+                    fputs(is_float ? "BINARY_FLOAT_INFINITY" : "BINARY_DOUBLE_INFINITY", ctx->fp);
+                else
+                    fprintf(ctx->fp, "-%s", is_float ? "BINARY_FLOAT_INFINITY" : "BINARY_DOUBLE_INFINITY");
+                break;
+            case DBMS_POSTGRES:
+                fprintf(ctx->fp, "'%s'::%s",
+                    strcmp(val, "Inf") == 0 ? "Infinity" :
+                    strcmp(val, "-Inf") == 0 ? "-Infinity" : val,
+                    is_float ? "REAL" : "DOUBLE PRECISION");
+                break;
+            default:
+                /* MySQL / SQL Server: no NaN/Inf support → NULL */
+                fputs("NULL", ctx->fp);
+                break;
+            }
         } else if (is_numeric_value(col_values[i])) {
             fputs(col_values[i], ctx->fp);
         } else {

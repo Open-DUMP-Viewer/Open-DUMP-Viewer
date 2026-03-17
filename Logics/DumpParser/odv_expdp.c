@@ -200,7 +200,7 @@ static void ddl_xml_callback(const char *tag, const char *value,
                              "CHAR(%d)", col->length);
                     break;
                 case COL_NUMBER:
-                    if (col->precision > 0 && col->scale > 0)
+                    if (col->precision > 0 && col->scale != 0)
                         snprintf(col->type_str, sizeof(col->type_str),
                                  "NUMBER(%d,%d)", col->precision, col->scale);
                     else if (col->precision > 0)
