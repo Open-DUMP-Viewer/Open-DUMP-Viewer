@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.2.0] - 2026-03-17
+
+### 改善
+- **SQL エクスポートの型マッピングを大幅改善**: Oracle 固有型を各 DBMS (PostgreSQL / MySQL / SQL Server) に正しく変換。Oracle 23ai・PostgreSQL 17・MySQL・SQL Server の4環境で実機検証済み
+  - `NUMBER(>38)` (EXPDP の FLOAT) を `DOUBLE PRECISION` / `DOUBLE` / `FLOAT` に正しく変換
+  - `NUMBER(p, 負スケール)` を `NUMERIC(p+|s|, 0)` に変換
+  - `TIMESTAMP WITH LOCAL TIME ZONE` を PostgreSQL `TIMESTAMPTZ` / MySQL `DATETIME` / SQL Server `DATETIMEOFFSET` に変換
+  - `FLOAT(n)` のバイナリ精度を IEEE 浮動小数点型に正しくマッピング
+  - `INTERVAL` / `LONG RAW` / `XMLTYPE` / `ROWID` / `BFILE` 等の不足型を追加
+- **Oracle 向け DROP TABLE を PL/SQL ブロックに変更**: `IF EXISTS` 非対応の Oracle 21c 以前でもエラーなく実行可能
+- **NaN / Infinity の DBMS 別出力**: Oracle (`BINARY_FLOAT_NAN` 等) / PostgreSQL (`'NaN'::REAL` 等) / MySQL・SQL Server (`NULL`)
+- **EXPDP パーサーで負スケールを保持**: `NUMBER(5,-3)` 等の型情報が正しく type_str に反映
+
+## [2.1.0] - 2026-03-17
+
+### 改善
+- **EXPDP パーサー大幅改善**: TYPE_NUM マッピング拡充・レコード overread 修正
+
 ## [2.0.0] - 2026-03-16
 
 ### 破壊的変更

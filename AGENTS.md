@@ -143,6 +143,20 @@ dotnet build "OraDB DUMP Viewer.vbproj"
 - CI/CD ワークフロー (`dotnet-version`, `node-version`, アクションバージョン)
 - `README.md` の動作環境記載
 
+### アプリバージョン管理
+
+リリース時に以下の **3ファイル** を更新する:
+
+| ファイル | 項目 | 例 |
+|---|---|---|
+| `OraDB DUMP Viewer.vbproj` | `<Version>` | `2.2.0` |
+| `Logics/DumpParser/odv_api.c` | `ODV_VERSION_STRING` | `"1.5.0"` |
+| `CHANGELOG.md` | 新バージョンセクション追加 | `## [2.2.0] - 2026-03-17` |
+
+- アプリバージョン (`vbproj`): UI・ロジック全体の変更に対してバンプ
+- DLL バージョン (`odv_api.c`): C ネイティブ DLL の変更に対してバンプ
+- セマンティックバージョニング: 破壊的変更=メジャー、機能追加=マイナー、バグ修正=パッチ
+
 ## Release Flow
 
 ### ブランチ戦略
