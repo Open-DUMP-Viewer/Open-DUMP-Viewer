@@ -98,6 +98,18 @@ Namespace My
         End Property
 
         <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
+        Public Property ExportSqlInferInteger() As Boolean
+            Get
+                Return CType(Me("ExportSqlInferInteger"),Boolean)
+            End Get
+            Set
+                Me("ExportSqlInferInteger") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
          Global.System.Diagnostics.DebuggerNonUserCodeAttribute()>  _
         Public Property RecentWorkspaces() As Global.System.Collections.Specialized.StringCollection
             Get

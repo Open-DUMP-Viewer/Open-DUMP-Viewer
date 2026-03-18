@@ -20,6 +20,9 @@ Public Module ExportOptions
     ''' <summary>SQL: DROP TABLE + CREATE TABLE DDL を出力するか</summary>
     Public Property SqlCreateTable As Boolean = True
 
+    ''' <summary>SQL: 裸の NUMBER を実データから整数型に推定するか</summary>
+    Public Property SqlInferInteger As Boolean = False
+
     ''' <summary>
     ''' My.Settings から設定を読み込み
     ''' </summary>
@@ -30,6 +33,7 @@ Public Module ExportOptions
             CsvWriteHeader = My.Settings.ExportCsvWriteHeader
             CsvWriteTypes = My.Settings.ExportCsvWriteTypes
             SqlCreateTable = My.Settings.ExportSqlCreateTable
+            SqlInferInteger = My.Settings.ExportSqlInferInteger
         Catch
             ' 初回起動時や設定未登録時はデフォルト値を使用
         End Try
@@ -45,6 +49,7 @@ Public Module ExportOptions
             My.Settings.ExportCsvWriteHeader = CsvWriteHeader
             My.Settings.ExportCsvWriteTypes = CsvWriteTypes
             My.Settings.ExportSqlCreateTable = SqlCreateTable
+            My.Settings.ExportSqlInferInteger = SqlInferInteger
             My.Settings.Save()
         Catch
             ' 設定保存失敗は無視

@@ -772,6 +772,7 @@ Public Class OraDB_DUMP_Viewer
         Dim sqlDlg As New SqlExportDialog()
         If sqlDlg.ShowDialog(Me) <> DialogResult.OK Then Return
         Dim dbmsType = sqlDlg.SelectedDbmsType
+        Dim dbName = sqlDlg.DatabaseName
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
@@ -788,7 +789,22 @@ Public Class OraDB_DUMP_Viewer
                             ' TablePreview: インメモリデータから出力
                             ok = SqlExportLogic.ExportFromData(preview.FilteredData,
                                     preview.ExportColumnNames, ctx.ColumnTypes,
-                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker)
+                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
+                                    ctx.ColumnNotNulls, ctx.ColumnDefaults, dbName)
+                        ElseIf ExportOptions.SqlInferInteger Then
+                            ' InferInteger ON: データを読み込んで VB.NET パスで出力
+                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                            Dim rows As New List(Of String())
+                            If tableData IsNot Nothing AndAlso
+                               tableData.ContainsKey(ctx.Schema) AndAlso
+                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
+                                rows = tableData(ctx.Schema)(ctx.TableName)
+                            End If
+                            Dim colNames = New List(Of String)(If(ctx.ColumnNames, Array.Empty(Of String)()))
+                            ok = SqlExportLogic.ExportFromData(rows, colNames, ctx.ColumnTypes,
+                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
+                                    ctx.ColumnNotNulls, ctx.ColumnDefaults, dbName)
                         Else
                             ' Workspace: DLLから再パース
                             ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
@@ -813,7 +829,7 @@ Public Class OraDB_DUMP_Viewer
                     Dim folder = fbd.SelectedPath
                     Dim success = dlg.RunExport(
                         Sub(worker, args)
-                            Dim ok = BulkExportLogic.ExportSql(contexts, folder, dbmsType, worker)
+                            Dim ok = BulkExportLogic.ExportSql(contexts, folder, dbmsType, worker, dbName)
                             If Not ok Then args.Cancel = True
                         End Sub)
                     If success Then

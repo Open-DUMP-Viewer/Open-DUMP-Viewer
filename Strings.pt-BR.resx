@@ -110,6 +110,14 @@
   <data name="Menu_Help_Language" xml:space="preserve"><value>Idioma</value></data>
   <data name="Menu_Help_Language_Japanese" xml:space="preserve"><value>日本語</value></data>
   <data name="Menu_Help_Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Menu_Help_Language_Chinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Menu_Help_Language_Korean" xml:space="preserve"><value>한국어</value></data>
+  <data name="Menu_Help_Language_German" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="Menu_Help_Language_French" xml:space="preserve"><value>Français</value></data>
+  <data name="Menu_Help_Language_Spanish" xml:space="preserve"><value>Español</value></data>
+  <data name="Menu_Help_Language_Italian" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu_Help_Language_Russian" xml:space="preserve"><value>Русский</value></data>
+  <data name="Menu_Help_Language_Portuguese" xml:space="preserve"><value>Português (BR)</value></data>
 
   <!-- ========== Toolbar ========== -->
   <data name="Toolbar_Property" xml:space="preserve"><value>Propriedades</value></data>
@@ -384,10 +392,12 @@ Continuar?</value></data>
   <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>Incluir linha de tipos das colunas</value></data>
   <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>Opções de script SQL</value></data>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Incluir DROP TABLE + CREATE TABLE</value></data>
+  <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Inferir tipos inteiros a partir dos dados para colunas NUMBER</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>Exportação de script SQL</value></data>
   <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>BD de destino:</value></data>
+  <data name="SqlExport_DatabaseName" xml:space="preserve"><value>USE [nome do BD]:</value></data>
 
   <!-- ========== LOB Extraction Dialog ========== -->
   <data name="LobExtract_FormTitle" xml:space="preserve"><value>Extração de arquivos LOB - {0}</value></data>

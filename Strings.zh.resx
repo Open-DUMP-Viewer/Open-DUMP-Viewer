@@ -110,6 +110,14 @@
   <data name="Menu_Help_Language" xml:space="preserve"><value>语言</value></data>
   <data name="Menu_Help_Language_Japanese" xml:space="preserve"><value>日本語</value></data>
   <data name="Menu_Help_Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Menu_Help_Language_Chinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Menu_Help_Language_Korean" xml:space="preserve"><value>한국어</value></data>
+  <data name="Menu_Help_Language_German" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="Menu_Help_Language_French" xml:space="preserve"><value>Français</value></data>
+  <data name="Menu_Help_Language_Spanish" xml:space="preserve"><value>Español</value></data>
+  <data name="Menu_Help_Language_Italian" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu_Help_Language_Russian" xml:space="preserve"><value>Русский</value></data>
+  <data name="Menu_Help_Language_Portuguese" xml:space="preserve"><value>Português (BR)</value></data>
 
   <!-- ========== Toolbar ========== -->
   <data name="Toolbar_Property" xml:space="preserve"><value>属性</value></data>
@@ -384,10 +392,12 @@ https://www.odv.dev/
   <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>输出列类型行</value></data>
   <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>SQL 脚本选项</value></data>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>输出 DROP TABLE + CREATE TABLE</value></data>
+  <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>根据实际数据推断 NUMBER 列的整数类型</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>SQL 脚本导出</value></data>
   <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>目标数据库:</value></data>
+  <data name="SqlExport_DatabaseName" xml:space="preserve"><value>USE [数据库名]:</value></data>
 
   <!-- ========== LOB Extraction Dialog ========== -->
   <data name="LobExtract_FormTitle" xml:space="preserve"><value>LOB 文件提取 - {0}</value></data>

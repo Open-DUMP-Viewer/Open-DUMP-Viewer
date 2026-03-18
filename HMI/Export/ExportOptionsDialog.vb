@@ -26,6 +26,7 @@ Public Class ExportOptionsDialog
         chkCsvHeader.Checked = ExportOptions.CsvWriteHeader
         chkCsvTypes.Checked = ExportOptions.CsvWriteTypes
         chkCreateTable.Checked = ExportOptions.SqlCreateTable
+        chkInferInteger.Checked = ExportOptions.SqlInferInteger
     End Sub
 
     Private Sub rdoCustom_CheckedChanged(sender As Object, e As EventArgs) Handles rdoCustom.CheckedChanged
@@ -48,6 +49,7 @@ Public Class ExportOptionsDialog
         ExportOptions.CsvWriteHeader = chkCsvHeader.Checked
         ExportOptions.CsvWriteTypes = chkCsvTypes.Checked
         ExportOptions.SqlCreateTable = chkCreateTable.Checked
+        ExportOptions.SqlInferInteger = chkInferInteger.Checked
 
         ' 設定を永続化
         ExportOptions.Save()
@@ -64,6 +66,7 @@ Public Class ExportOptionsDialog
         chkCsvTypes.Text = Loc.S("ExportOptions_CsvWriteTypes")
         grpSqlOptions.Text = Loc.S("ExportOptions_SqlOptions")
         chkCreateTable.Text = Loc.S("ExportOptions_SqlCreateTable")
+        chkInferInteger.Text = Loc.S("ExportOptions_SqlInferInteger")
         btnOK.Text = Loc.S("Button_OK")
         btnCancel.Text = Loc.S("Button_Cancel")
     End Sub

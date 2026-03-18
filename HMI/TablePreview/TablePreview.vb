@@ -51,6 +51,12 @@ Public Class TablePreview
     ''' <summary>カラム型情報</summary>
     Private _columnTypes As String()
 
+    ''' <summary>NOT NULL フラグ</summary>
+    Private _columnNotNulls As Boolean()
+
+    ''' <summary>DEFAULT 値</summary>
+    Private _columnDefaults As String()
+
     ''' <summary>列名→インデックスの逆引きマップ（O(1) lookup）</summary>
     Private _columnIndexMap As Dictionary(Of String, Integer)
 
@@ -89,7 +95,8 @@ Public Class TablePreview
     ''' <param name="schema">スキーマ名（エクスポート用）</param>
     ''' <param name="columnTypes">カラム型配列（エクスポート用）</param>
     Public Sub New(tableData As List(Of String()), columnNames As List(Of String), tableName As String,
-                   Optional schema As String = Nothing, Optional columnTypes As String() = Nothing)
+                   Optional schema As String = Nothing, Optional columnTypes As String() = Nothing,
+                   Optional columnNotNulls As Boolean() = Nothing, Optional columnDefaults As String() = Nothing)
         ' デザイナーで定義されたコンポーネントを初期化
         InitializeComponent()
 
@@ -101,6 +108,8 @@ Public Class TablePreview
         _schema = If(schema, "")
         _tableName = tableName
         _columnTypes = columnTypes
+        _columnNotNulls = columnNotNulls
+        _columnDefaults = columnDefaults
 
         ' 列名→インデックス逆引きマップを構築（1回だけ、O(n)）
         _columnIndexMap = New Dictionary(Of String, Integer)(_columnNames.Count)
@@ -167,6 +176,8 @@ Public Class TablePreview
             .TableName = _tableName,
             .ColumnNames = _columnNames.ToArray(),
             .ColumnTypes = _columnTypes,
+            .ColumnNotNulls = _columnNotNulls,
+            .ColumnDefaults = _columnDefaults,
             .RowCount = _filteredData.Count,
             .DataOffset = 0
         }

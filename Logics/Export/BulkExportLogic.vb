@@ -36,15 +36,27 @@ Public Class BulkExportLogic
     Public Shared Function ExportSql(contexts As List(Of ExportHelper.TableExportContext),
                                       outputFolder As String,
                                       dbmsType As Integer,
-                                      worker As BackgroundWorker) As Boolean
+                                      worker As BackgroundWorker,
+                                      Optional databaseName As String = Nothing) As Boolean
         For i As Integer = 0 To contexts.Count - 1
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
             Dim ctx = contexts(i)
             Dim outputPath = Path.Combine(outputFolder, $"{ctx.TableName}.sql")
 
-            ' C DLL ストリーミング
-            Dim ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
+            Dim ok As Boolean
+            If ExportOptions.SqlInferInteger Then
+                ' InferInteger ON: データを読み込んで VB.NET パスで出力
+                Dim tableData = LoadTableData(ctx)
+                Dim colNames = New List(Of String)(If(ctx.ColumnNames, Array.Empty(Of String)()))
+                ok = SqlExportLogic.ExportFromData(tableData, colNames, ctx.ColumnTypes,
+                        ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
+                        ctx.ColumnNotNulls, ctx.ColumnDefaults, databaseName)
+                tableData = Nothing
+            Else
+                ' C DLL ストリーミング
+                ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType)
+            End If
             If Not ok Then Return False
 
             ReportTableProgress(worker, ctx.TableName, i + 1, contexts.Count)

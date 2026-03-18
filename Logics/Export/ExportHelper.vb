@@ -102,6 +102,93 @@ Public Module ExportHelper
     End Function
 #End Region
 
+#Region "裸 NUMBER → INTEGER 推定"
+    ' 各整数型の範囲定数
+    Private Const SMALLINT_MIN As Long = -32768L
+    Private Const SMALLINT_MAX As Long = 32767L
+    Private Const INT_MIN As Long = -2147483648L
+    Private Const INT_MAX As Long = 2147483647L
+
+    ''' <summary>
+    ''' 裸の NUMBER カラム (精度・スケールなし) の実データを走査し、
+    ''' 全行が整数値なら値の範囲に応じた NUMBER(n) に書き換えた配列を返す。
+    ''' NUMBER(n) は後続の MapOracleType で INTEGER 系にマッピングされる。
+    ''' </summary>
+    Public Function InferIntegerTypes(columnTypes As String(), data As List(Of String()),
+                                      Optional columnDefaults As String() = Nothing) As String()
+        If columnTypes Is Nothing Then Return columnTypes
+
+        Dim result = CType(columnTypes.Clone(), String())
+
+        For colIdx As Integer = 0 To result.Length - 1
+            Dim upper = If(result(colIdx), "").Trim().ToUpperInvariant()
+            ' 裸の NUMBER のみが対象 (括弧なし)
+            If upper <> "NUMBER" Then Continue For
+
+            Dim allInteger = True
+            Dim hasNonNull = False
+            ' 値の範囲を追跡: 0=SMALLINT, 1=INT, 2=BIGINT, 3=超過
+            Dim rangeLevel As Integer = 0
+
+            ' DEFAULT 値も範囲判定に含める
+            If columnDefaults IsNot Nothing AndAlso colIdx < columnDefaults.Length AndAlso
+               Not String.IsNullOrEmpty(columnDefaults(colIdx)) Then
+                Dim defVal As Long
+                If Long.TryParse(columnDefaults(colIdx).Trim(), defVal) Then
+                    If defVal < SMALLINT_MIN OrElse defVal > SMALLINT_MAX Then rangeLevel = 1
+                    If defVal < INT_MIN OrElse defVal > INT_MAX Then rangeLevel = 2
+                End If
+            End If
+
+            For Each row In data
+                If colIdx >= row.Length Then Continue For
+                Dim value = row(colIdx)
+                If String.IsNullOrEmpty(value) Then Continue For
+
+                hasNonNull = True
+
+                ' 小数点を含むかチェック
+                Dim intStr = value
+                If value.Contains("."c) Then
+                    Dim dotPos = value.IndexOf("."c)
+                    Dim fraction = value.Substring(dotPos + 1)
+                    If fraction.Trim("0"c).Length > 0 Then
+                        allInteger = False
+                        Exit For
+                    End If
+                    intStr = value.Substring(0, dotPos)
+                End If
+
+                ' 値の範囲を判定
+                Dim numVal As Long
+                If Long.TryParse(intStr, numVal) Then
+                    If rangeLevel < 1 AndAlso (numVal < SMALLINT_MIN OrElse numVal > SMALLINT_MAX) Then
+                        rangeLevel = 1 ' INT 以上
+                    End If
+                    If rangeLevel < 2 AndAlso (numVal < INT_MIN OrElse numVal > INT_MAX) Then
+                        rangeLevel = 2 ' BIGINT 以上
+                    End If
+                Else
+                    ' Long に収まらない → BIGINT 超過
+                    rangeLevel = 3
+                End If
+            Next
+
+            If hasNonNull AndAlso allInteger Then
+                ' 範囲に応じた精度で NUMBER(n) を生成
+                Select Case rangeLevel
+                    Case 0 : result(colIdx) = "NUMBER(4)"  ' → SMALLINT
+                    Case 1 : result(colIdx) = "NUMBER(9)"  ' → INT
+                    Case 2 : result(colIdx) = "NUMBER(18)" ' → BIGINT
+                    Case Else : result(colIdx) = "NUMBER(38)" ' → DECIMAL(38,0)
+                End Select
+            End If
+        Next
+
+        Return result
+    End Function
+#End Region
+
 #Region "Oracle → 各 DBMS 型マッピング"
     ''' <summary>
     ''' Oracle 型文字列を対象 DBMS の型に変換
@@ -245,6 +332,8 @@ Public Module ExportHelper
         Public Property TableName As String
         Public Property ColumnNames As String()
         Public Property ColumnTypes As String()
+        Public Property ColumnNotNulls As Boolean()
+        Public Property ColumnDefaults As String()
         Public Property RowCount As Long
         Public Property DataOffset As Long
     End Class

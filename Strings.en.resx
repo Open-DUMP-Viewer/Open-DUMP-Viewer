@@ -392,10 +392,12 @@ Continue?</value></data>
   <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>Output column type row</value></data>
   <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>SQL Script Options</value></data>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Output DROP TABLE + CREATE TABLE</value></data>
+  <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Infer integer types from actual data for bare NUMBER columns</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>SQL Script Export</value></data>
   <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>Target DB:</value></data>
+  <data name="SqlExport_DatabaseName" xml:space="preserve"><value>USE [DB Name]:</value></data>
 
   <!-- ========== LOB Extraction Dialog ========== -->
   <data name="LobExtract_FormTitle" xml:space="preserve"><value>LOB File Extraction - {0}</value></data>
@@ -407,6 +409,13 @@ Continue?</value></data>
   <data name="LobExtract_Sequential" xml:space="preserve"><value>Sequential</value></data>
   <data name="LobExtract_ColumnValue" xml:space="preserve"><value>Column Value</value></data>
   <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>Select output folder for LOB files</value></data>
+  <data name="LobExtract_ExtractComplete" xml:space="preserve"><value>LOB file extraction completed.
+Output file count: {0}</value></data>
+  <data name="LobExtract_ExtractError" xml:space="preserve"><value>An error occurred during LOB extraction</value></data>
+  <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>Please select a LOB column.</value></data>
+  <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>Please specify an output folder.</value></data>
+  <data name="LobExtract_CreateFolderError" xml:space="preserve"><value>Failed to create the output folder:
+{0}</value></data>
 
   <!-- ========== Database Connection Dialog ========== -->
   <data name="DbConn_FormTitle" xml:space="preserve"><value>Database Connection</value></data>

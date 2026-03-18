@@ -60,320 +60,124 @@
   </resheader>
 
   <!-- Main Menu -->
-  <data name="Menu_File" xml:space="preserve">
-    <value>&amp;Fichier</value>
-  </data>
-  <data name="Menu_File_Open" xml:space="preserve">
-    <value>&amp;Ouvrir</value>
-  </data>
-  <data name="Menu_File_Open_Workspace" xml:space="preserve">
-    <value>Espace de &amp;travail...</value>
-  </data>
-  <data name="Menu_File_Open_DumpFile" xml:space="preserve">
-    <value>Fichier &amp;Dump...</value>
-  </data>
-  <data name="Menu_File_Close" xml:space="preserve">
-    <value>&amp;Fermer</value>
-  </data>
-  <data name="Menu_File_SaveWorkspace" xml:space="preserve">
-    <value>&amp;Enregistrer l'espace de travail</value>
-  </data>
-  <data name="Menu_File_SaveWorkspaceAs" xml:space="preserve">
-    <value>Enregistrer l'espace de travail &amp;sous...</value>
-  </data>
-  <data name="Menu_File_CloseWorkspace" xml:space="preserve">
-    <value>Fermer &amp;l'espace de travail</value>
-  </data>
-  <data name="Menu_File_CreateDump" xml:space="preserve">
-    <value>&amp;Générer un fichier Dump...</value>
-  </data>
-  <data name="Menu_File_RecentWorkspaces" xml:space="preserve">
-    <value>Espaces de travail &amp;récents</value>
-  </data>
-  <data name="Menu_File_RecentDumps" xml:space="preserve">
-    <value>Fichiers &amp;Dump récents</value>
-  </data>
-  <data name="Menu_File_Exit" xml:space="preserve">
-    <value>&amp;Quitter</value>
-  </data>
-  <data name="Menu_Edit" xml:space="preserve">
-    <value>&amp;Édition</value>
-  </data>
-  <data name="Menu_Edit_Undo" xml:space="preserve">
-    <value>Ann&amp;uler</value>
-  </data>
-  <data name="Menu_Edit_Redo" xml:space="preserve">
-    <value>&amp;Rétablir</value>
-  </data>
-  <data name="Menu_Edit_Cut" xml:space="preserve">
-    <value>Co&amp;uper</value>
-  </data>
-  <data name="Menu_Edit_Copy" xml:space="preserve">
-    <value>&amp;Copier</value>
-  </data>
-  <data name="Menu_Edit_Paste" xml:space="preserve">
-    <value>Co&amp;ller</value>
-  </data>
-  <data name="Menu_Edit_SelectAll" xml:space="preserve">
-    <value>&amp;Tout sélectionner</value>
-  </data>
-  <data name="Menu_View" xml:space="preserve">
-    <value>&amp;Affichage</value>
-  </data>
-  <data name="Menu_View_Toolbar" xml:space="preserve">
-    <value>Barre d'&amp;outils</value>
-  </data>
-  <data name="Menu_View_Export" xml:space="preserve">
-    <value>Exporter</value>
-  </data>
-  <data name="Menu_View_StatusBar" xml:space="preserve">
-    <value>Barre d'é&amp;tat</value>
-  </data>
-  <data name="Menu_Object" xml:space="preserve">
-    <value>&amp;Objet</value>
-  </data>
-  <data name="Menu_Object_Open" xml:space="preserve">
-    <value>&amp;Ouvrir</value>
-  </data>
-  <data name="Menu_Object_ClearFilters" xml:space="preserve">
-    <value>Effacer tous les &amp;filtres</value>
-  </data>
-  <data name="Menu_Object_Delete" xml:space="preserve">
-    <value>&amp;Supprimer</value>
-  </data>
-  <data name="Menu_Object_UndoChanges" xml:space="preserve">
-    <value>&amp;Annuler les modifications</value>
-  </data>
-  <data name="Menu_Object_Property" xml:space="preserve">
-    <value>&amp;Propriétés</value>
-  </data>
-  <data name="Menu_Object_Export" xml:space="preserve">
-    <value>&amp;Exporter</value>
-  </data>
-  <data name="Menu_Object_ExportScript" xml:space="preserve">
-    <value>&amp;Script</value>
-  </data>
-  <data name="Menu_Object_ExportData" xml:space="preserve">
-    <value>&amp;Données</value>
-  </data>
-  <data name="Menu_Object_Report" xml:space="preserve">
-    <value>&amp;Rapport</value>
-  </data>
-  <data name="Menu_Object_ReportObjectList" xml:space="preserve">
-    <value>Liste des objets</value>
-  </data>
-  <data name="Menu_Object_ReportTableDef" xml:space="preserve">
-    <value>Définition de table</value>
-  </data>
-  <data name="Menu_Tools" xml:space="preserve">
-    <value>Ou&amp;tils</value>
-  </data>
-  <data name="Menu_Tools_ExtractFile" xml:space="preserve">
-    <value>Extraire un &amp;fichier</value>
-  </data>
-  <data name="Menu_Tools_Options" xml:space="preserve">
-    <value>&amp;Options</value>
-  </data>
-  <data name="Menu_Window" xml:space="preserve">
-    <value>Fe&amp;nêtre</value>
-  </data>
-  <data name="Menu_Window_Cascade" xml:space="preserve">
-    <value>&amp;Cascade</value>
-  </data>
-  <data name="Menu_Window_Tile" xml:space="preserve">
-    <value>&amp;Mosaïque</value>
-  </data>
-  <data name="Menu_Window_ArrangeIcons" xml:space="preserve">
-    <value>Organiser les &amp;icônes</value>
-  </data>
-  <data name="Menu_Help" xml:space="preserve">
-    <value>&amp;Aide</value>
-  </data>
-  <data name="Menu_Help_Contents" xml:space="preserve">
-    <value>&amp;Sommaire</value>
-  </data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve">
-    <value>&amp;Rapport d'erreur</value>
-  </data>
-  <data name="Menu_Help_License" xml:space="preserve">
-    <value>Activation de &amp;licence</value>
-  </data>
-  <data name="Menu_Help_About" xml:space="preserve">
-    <value>À &amp;propos</value>
-  </data>
-  <data name="Menu_Help_Language" xml:space="preserve">
-    <value>Langue</value>
-  </data>
-  <data name="Menu_Help_Language_Japanese" xml:space="preserve">
-    <value>日本語</value>
-  </data>
-  <data name="Menu_Help_Language_English" xml:space="preserve">
-    <value>English</value>
-  </data>
+  <data name="Menu_File" xml:space="preserve"><value>&amp;Fichier</value></data>
+  <data name="Menu_File_Open" xml:space="preserve"><value>&amp;Ouvrir</value></data>
+  <data name="Menu_File_Open_Workspace" xml:space="preserve"><value>Espace de &amp;travail...</value></data>
+  <data name="Menu_File_Open_DumpFile" xml:space="preserve"><value>Fichier &amp;Dump...</value></data>
+  <data name="Menu_File_Close" xml:space="preserve"><value>&amp;Fermer</value></data>
+  <data name="Menu_File_SaveWorkspace" xml:space="preserve"><value>&amp;Enregistrer l'espace de travail</value></data>
+  <data name="Menu_File_SaveWorkspaceAs" xml:space="preserve"><value>Enregistrer l'espace de travail &amp;sous...</value></data>
+  <data name="Menu_File_CloseWorkspace" xml:space="preserve"><value>Fermer &amp;l'espace de travail</value></data>
+  <data name="Menu_File_CreateDump" xml:space="preserve"><value>&amp;Générer un fichier Dump...</value></data>
+  <data name="Menu_File_RecentWorkspaces" xml:space="preserve"><value>Espaces de travail &amp;récents</value></data>
+  <data name="Menu_File_RecentDumps" xml:space="preserve"><value>Fichiers &amp;Dump récents</value></data>
+  <data name="Menu_File_Exit" xml:space="preserve"><value>&amp;Quitter</value></data>
+  <data name="Menu_Edit" xml:space="preserve"><value>&amp;Édition</value></data>
+  <data name="Menu_Edit_Undo" xml:space="preserve"><value>Ann&amp;uler</value></data>
+  <data name="Menu_Edit_Redo" xml:space="preserve"><value>&amp;Rétablir</value></data>
+  <data name="Menu_Edit_Cut" xml:space="preserve"><value>Co&amp;uper</value></data>
+  <data name="Menu_Edit_Copy" xml:space="preserve"><value>&amp;Copier</value></data>
+  <data name="Menu_Edit_Paste" xml:space="preserve"><value>Co&amp;ller</value></data>
+  <data name="Menu_Edit_SelectAll" xml:space="preserve"><value>&amp;Tout sélectionner</value></data>
+  <data name="Menu_View" xml:space="preserve"><value>&amp;Affichage</value></data>
+  <data name="Menu_View_Toolbar" xml:space="preserve"><value>Barre d'&amp;outils</value></data>
+  <data name="Menu_View_Export" xml:space="preserve"><value>Exporter</value></data>
+  <data name="Menu_View_StatusBar" xml:space="preserve"><value>Barre d'é&amp;tat</value></data>
+  <data name="Menu_Object" xml:space="preserve"><value>&amp;Objet</value></data>
+  <data name="Menu_Object_Open" xml:space="preserve"><value>&amp;Ouvrir</value></data>
+  <data name="Menu_Object_ClearFilters" xml:space="preserve"><value>Effacer tous les &amp;filtres</value></data>
+  <data name="Menu_Object_Delete" xml:space="preserve"><value>&amp;Supprimer</value></data>
+  <data name="Menu_Object_UndoChanges" xml:space="preserve"><value>&amp;Annuler les modifications</value></data>
+  <data name="Menu_Object_Property" xml:space="preserve"><value>&amp;Propriétés</value></data>
+  <data name="Menu_Object_Export" xml:space="preserve"><value>&amp;Exporter</value></data>
+  <data name="Menu_Object_ExportScript" xml:space="preserve"><value>&amp;Script</value></data>
+  <data name="Menu_Object_ExportData" xml:space="preserve"><value>&amp;Données</value></data>
+  <data name="Menu_Object_Report" xml:space="preserve"><value>&amp;Rapport</value></data>
+  <data name="Menu_Object_ReportObjectList" xml:space="preserve"><value>Liste des objets</value></data>
+  <data name="Menu_Object_ReportTableDef" xml:space="preserve"><value>Définition de table</value></data>
+  <data name="Menu_Tools" xml:space="preserve"><value>Ou&amp;tils</value></data>
+  <data name="Menu_Tools_ExtractFile" xml:space="preserve"><value>Extraire un &amp;fichier</value></data>
+  <data name="Menu_Tools_Options" xml:space="preserve"><value>&amp;Options</value></data>
+  <data name="Menu_Window" xml:space="preserve"><value>Fe&amp;nêtre</value></data>
+  <data name="Menu_Window_Cascade" xml:space="preserve"><value>&amp;Cascade</value></data>
+  <data name="Menu_Window_Tile" xml:space="preserve"><value>&amp;Mosaïque</value></data>
+  <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>Organiser les &amp;icônes</value></data>
+  <data name="Menu_Help" xml:space="preserve"><value>&amp;Aide</value></data>
+  <data name="Menu_Help_Contents" xml:space="preserve"><value>&amp;Sommaire</value></data>
+  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>&amp;Rapport d'erreur</value></data>
+  <data name="Menu_Help_License" xml:space="preserve"><value>Activation de &amp;licence</value></data>
+  <data name="Menu_Help_About" xml:space="preserve"><value>À &amp;propos</value></data>
+  <data name="Menu_Help_Language" xml:space="preserve"><value>Langue</value></data>
+  <data name="Menu_Help_Language_Japanese" xml:space="preserve"><value>日本語</value></data>
+  <data name="Menu_Help_Language_English" xml:space="preserve"><value>English</value></data>
+  <data name="Menu_Help_Language_Chinese" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Menu_Help_Language_Korean" xml:space="preserve"><value>한국어</value></data>
+  <data name="Menu_Help_Language_German" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="Menu_Help_Language_French" xml:space="preserve"><value>Français</value></data>
+  <data name="Menu_Help_Language_Spanish" xml:space="preserve"><value>Español</value></data>
+  <data name="Menu_Help_Language_Italian" xml:space="preserve"><value>Italiano</value></data>
+  <data name="Menu_Help_Language_Russian" xml:space="preserve"><value>Русский</value></data>
+  <data name="Menu_Help_Language_Portuguese" xml:space="preserve"><value>Português (BR)</value></data>
 
   <!-- Toolbar -->
-  <data name="Toolbar_Property" xml:space="preserve">
-    <value>Propriétés</value>
-  </data>
-  <data name="Toolbar_Delete" xml:space="preserve">
-    <value>Supprimer</value>
-  </data>
-  <data name="Toolbar_SqlScript" xml:space="preserve">
-    <value>Script SQL</value>
-  </data>
-  <data name="Toolbar_CsvExport" xml:space="preserve">
-    <value>Export CSV</value>
-  </data>
-  <data name="Toolbar_ExcelExport" xml:space="preserve">
-    <value>Export Excel</value>
-  </data>
-  <data name="Toolbar_AccessExport" xml:space="preserve">
-    <value>Export Access</value>
-  </data>
-  <data name="Toolbar_SqlServer" xml:space="preserve">
-    <value>SQL Server</value>
-  </data>
-  <data name="Toolbar_Odbc" xml:space="preserve">
-    <value>ODBC</value>
-  </data>
+  <data name="Toolbar_Property" xml:space="preserve"><value>Propriétés</value></data>
+  <data name="Toolbar_Delete" xml:space="preserve"><value>Supprimer</value></data>
+  <data name="Toolbar_SqlScript" xml:space="preserve"><value>Script SQL</value></data>
+  <data name="Toolbar_CsvExport" xml:space="preserve"><value>Export CSV</value></data>
+  <data name="Toolbar_ExcelExport" xml:space="preserve"><value>Export Excel</value></data>
+  <data name="Toolbar_AccessExport" xml:space="preserve"><value>Export Access</value></data>
+  <data name="Toolbar_SqlServer" xml:space="preserve"><value>SQL Server</value></data>
+  <data name="Toolbar_Odbc" xml:space="preserve"><value>ODBC</value></data>
 
   <!-- Common Buttons -->
-  <data name="Button_Search" xml:space="preserve">
-    <value>Rechercher</value>
-  </data>
-  <data name="Button_Reset" xml:space="preserve">
-    <value>Réinitialiser</value>
-  </data>
-  <data name="Button_Close" xml:space="preserve">
-    <value>Fermer</value>
-  </data>
-  <data name="Button_Cancel" xml:space="preserve">
-    <value>Annuler</value>
-  </data>
-  <data name="Button_OK" xml:space="preserve">
-    <value>OK</value>
-  </data>
-  <data name="Button_Submit" xml:space="preserve">
-    <value>Envoyer</value>
-  </data>
-  <data name="Button_Extract" xml:space="preserve">
-    <value>Extraire</value>
-  </data>
-  <data name="Button_ConnectionTest" xml:space="preserve">
-    <value>Tester la connexion</value>
-  </data>
-  <data name="Button_AddCondition" xml:space="preserve">
-    <value>Ajouter une condition</value>
-  </data>
-  <data name="Button_Clear" xml:space="preserve">
-    <value>Effacer</value>
-  </data>
-  <data name="Button_AdvancedSearch" xml:space="preserve">
-    <value>Recherche avancée</value>
-  </data>
-  <data name="Button_Previous" xml:space="preserve">
-    <value>&lt; Précédent</value>
-  </data>
-  <data name="Button_Next" xml:space="preserve">
-    <value>Suivant &gt;</value>
-  </data>
-  <data name="Button_Delete" xml:space="preserve">
-    <value>Supprimer</value>
-  </data>
-  <data name="Button_Update" xml:space="preserve">
-    <value>Mettre à jour vers la dernière version</value>
-  </data>
+  <data name="Button_Search" xml:space="preserve"><value>Rechercher</value></data>
+  <data name="Button_Reset" xml:space="preserve"><value>Réinitialiser</value></data>
+  <data name="Button_Close" xml:space="preserve"><value>Fermer</value></data>
+  <data name="Button_Cancel" xml:space="preserve"><value>Annuler</value></data>
+  <data name="Button_OK" xml:space="preserve"><value>OK</value></data>
+  <data name="Button_Submit" xml:space="preserve"><value>Envoyer</value></data>
+  <data name="Button_Extract" xml:space="preserve"><value>Extraire</value></data>
+  <data name="Button_ConnectionTest" xml:space="preserve"><value>Tester la connexion</value></data>
+  <data name="Button_AddCondition" xml:space="preserve"><value>Ajouter une condition</value></data>
+  <data name="Button_Clear" xml:space="preserve"><value>Effacer</value></data>
+  <data name="Button_AdvancedSearch" xml:space="preserve"><value>Recherche avancée</value></data>
+  <data name="Button_Previous" xml:space="preserve"><value>&lt; Précédent</value></data>
+  <data name="Button_Next" xml:space="preserve"><value>Suivant &gt;</value></data>
+  <data name="Button_Delete" xml:space="preserve"><value>Supprimer</value></data>
+  <data name="Button_Update" xml:space="preserve"><value>Mettre à jour vers la dernière version</value></data>
 
   <!-- Common Dialog Titles -->
-  <data name="Title_Error" xml:space="preserve">
-    <value>Erreur</value>
-  </data>
-  <data name="Title_Info" xml:space="preserve">
-    <value>Information</value>
-  </data>
-  <data name="Title_Complete" xml:space="preserve">
-    <value>Terminé</value>
-  </data>
-  <data name="Title_Confirm" xml:space="preserve">
-    <value>Confirmation</value>
-  </data>
-  <data name="Title_Warning" xml:space="preserve">
-    <value>Avertissement</value>
-  </data>
-  <data name="Title_InputError" xml:space="preserve">
-    <value>Erreur de saisie</value>
-  </data>
-  <data name="Title_DllError" xml:space="preserve">
-    <value>Erreur DLL</value>
-  </data>
-  <data name="Title_Help" xml:space="preserve">
-    <value>Aide</value>
-  </data>
-  <data name="Title_AuthFailed" xml:space="preserve">
-    <value>Échec de l'authentification</value>
-  </data>
-  <data name="Title_AuthSuccess" xml:space="preserve">
-    <value>Authentification réussie</value>
-  </data>
-  <data name="Title_LobExtract" xml:space="preserve">
-    <value>Extraction de fichiers LOB</value>
-  </data>
-  <data name="Title_BulkExport" xml:space="preserve">
-    <value>Export en masse</value>
-  </data>
+  <data name="Title_Error" xml:space="preserve"><value>Erreur</value></data>
+  <data name="Title_Info" xml:space="preserve"><value>Information</value></data>
+  <data name="Title_Complete" xml:space="preserve"><value>Terminé</value></data>
+  <data name="Title_Confirm" xml:space="preserve"><value>Confirmation</value></data>
+  <data name="Title_Warning" xml:space="preserve"><value>Avertissement</value></data>
+  <data name="Title_InputError" xml:space="preserve"><value>Erreur de saisie</value></data>
+  <data name="Title_DllError" xml:space="preserve"><value>Erreur DLL</value></data>
+  <data name="Title_Help" xml:space="preserve"><value>Aide</value></data>
+  <data name="Title_AuthFailed" xml:space="preserve"><value>Échec de l'authentification</value></data>
+  <data name="Title_AuthSuccess" xml:space="preserve"><value>Authentification réussie</value></data>
+  <data name="Title_LobExtract" xml:space="preserve"><value>Extraction de fichiers LOB</value></data>
+  <data name="Title_BulkExport" xml:space="preserve"><value>Export en masse</value></data>
 
   <!-- Status Bar -->
-  <data name="Status_Unlicensed" xml:space="preserve">
-    <value>OraDB DUMP Viewer - Non licencié</value>
-  </data>
-  <data name="Status_Licensed" xml:space="preserve">
-    <value>OraDB DUMP Viewer - {0}</value>
-  </data>
-  <data name="Status_SelectDumpFile" xml:space="preserve">
-    <value>Sélectionnez un chemin de fichier Dump...</value>
-  </data>
-  <data name="Status_GettingTableList" xml:space="preserve">
-    <value>Récupération de la liste des tables...</value>
-  </data>
-  <data name="Status_SearchingTables" xml:space="preserve">
-    <value>Recherche des tables... ({0}%) | Écoulé : {1}{2}</value>
-  </data>
-  <data name="Status_SearchingTablesWithName" xml:space="preserve">
-    <value>Recherche des tables... ({0}%) | {1} | Écoulé : {2}{3}</value>
-  </data>
-  <data name="Status_Processing" xml:space="preserve">
-    <value>Traitement... {0} lignes ({1}%) | {2} | Écoulé : {3}{4} | {5} lignes/s</value>
-  </data>
-  <data name="Status_ProcessingFull" xml:space="preserve">
-    <value>Traitement... {0}/{1} lignes ({2}) | Écoulé : {3} | Restant : {4} | Vitesse : {5} lignes/s | Fin estimée : {6}</value>
-  </data>
-  <data name="Status_ProcessingSimple" xml:space="preserve">
-    <value>Traitement... ligne {0}</value>
-  </data>
-  <data name="Status_ListingTables" xml:space="preserve">
-    <value>Récupération de la liste des tables... {0} tables ({1}%){2} | Écoulé : {3}{4}</value>
-  </data>
-  <data name="Status_Remaining" xml:space="preserve">
-    <value> | Restant : {0}</value>
-  </data>
-  <data name="Status_Calculating" xml:space="preserve">
-    <value>Calcul en cours...</value>
-  </data>
-  <data name="Status_AnalysisComplete" xml:space="preserve">
-    <value>Analyse terminée : {0} tables, {1} lignes ({2}s)</value>
-  </data>
-  <data name="Status_TableAnalysisComplete" xml:space="preserve">
-    <value>Analyse terminée : {0}.{1} {2} lignes ({3}s)</value>
-  </data>
-  <data name="Status_TableListComplete" xml:space="preserve">
-    <value>Liste des tables terminée : {0} tables ({1}s)</value>
-  </data>
-  <data name="Time_DayFormat" xml:space="preserve">
-    <value>{0}j {1}</value>
-  </data>
-  <data name="Time_SecondFormat" xml:space="preserve">
-    <value>{0}s</value>
-  </data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - Non licencié</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_SelectDumpFile" xml:space="preserve"><value>Sélectionnez un chemin de fichier Dump...</value></data>
+  <data name="Status_GettingTableList" xml:space="preserve"><value>Récupération de la liste des tables...</value></data>
+  <data name="Status_SearchingTables" xml:space="preserve"><value>Recherche des tables... ({0}%) | Écoulé : {1}{2}</value></data>
+  <data name="Status_SearchingTablesWithName" xml:space="preserve"><value>Recherche des tables... ({0}%) | {1} | Écoulé : {2}{3}</value></data>
+  <data name="Status_Processing" xml:space="preserve"><value>Traitement... {0} lignes ({1}%) | {2} | Écoulé : {3}{4} | {5} lignes/s</value></data>
+  <data name="Status_ProcessingFull" xml:space="preserve"><value>Traitement... {0}/{1} lignes ({2}) | Écoulé : {3} | Restant : {4} | Vitesse : {5} lignes/s | Fin estimée : {6}</value></data>
+  <data name="Status_ProcessingSimple" xml:space="preserve"><value>Traitement... ligne {0}</value></data>
+  <data name="Status_ListingTables" xml:space="preserve"><value>Récupération de la liste des tables... {0} tables ({1}%){2} | Écoulé : {3}{4}</value></data>
+  <data name="Status_Remaining" xml:space="preserve"><value> | Restant : {0}</value></data>
+  <data name="Status_Calculating" xml:space="preserve"><value>Calcul en cours...</value></data>
+  <data name="Status_AnalysisComplete" xml:space="preserve"><value>Analyse terminée : {0} tables, {1} lignes ({2}s)</value></data>
+  <data name="Status_TableAnalysisComplete" xml:space="preserve"><value>Analyse terminée : {0}.{1} {2} lignes ({3}s)</value></data>
+  <data name="Status_TableListComplete" xml:space="preserve"><value>Liste des tables terminée : {0} tables ({1}s)</value></data>
+  <data name="Time_DayFormat" xml:space="preserve"><value>{0}j {1}</value></data>
+  <data name="Time_SecondFormat" xml:space="preserve"><value>{0}s</value></data>
 
   <!-- License -->
   <data name="License_NotRegistered" xml:space="preserve">
@@ -389,834 +193,334 @@ Souhaitez-vous sélectionner un fichier de licence (.lic.json) pour l'activation
 
 Souhaitez-vous sélectionner un nouveau fichier de licence ?</value>
   </data>
-  <data name="License_Required" xml:space="preserve">
-    <value>Activation de licence requise</value>
-  </data>
-  <data name="License_Success" xml:space="preserve">
-    <value>Licence activée avec succès.</value>
-  </data>
-  <data name="License_CheckError" xml:space="preserve">
-    <value>Erreur lors de la vérification de la licence : {0}</value>
-  </data>
-  <data name="License_AuthError" xml:space="preserve">
-    <value>Erreur lors de l'activation de la licence : {0}</value>
-  </data>
-  <data name="License_FileDialogTitle" xml:space="preserve">
-    <value>Sélectionner un fichier de licence (*.lic.json)</value>
-  </data>
-  <data name="License_FileFilter" xml:space="preserve">
-    <value>Fichier de licence (*.lic.json)|*.lic.json|Tous les fichiers (*.*)|*.*</value>
-  </data>
+  <data name="License_Required" xml:space="preserve"><value>Activation de licence requise</value></data>
+  <data name="License_Success" xml:space="preserve"><value>Licence activée avec succès.</value></data>
+  <data name="License_CheckError" xml:space="preserve"><value>Erreur lors de la vérification de la licence : {0}</value></data>
+  <data name="License_AuthError" xml:space="preserve"><value>Erreur lors de l'activation de la licence : {0}</value></data>
+  <data name="License_FileDialogTitle" xml:space="preserve"><value>Sélectionner un fichier de licence (*.lic.json)</value></data>
+  <data name="License_FileFilter" xml:space="preserve"><value>Fichier de licence (*.lic.json)|*.lic.json|Tous les fichiers (*.*)|*.*</value></data>
 
   <!-- Main Form Messages -->
-  <data name="Msg_WorkspaceNotOpen" xml:space="preserve">
-    <value>Aucun espace de travail ouvert.</value>
-  </data>
-  <data name="Msg_OpenWorkspacePlease" xml:space="preserve">
-    <value>Veuillez ouvrir un espace de travail.</value>
-  </data>
-  <data name="Msg_FileNotFound" xml:space="preserve">
-    <value>Fichier introuvable.</value>
-  </data>
-  <data name="Msg_DumpFileNotFound" xml:space="preserve">
-    <value>Le fichier Dump spécifié dans l'espace de travail est introuvable.</value>
-  </data>
-  <data name="Msg_WorkspaceLoadFailed" xml:space="preserve">
-    <value>Échec du chargement de l'espace de travail.</value>
-  </data>
-  <data name="Msg_WorkspaceSaved" xml:space="preserve">
-    <value>Espace de travail enregistré.</value>
-  </data>
-  <data name="Msg_WorkspaceSaveFailed" xml:space="preserve">
-    <value>Échec de l'enregistrement de l'espace de travail.</value>
-  </data>
-  <data name="Msg_CloseWorkspaceConfirm" xml:space="preserve">
-    <value>Enregistrer l'espace de travail avant de fermer ?</value>
-  </data>
-  <data name="Msg_HelpNotFound" xml:space="preserve">
-    <value>Fichier d'aide introuvable.</value>
-  </data>
-  <data name="Msg_NoExportTables" xml:space="preserve">
-    <value>Aucune table disponible pour l'export dans l'espace de travail.</value>
-  </data>
-  <data name="Msg_BulkExportConfirm" xml:space="preserve">
-    <value>Exporter {0} tables en masse ?</value>
-  </data>
-  <data name="Msg_ConnectViaSqlServer" xml:space="preserve">
-    <value>Veuillez vous connecter via l'onglet SQL Server.</value>
-  </data>
-  <data name="Msg_ConnectViaOdbc" xml:space="preserve">
-    <value>Veuillez vous connecter via l'onglet ODBC.</value>
-  </data>
-  <data name="Msg_SelectTableForLob" xml:space="preserve">
-    <value>Veuillez sélectionner une table.</value>
-  </data>
-  <data name="Msg_NoColumnTypeInfo" xml:space="preserve">
-    <value>Aucune information de type de colonne disponible.</value>
-  </data>
-  <data name="Msg_NoLobColumns" xml:space="preserve">
-    <value>La table sélectionnée n'a pas de colonnes LOB (BLOB/CLOB/NCLOB).</value>
-  </data>
+  <data name="Msg_WorkspaceNotOpen" xml:space="preserve"><value>Aucun espace de travail ouvert.</value></data>
+  <data name="Msg_OpenWorkspacePlease" xml:space="preserve"><value>Veuillez ouvrir un espace de travail.</value></data>
+  <data name="Msg_FileNotFound" xml:space="preserve"><value>Fichier introuvable.</value></data>
+  <data name="Msg_DumpFileNotFound" xml:space="preserve"><value>Le fichier Dump spécifié dans l'espace de travail est introuvable.</value></data>
+  <data name="Msg_WorkspaceLoadFailed" xml:space="preserve"><value>Échec du chargement de l'espace de travail.</value></data>
+  <data name="Msg_WorkspaceSaved" xml:space="preserve"><value>Espace de travail enregistré.</value></data>
+  <data name="Msg_WorkspaceSaveFailed" xml:space="preserve"><value>Échec de l'enregistrement de l'espace de travail.</value></data>
+  <data name="Msg_CloseWorkspaceConfirm" xml:space="preserve"><value>Enregistrer l'espace de travail avant de fermer ?</value></data>
+  <data name="Msg_HelpNotFound" xml:space="preserve"><value>Fichier d'aide introuvable.</value></data>
+  <data name="Msg_NoExportTables" xml:space="preserve"><value>Aucune table disponible pour l'export dans l'espace de travail.</value></data>
+  <data name="Msg_BulkExportConfirm" xml:space="preserve"><value>Exporter {0} tables en masse ?</value></data>
+  <data name="Msg_ConnectViaSqlServer" xml:space="preserve"><value>Veuillez vous connecter via l'onglet SQL Server.</value></data>
+  <data name="Msg_ConnectViaOdbc" xml:space="preserve"><value>Veuillez vous connecter via l'onglet ODBC.</value></data>
+  <data name="Msg_SelectTableForLob" xml:space="preserve"><value>Veuillez sélectionner une table.</value></data>
+  <data name="Msg_NoColumnTypeInfo" xml:space="preserve"><value>Aucune information de type de colonne disponible.</value></data>
+  <data name="Msg_NoLobColumns" xml:space="preserve"><value>La table sélectionnée n'a pas de colonnes LOB (BLOB/CLOB/NCLOB).</value></data>
 
   <!-- Export Complete Messages -->
-  <data name="Msg_SqlExportComplete" xml:space="preserve">
-    <value>Export du script SQL terminé.</value>
-  </data>
-  <data name="Msg_CsvExportComplete" xml:space="preserve">
-    <value>Export CSV terminé.</value>
-  </data>
-  <data name="Msg_ExcelExportComplete" xml:space="preserve">
-    <value>Export Excel terminé.</value>
-  </data>
-  <data name="Msg_AccessExportComplete" xml:space="preserve">
-    <value>Export Access terminé.</value>
-  </data>
-  <data name="Msg_SqlServerExportComplete" xml:space="preserve">
-    <value>Export vers SQL Server terminé.</value>
-  </data>
-  <data name="Msg_OdbcExportComplete" xml:space="preserve">
-    <value>Export ODBC terminé.</value>
-  </data>
-  <data name="Msg_RowsExported" xml:space="preserve">
-    <value>{0} lignes exportées.</value>
-  </data>
-  <data name="Msg_BulkSqlExportComplete" xml:space="preserve">
-    <value>Export SQL en masse terminé.</value>
-  </data>
-  <data name="Msg_BulkCsvExportComplete" xml:space="preserve">
-    <value>Export CSV en masse terminé.</value>
-  </data>
-  <data name="Msg_BulkExcelExportComplete" xml:space="preserve">
-    <value>Export Excel en masse terminé.</value>
-  </data>
-  <data name="Msg_BulkAccessExportComplete" xml:space="preserve">
-    <value>Export Access en masse terminé.</value>
-  </data>
-  <data name="Msg_BulkSqlServerExportComplete" xml:space="preserve">
-    <value>Export SQL Server en masse terminé.</value>
-  </data>
-  <data name="Msg_BulkOdbcExportComplete" xml:space="preserve">
-    <value>Export ODBC en masse terminé.</value>
-  </data>
-  <data name="Msg_TablesExported" xml:space="preserve">
-    <value>{0} tables exportées.</value>
-  </data>
-  <data name="Msg_ObjectListExported" xml:space="preserve">
-    <value>Liste des objets exportée.</value>
-  </data>
-  <data name="Msg_TableDefExported" xml:space="preserve">
-    <value>Définition de table exportée.</value>
-  </data>
+  <data name="Msg_SqlExportComplete" xml:space="preserve"><value>Export du script SQL terminé.</value></data>
+  <data name="Msg_CsvExportComplete" xml:space="preserve"><value>Export CSV terminé.</value></data>
+  <data name="Msg_ExcelExportComplete" xml:space="preserve"><value>Export Excel terminé.</value></data>
+  <data name="Msg_AccessExportComplete" xml:space="preserve"><value>Export Access terminé.</value></data>
+  <data name="Msg_SqlServerExportComplete" xml:space="preserve"><value>Export vers SQL Server terminé.</value></data>
+  <data name="Msg_OdbcExportComplete" xml:space="preserve"><value>Export ODBC terminé.</value></data>
+  <data name="Msg_RowsExported" xml:space="preserve"><value>{0} lignes exportées.</value></data>
+  <data name="Msg_BulkSqlExportComplete" xml:space="preserve"><value>Export SQL en masse terminé.</value></data>
+  <data name="Msg_BulkCsvExportComplete" xml:space="preserve"><value>Export CSV en masse terminé.</value></data>
+  <data name="Msg_BulkExcelExportComplete" xml:space="preserve"><value>Export Excel en masse terminé.</value></data>
+  <data name="Msg_BulkAccessExportComplete" xml:space="preserve"><value>Export Access en masse terminé.</value></data>
+  <data name="Msg_BulkSqlServerExportComplete" xml:space="preserve"><value>Export SQL Server en masse terminé.</value></data>
+  <data name="Msg_BulkOdbcExportComplete" xml:space="preserve"><value>Export ODBC en masse terminé.</value></data>
+  <data name="Msg_TablesExported" xml:space="preserve"><value>{0} tables exportées.</value></data>
+  <data name="Msg_ObjectListExported" xml:space="preserve"><value>Liste des objets exportée.</value></data>
+  <data name="Msg_TableDefExported" xml:space="preserve"><value>Définition de table exportée.</value></data>
 
   <!-- File Dialogs -->
-  <data name="Dialog_OpenDumpTitle" xml:space="preserve">
-    <value>Sélectionner un fichier Oracle DUMP</value>
-  </data>
-  <data name="Dialog_DumpFilter" xml:space="preserve">
-    <value>Fichiers Oracle Dump (*.dmp)|*.dmp|Tous les fichiers (*.*)|*.*</value>
-  </data>
-  <data name="Dialog_OpenWorkspaceTitle" xml:space="preserve">
-    <value>Ouvrir un espace de travail</value>
-  </data>
-  <data name="Dialog_WorkspaceFilter" xml:space="preserve">
-    <value>Fichiers d'espace de travail (*.odvw)|*.odvw|Tous les fichiers (*.*)|*.*</value>
-  </data>
-  <data name="Dialog_SaveWorkspaceTitle" xml:space="preserve">
-    <value>Enregistrer l'espace de travail</value>
-  </data>
-  <data name="Dialog_FileSelectionError" xml:space="preserve">
-    <value>Erreur lors de la sélection du fichier : {0}</value>
-  </data>
-  <data name="Dialog_SqlFilter" xml:space="preserve">
-    <value>Fichiers SQL|*.sql|Tous les fichiers|*.*</value>
-  </data>
-  <data name="Dialog_CsvFilter" xml:space="preserve">
-    <value>Fichiers CSV|*.csv|Tous les fichiers|*.*</value>
-  </data>
-  <data name="Dialog_ExcelFilter" xml:space="preserve">
-    <value>Fichiers Excel|*.xlsx|Tous les fichiers|*.*</value>
-  </data>
-  <data name="Dialog_AccessFilter" xml:space="preserve">
-    <value>Base de données Access|*.accdb|Tous les fichiers|*.*</value>
-  </data>
-  <data name="Dialog_TextFilter" xml:space="preserve">
-    <value>Fichiers texte|*.txt|Tous les fichiers|*.*</value>
-  </data>
-  <data name="Dialog_SqlFolderBrowse" xml:space="preserve">
-    <value>Sélectionner le dossier de sortie pour les fichiers SQL</value>
-  </data>
-  <data name="Dialog_CsvFolderBrowse" xml:space="preserve">
-    <value>Sélectionner le dossier de sortie pour les fichiers CSV</value>
-  </data>
+  <data name="Dialog_OpenDumpTitle" xml:space="preserve"><value>Sélectionner un fichier Oracle DUMP</value></data>
+  <data name="Dialog_DumpFilter" xml:space="preserve"><value>Fichiers Oracle Dump (*.dmp)|*.dmp|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Dialog_OpenWorkspaceTitle" xml:space="preserve"><value>Ouvrir un espace de travail</value></data>
+  <data name="Dialog_WorkspaceFilter" xml:space="preserve"><value>Fichiers d'espace de travail (*.odvw)|*.odvw|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Dialog_SaveWorkspaceTitle" xml:space="preserve"><value>Enregistrer l'espace de travail</value></data>
+  <data name="Dialog_FileSelectionError" xml:space="preserve"><value>Erreur lors de la sélection du fichier : {0}</value></data>
+  <data name="Dialog_SqlFilter" xml:space="preserve"><value>Fichiers SQL|*.sql|Tous les fichiers|*.*</value></data>
+  <data name="Dialog_CsvFilter" xml:space="preserve"><value>Fichiers CSV|*.csv|Tous les fichiers|*.*</value></data>
+  <data name="Dialog_ExcelFilter" xml:space="preserve"><value>Fichiers Excel|*.xlsx|Tous les fichiers|*.*</value></data>
+  <data name="Dialog_AccessFilter" xml:space="preserve"><value>Base de données Access|*.accdb|Tous les fichiers|*.*</value></data>
+  <data name="Dialog_TextFilter" xml:space="preserve"><value>Fichiers texte|*.txt|Tous les fichiers|*.*</value></data>
+  <data name="Dialog_SqlFolderBrowse" xml:space="preserve"><value>Sélectionner le dossier de sortie pour les fichiers SQL</value></data>
+  <data name="Dialog_CsvFolderBrowse" xml:space="preserve"><value>Sélectionner le dossier de sortie pour les fichiers CSV</value></data>
 
   <!-- Analysis Errors -->
   <data name="Analyze_DllNotFound" xml:space="preserve">
     <value>DLL d'analyse introuvable : {0}
 Assurez-vous que OraDB_DumpParser.dll se trouve dans le même dossier que l'exécutable.</value>
   </data>
-  <data name="Analyze_ParseError" xml:space="preserve">
-    <value>Erreur lors de l'analyse du fichier Dump : {0}</value>
-  </data>
-  <data name="Analyze_TableListError" xml:space="preserve">
-    <value>Erreur lors de la récupération de la liste des tables : {0}</value>
-  </data>
-  <data name="Analyze_TableError" xml:space="preserve">
-    <value>Erreur lors de l'analyse de la table : {0}</value>
-  </data>
-  <data name="Analyze_FilePathEmpty" xml:space="preserve">
-    <value>Le chemin du fichier n'est pas spécifié.</value>
-  </data>
-  <data name="Analyze_FileNotFound" xml:space="preserve">
-    <value>Fichier introuvable : {0}</value>
-  </data>
-  <data name="Analyze_InvalidFormat" xml:space="preserve">
-    <value>Le fichier doit être au format .dmp.</value>
-  </data>
+  <data name="Analyze_ParseError" xml:space="preserve"><value>Erreur lors de l'analyse du fichier Dump : {0}</value></data>
+  <data name="Analyze_TableListError" xml:space="preserve"><value>Erreur lors de la récupération de la liste des tables : {0}</value></data>
+  <data name="Analyze_TableError" xml:space="preserve"><value>Erreur lors de l'analyse de la table : {0}</value></data>
+  <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>Le chemin du fichier n'est pas spécifié.</value></data>
+  <data name="Analyze_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
+  <data name="Analyze_InvalidFormat" xml:space="preserve"><value>Le fichier doit être au format .dmp.</value></data>
 
   <!-- Workspace -->
-  <data name="Workspace_Column_Name" xml:space="preserve">
-    <value>Nom</value>
-  </data>
-  <data name="Workspace_Column_Owner" xml:space="preserve">
-    <value>Propriétaire</value>
-  </data>
-  <data name="Workspace_Column_Type" xml:space="preserve">
-    <value>Type</value>
-  </data>
-  <data name="Workspace_Column_RowCount" xml:space="preserve">
-    <value>Lignes</value>
-  </data>
-  <data name="Workspace_ContextMenu_Exclude" xml:space="preserve">
-    <value>Exclure</value>
-  </data>
-  <data name="Workspace_ContextMenu_InvertSelection" xml:space="preserve">
-    <value>Inverser la sélection</value>
-  </data>
-  <data name="Workspace_ContextMenu_RestoreAll" xml:space="preserve">
-    <value>Restaurer tous les exclus</value>
-  </data>
-  <data name="Workspace_TableNotSelected" xml:space="preserve">
-    <value>Aucune table sélectionnée.</value>
-  </data>
-  <data name="Workspace_SchemaNotSelected" xml:space="preserve">
-    <value>Aucun schéma sélectionné.</value>
-  </data>
-  <data name="Workspace_NoColumnInfo" xml:space="preserve">
-    <value>La table n'a pas d'informations de colonnes.</value>
-  </data>
-  <data name="Workspace_TableDisplayError" xml:space="preserve">
-    <value>Erreur d'affichage de la table : {0}</value>
-  </data>
-  <data name="Workspace_NoSchema" xml:space="preserve">
-    <value>Aucun schéma de base de données trouvé.</value>
-  </data>
-  <data name="Workspace_SchemaTreeError" xml:space="preserve">
-    <value>Impossible de créer l'arborescence du schéma : {0}</value>
-  </data>
-  <data name="Workspace_SchemaNotFound" xml:space="preserve">
-    <value>Schéma '{0}' introuvable.</value>
-  </data>
-  <data name="Workspace_TableListError" xml:space="preserve">
-    <value>Impossible d'afficher la liste des tables : {0}</value>
-  </data>
+  <data name="Workspace_Column_Name" xml:space="preserve"><value>Nom</value></data>
+  <data name="Workspace_Column_Owner" xml:space="preserve"><value>Propriétaire</value></data>
+  <data name="Workspace_Column_Type" xml:space="preserve"><value>Type</value></data>
+  <data name="Workspace_Column_RowCount" xml:space="preserve"><value>Lignes</value></data>
+  <data name="Workspace_ContextMenu_Exclude" xml:space="preserve"><value>Exclure</value></data>
+  <data name="Workspace_ContextMenu_InvertSelection" xml:space="preserve"><value>Inverser la sélection</value></data>
+  <data name="Workspace_ContextMenu_RestoreAll" xml:space="preserve"><value>Restaurer tous les exclus</value></data>
+  <data name="Workspace_TableNotSelected" xml:space="preserve"><value>Aucune table sélectionnée.</value></data>
+  <data name="Workspace_SchemaNotSelected" xml:space="preserve"><value>Aucun schéma sélectionné.</value></data>
+  <data name="Workspace_NoColumnInfo" xml:space="preserve"><value>La table n'a pas d'informations de colonnes.</value></data>
+  <data name="Workspace_TableDisplayError" xml:space="preserve"><value>Erreur d'affichage de la table : {0}</value></data>
+  <data name="Workspace_NoSchema" xml:space="preserve"><value>Aucun schéma de base de données trouvé.</value></data>
+  <data name="Workspace_SchemaTreeError" xml:space="preserve"><value>Impossible de créer l'arborescence du schéma : {0}</value></data>
+  <data name="Workspace_SchemaNotFound" xml:space="preserve"><value>Schéma '{0}' introuvable.</value></data>
+  <data name="Workspace_TableListError" xml:space="preserve"><value>Impossible d'afficher la liste des tables : {0}</value></data>
 
   <!-- Reports -->
-  <data name="Report_ObjectList_Title" xml:space="preserve">
-    <value>Rapport de la liste des objets : {0}</value>
-  </data>
-  <data name="Report_OutputDate" xml:space="preserve">
-    <value>Date de sortie : {0}</value>
-  </data>
-  <data name="Report_Column_Schema" xml:space="preserve">
-    <value>Schéma</value>
-  </data>
-  <data name="Report_Column_TableName" xml:space="preserve">
-    <value>Nom de la table</value>
-  </data>
-  <data name="Report_Column_RowCount" xml:space="preserve">
-    <value>Lignes</value>
-  </data>
-  <data name="Report_TableDef_Title" xml:space="preserve">
-    <value>Rapport de définition de table : {0}</value>
-  </data>
-  <data name="Report_Table" xml:space="preserve">
-    <value>Table : {0}</value>
-  </data>
-  <data name="Report_Column_Number" xml:space="preserve">
-    <value>#</value>
-  </data>
-  <data name="Report_Column_ColumnName" xml:space="preserve">
-    <value>Nom de colonne</value>
-  </data>
-  <data name="Report_Column_ColumnType" xml:space="preserve">
-    <value>Type</value>
-  </data>
-  <data name="Report_DefaultObjectList" xml:space="preserve">
-    <value>ObjectList.txt</value>
-  </data>
-  <data name="Report_DefaultTableDef" xml:space="preserve">
-    <value>TableDefinition.txt</value>
-  </data>
+  <data name="Report_ObjectList_Title" xml:space="preserve"><value>Rapport de la liste des objets : {0}</value></data>
+  <data name="Report_OutputDate" xml:space="preserve"><value>Date de sortie : {0}</value></data>
+  <data name="Report_Column_Schema" xml:space="preserve"><value>Schéma</value></data>
+  <data name="Report_Column_TableName" xml:space="preserve"><value>Nom de la table</value></data>
+  <data name="Report_Column_RowCount" xml:space="preserve"><value>Lignes</value></data>
+  <data name="Report_TableDef_Title" xml:space="preserve"><value>Rapport de définition de table : {0}</value></data>
+  <data name="Report_Table" xml:space="preserve"><value>Table : {0}</value></data>
+  <data name="Report_Column_Number" xml:space="preserve"><value>#</value></data>
+  <data name="Report_Column_ColumnName" xml:space="preserve"><value>Nom de colonne</value></data>
+  <data name="Report_Column_ColumnType" xml:space="preserve"><value>Type</value></data>
+  <data name="Report_DefaultObjectList" xml:space="preserve"><value>ObjectList.txt</value></data>
+  <data name="Report_DefaultTableDef" xml:space="preserve"><value>TableDefinition.txt</value></data>
 
   <!-- About Dialog -->
-  <data name="About_FormTitle" xml:space="preserve">
-    <value>À propos</value>
-  </data>
-  <data name="About_VersionLabel" xml:space="preserve">
-    <value>Version :</value>
-  </data>
-  <data name="About_LatestVersionLabel" xml:space="preserve">
-    <value>Dernière version :</value>
-  </data>
-  <data name="About_Checking" xml:space="preserve">
-    <value>Vérification...</value>
-  </data>
-  <data name="About_CheckFailed" xml:space="preserve">
-    <value>Impossible de vérifier</value>
-  </data>
-  <data name="About_CheckFailedOffline" xml:space="preserve">
-    <value>Impossible de vérifier (hors ligne)</value>
-  </data>
-  <data name="About_NewVersionAvailable" xml:space="preserve">
-    <value>v{0} (Une nouvelle version est disponible)</value>
-  </data>
-  <data name="About_LatestInUse" xml:space="preserve">
-    <value>v{0} (Dernière version utilisée)</value>
-  </data>
-  <data name="About_OpenReleasePage" xml:space="preserve">
-    <value>Ouvrir la page de publication</value>
-  </data>
+  <data name="About_FormTitle" xml:space="preserve"><value>À propos</value></data>
+  <data name="About_VersionLabel" xml:space="preserve"><value>Version :</value></data>
+  <data name="About_LatestVersionLabel" xml:space="preserve"><value>Dernière version :</value></data>
+  <data name="About_Checking" xml:space="preserve"><value>Vérification...</value></data>
+  <data name="About_CheckFailed" xml:space="preserve"><value>Impossible de vérifier</value></data>
+  <data name="About_CheckFailedOffline" xml:space="preserve"><value>Impossible de vérifier (hors ligne)</value></data>
+  <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (Une nouvelle version est disponible)</value></data>
+  <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Dernière version utilisée)</value></data>
+  <data name="About_OpenReleasePage" xml:space="preserve"><value>Ouvrir la page de publication</value></data>
   <data name="About_UpdateConfirmMessage" xml:space="preserve">
     <value>Télécharger et exécuter le dernier installateur.
 L'application se fermera automatiquement.
 
 Continuer ?</value>
   </data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve">
-    <value>Confirmation de mise à jour</value>
-  </data>
-  <data name="About_Downloading" xml:space="preserve">
-    <value>Téléchargement...</value>
-  </data>
-  <data name="About_LaunchingInstaller" xml:space="preserve">
-    <value>Lancement de l'installateur...</value>
-  </data>
-  <data name="About_DownloadFailed" xml:space="preserve">
-    <value>Échec du téléchargement : {0}</value>
-  </data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve">
-    <value>echo Mise à jour de OraDB DUMP Viewer...</value>
-  </data>
+  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Confirmation de mise à jour</value></data>
+  <data name="About_Downloading" xml:space="preserve"><value>Téléchargement...</value></data>
+  <data name="About_LaunchingInstaller" xml:space="preserve"><value>Lancement de l'installateur...</value></data>
+  <data name="About_DownloadFailed" xml:space="preserve"><value>Échec du téléchargement : {0}</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Mise à jour de OraDB DUMP Viewer...</value></data>
 
   <!-- Error Report Dialog -->
-  <data name="ErrorReport_FormTitle" xml:space="preserve">
-    <value>Rapport d'erreur</value>
-  </data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve">
-    <value>Sujet :</value>
-  </data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve">
-    <value>Description :</value>
-  </data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve">
-    <value>Contact :</value>
-  </data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve">
-    <value>(Optionnel) Entrez votre e-mail ou vos coordonnées pour une réponse</value>
-  </data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve">
-    <value>── Les informations d'environnement suivantes seront envoyées automatiquement (aucune donnée personnelle) ──</value>
-  </data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve">
-    <value>App :</value>
-  </data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve">
-    <value>DLL :</value>
-  </data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve">
-    <value>OS :</value>
-  </data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve">
-    <value>.NET :</value>
-  </data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve">
-    <value>CPU :</value>
-  </data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve">
-    <value>Paramètres régionaux :</value>
-  </data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve">
-    <value>DPI :</value>
-  </data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve">
-    <value>Mémoire :</value>
-  </data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve">
-    <value>Écran :</value>
-  </data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve">
-    <value>Dump :</value>
-  </data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve">
-    <value>Veuillez entrer un sujet.</value>
-  </data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve">
-    <value>Veuillez entrer une description.</value>
-  </data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve">
-    <value>Rapport envoyé. Merci pour vos commentaires.</value>
-  </data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve">
-    <value>Voir l'Issue #{0}</value>
-  </data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve">
-    <value>Échec de l'envoi : {0}</value>
-  </data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve">
-    <value>Erreur d'envoi : {0}</value>
-  </data>
-  <data name="ErrorReport_Submitting" xml:space="preserve">
-    <value>Envoi en cours...</value>
-  </data>
+  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Rapport d'erreur</value></data>
+  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>Sujet :</value></data>
+  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>Description :</value></data>
+  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>Contact :</value></data>
+  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(Optionnel) Entrez votre e-mail ou vos coordonnées pour une réponse</value></data>
+  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── Les informations d'environnement suivantes seront envoyées automatiquement (aucune donnée personnelle) ──</value></data>
+  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>App :</value></data>
+  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL :</value></data>
+  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>OS :</value></data>
+  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET :</value></data>
+  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU :</value></data>
+  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>Paramètres régionaux :</value></data>
+  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI :</value></data>
+  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>Mémoire :</value></data>
+  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>Écran :</value></data>
+  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>Dump :</value></data>
+  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>Veuillez entrer un sujet.</value></data>
+  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>Veuillez entrer une description.</value></data>
+  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>Rapport envoyé. Merci pour vos commentaires.</value></data>
+  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>Voir l'Issue #{0}</value></data>
+  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>Échec de l'envoi : {0}</value></data>
+  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>Erreur d'envoi : {0}</value></data>
+  <data name="ErrorReport_Submitting" xml:space="preserve"><value>Envoi en cours...</value></data>
 
   <!-- Table Properties Dialog -->
-  <data name="TableProp_FormTitle" xml:space="preserve">
-    <value>Propriétés de la table - {0}.{1}</value>
-  </data>
-  <data name="TableProp_SchemaLabel" xml:space="preserve">
-    <value>Schéma :</value>
-  </data>
-  <data name="TableProp_TableNameLabel" xml:space="preserve">
-    <value>Nom de la table :</value>
-  </data>
-  <data name="TableProp_ColumnCountLabel" xml:space="preserve">
-    <value>Nombre de colonnes :</value>
-  </data>
-  <data name="TableProp_RowCountLabel" xml:space="preserve">
-    <value>Nombre de lignes :</value>
-  </data>
-  <data name="TableProp_ColumnListLabel" xml:space="preserve">
-    <value>Liste des colonnes :</value>
-  </data>
-  <data name="TableProp_ColumnNameHeader" xml:space="preserve">
-    <value>Nom de colonne</value>
-  </data>
-  <data name="TableProp_TypeHeader" xml:space="preserve">
-    <value>Type</value>
-  </data>
-  <data name="TableProp_FormTitleBase" xml:space="preserve">
-    <value>Propriétés de la table</value>
-  </data>
+  <data name="TableProp_FormTitle" xml:space="preserve"><value>Propriétés de la table - {0}.{1}</value></data>
+  <data name="TableProp_SchemaLabel" xml:space="preserve"><value>Schéma :</value></data>
+  <data name="TableProp_TableNameLabel" xml:space="preserve"><value>Nom de la table :</value></data>
+  <data name="TableProp_ColumnCountLabel" xml:space="preserve"><value>Nombre de colonnes :</value></data>
+  <data name="TableProp_RowCountLabel" xml:space="preserve"><value>Nombre de lignes :</value></data>
+  <data name="TableProp_ColumnListLabel" xml:space="preserve"><value>Liste des colonnes :</value></data>
+  <data name="TableProp_ColumnNameHeader" xml:space="preserve"><value>Nom de colonne</value></data>
+  <data name="TableProp_TypeHeader" xml:space="preserve"><value>Type</value></data>
+  <data name="TableProp_FormTitleBase" xml:space="preserve"><value>Propriétés de la table</value></data>
 
   <!-- Table Preview -->
-  <data name="Preview_FormTitle" xml:space="preserve">
-    <value>Aperçu des données de la table - {0}</value>
-  </data>
-  <data name="Preview_SearchValueLabel" xml:space="preserve">
-    <value>Valeur recherchée :</value>
-  </data>
-  <data name="Preview_ColumnNameLabel" xml:space="preserve">
-    <value>Nom de colonne :</value>
-  </data>
-  <data name="Preview_RowCountLabel" xml:space="preserve">
-    <value>Total des lignes : {0} (Affichées : {1})</value>
-  </data>
-  <data name="Preview_RowCountDefault" xml:space="preserve">
-    <value>Total des lignes : 0 (Affichées : 0)</value>
-  </data>
-  <data name="Preview_PageSizeLabel" xml:space="preserve">
-    <value>Lignes par page :</value>
-  </data>
-  <data name="Preview_PageInfoLabel" xml:space="preserve">
-    <value>Page : {0}/{1}</value>
-  </data>
-  <data name="Preview_FormTitleBase" xml:space="preserve">
-    <value>Aperçu des données de la table</value>
-  </data>
-  <data name="Preview_NoColumnInfo" xml:space="preserve">
-    <value>Aucune information de colonne.</value>
-  </data>
-  <data name="Preview_DataDisplayError" xml:space="preserve">
-    <value>Erreur lors de l'affichage des données : {0}</value>
-  </data>
+  <data name="Preview_FormTitle" xml:space="preserve"><value>Aperçu des données de la table - {0}</value></data>
+  <data name="Preview_SearchValueLabel" xml:space="preserve"><value>Valeur recherchée :</value></data>
+  <data name="Preview_ColumnNameLabel" xml:space="preserve"><value>Nom de colonne :</value></data>
+  <data name="Preview_RowCountLabel" xml:space="preserve"><value>Total des lignes : {0} (Affichées : {1})</value></data>
+  <data name="Preview_RowCountDefault" xml:space="preserve"><value>Total des lignes : 0 (Affichées : 0)</value></data>
+  <data name="Preview_PageSizeLabel" xml:space="preserve"><value>Lignes par page :</value></data>
+  <data name="Preview_PageInfoLabel" xml:space="preserve"><value>Page : {0}/{1}</value></data>
+  <data name="Preview_FormTitleBase" xml:space="preserve"><value>Aperçu des données de la table</value></data>
+  <data name="Preview_NoColumnInfo" xml:space="preserve"><value>Aucune information de colonne.</value></data>
+  <data name="Preview_DataDisplayError" xml:space="preserve"><value>Erreur lors de l'affichage des données : {0}</value></data>
 
   <!-- Advanced Search -->
-  <data name="AdvSearch_FormTitle" xml:space="preserve">
-    <value>Recherche avancée</value>
-  </data>
-  <data name="AdvSearch_ConditionLabel" xml:space="preserve">
-    <value>Condition :</value>
-  </data>
-  <data name="AdvSearch_MinCondition" xml:space="preserve">
-    <value>Au moins une condition est requise.</value>
-  </data>
-  <data name="AdvSearch_InvalidConditions" xml:space="preserve">
-    <value>Veuillez entrer toutes les conditions correctement.</value>
-  </data>
+  <data name="AdvSearch_FormTitle" xml:space="preserve"><value>Recherche avancée</value></data>
+  <data name="AdvSearch_ConditionLabel" xml:space="preserve"><value>Condition :</value></data>
+  <data name="AdvSearch_MinCondition" xml:space="preserve"><value>Au moins une condition est requise.</value></data>
+  <data name="AdvSearch_InvalidConditions" xml:space="preserve"><value>Veuillez entrer toutes les conditions correctement.</value></data>
 
   <!-- Search Operators -->
-  <data name="Operator_Contains" xml:space="preserve">
-    <value>Contient</value>
-  </data>
-  <data name="Operator_NotContains" xml:space="preserve">
-    <value>Ne contient pas</value>
-  </data>
-  <data name="Operator_Equals" xml:space="preserve">
-    <value>Égal</value>
-  </data>
-  <data name="Operator_NotEquals" xml:space="preserve">
-    <value>Différent</value>
-  </data>
-  <data name="Operator_StartsWith" xml:space="preserve">
-    <value>Commence par</value>
-  </data>
-  <data name="Operator_EndsWith" xml:space="preserve">
-    <value>Se termine par</value>
-  </data>
-  <data name="Search_CaseSensitive" xml:space="preserve">
-    <value>Sensible à la casse</value>
-  </data>
+  <data name="Operator_Contains" xml:space="preserve"><value>Contient</value></data>
+  <data name="Operator_NotContains" xml:space="preserve"><value>Ne contient pas</value></data>
+  <data name="Operator_Equals" xml:space="preserve"><value>Égal</value></data>
+  <data name="Operator_NotEquals" xml:space="preserve"><value>Différent</value></data>
+  <data name="Operator_StartsWith" xml:space="preserve"><value>Commence par</value></data>
+  <data name="Operator_EndsWith" xml:space="preserve"><value>Se termine par</value></data>
+  <data name="Search_CaseSensitive" xml:space="preserve"><value>Sensible à la casse</value></data>
 
   <!-- Export Progress Dialog -->
-  <data name="ExportProgress_FormTitle" xml:space="preserve">
-    <value>Exportation...</value>
-  </data>
-  <data name="ExportProgress_Exporting" xml:space="preserve">
-    <value>Exportation en cours...</value>
-  </data>
-  <data name="ExportProgress_Cancelling" xml:space="preserve">
-    <value>Annulation...</value>
-  </data>
-  <data name="ExportProgress_Table" xml:space="preserve">
-    <value>Table {0}/{1} : {2}</value>
-  </data>
-  <data name="ExportProgress_TableName" xml:space="preserve">
-    <value>Table : {0}</value>
-  </data>
-  <data name="ExportProgress_RowsProcessed" xml:space="preserve">
-    <value>Lignes traitées : {0} / {1}</value>
-  </data>
-  <data name="ExportProgress_RowsProcessedOnly" xml:space="preserve">
-    <value>Lignes traitées : {0}</value>
-  </data>
-  <data name="ExportProgress_Elapsed" xml:space="preserve">
-    <value>Écoulé : {0}</value>
-  </data>
-  <data name="ExportProgress_ExportError" xml:space="preserve">
-    <value>Erreur d'exportation : {0}</value>
-  </data>
+  <data name="ExportProgress_FormTitle" xml:space="preserve"><value>Exportation...</value></data>
+  <data name="ExportProgress_Exporting" xml:space="preserve"><value>Exportation en cours...</value></data>
+  <data name="ExportProgress_Cancelling" xml:space="preserve"><value>Annulation...</value></data>
+  <data name="ExportProgress_Table" xml:space="preserve"><value>Table {0}/{1} : {2}</value></data>
+  <data name="ExportProgress_TableName" xml:space="preserve"><value>Table : {0}</value></data>
+  <data name="ExportProgress_RowsProcessed" xml:space="preserve"><value>Lignes traitées : {0} / {1}</value></data>
+  <data name="ExportProgress_RowsProcessedOnly" xml:space="preserve"><value>Lignes traitées : {0}</value></data>
+  <data name="ExportProgress_Elapsed" xml:space="preserve"><value>Écoulé : {0}</value></data>
+  <data name="ExportProgress_ExportError" xml:space="preserve"><value>Erreur d'exportation : {0}</value></data>
 
   <!-- Export Options Dialog -->
-  <data name="ExportOptions_FormTitle" xml:space="preserve">
-    <value>Options d'exportation</value>
-  </data>
-  <data name="ExportOptions_DateFormat" xml:space="preserve">
-    <value>Format de date</value>
-  </data>
-  <data name="ExportOptions_DateSlash" xml:space="preserve">
-    <value>YYYY/MM/DD HH:MI:SS (Par défaut)</value>
-  </data>
-  <data name="ExportOptions_DateCustom" xml:space="preserve">
-    <value>Personnalisé :</value>
-  </data>
-  <data name="ExportOptions_CsvOptions" xml:space="preserve">
-    <value>Options CSV</value>
-  </data>
-  <data name="ExportOptions_CsvWriteHeader" xml:space="preserve">
-    <value>Inclure l'en-tête des noms de colonnes</value>
-  </data>
-  <data name="ExportOptions_CsvWriteTypes" xml:space="preserve">
-    <value>Inclure la ligne des types de colonnes</value>
-  </data>
-  <data name="ExportOptions_SqlOptions" xml:space="preserve">
-    <value>Options du script SQL</value>
-  </data>
-  <data name="ExportOptions_SqlCreateTable" xml:space="preserve">
-    <value>Inclure DROP TABLE + CREATE TABLE</value>
-  </data>
+  <data name="ExportOptions_FormTitle" xml:space="preserve"><value>Options d'exportation</value></data>
+  <data name="ExportOptions_DateFormat" xml:space="preserve"><value>Format de date</value></data>
+  <data name="ExportOptions_DateSlash" xml:space="preserve"><value>YYYY/MM/DD HH:MI:SS (Par défaut)</value></data>
+  <data name="ExportOptions_DateCustom" xml:space="preserve"><value>Personnalisé :</value></data>
+  <data name="ExportOptions_CsvOptions" xml:space="preserve"><value>Options CSV</value></data>
+  <data name="ExportOptions_CsvWriteHeader" xml:space="preserve"><value>Inclure l'en-tête des noms de colonnes</value></data>
+  <data name="ExportOptions_CsvWriteTypes" xml:space="preserve"><value>Inclure la ligne des types de colonnes</value></data>
+  <data name="ExportOptions_SqlOptions" xml:space="preserve"><value>Options du script SQL</value></data>
+  <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Inclure DROP TABLE + CREATE TABLE</value></data>
+  <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Déduire les types entiers à partir des données pour les colonnes NUMBER</value></data>
 
   <!-- SQL Export Dialog -->
-  <data name="SqlExport_FormTitle" xml:space="preserve">
-    <value>Export de script SQL</value>
-  </data>
-  <data name="SqlExport_DatabaseLabel" xml:space="preserve">
-    <value>BD cible :</value>
-  </data>
+  <data name="SqlExport_FormTitle" xml:space="preserve"><value>Export de script SQL</value></data>
+  <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>BD cible :</value></data>
+  <data name="SqlExport_DatabaseName" xml:space="preserve"><value>USE [nom de BD]:</value></data>
 
   <!-- LOB Extraction Dialog -->
-  <data name="LobExtract_FormTitle" xml:space="preserve">
-    <value>Extraction de fichiers LOB - {0}</value>
-  </data>
-  <data name="LobExtract_LobColumnLabel" xml:space="preserve">
-    <value>Colonne LOB :</value>
-  </data>
-  <data name="LobExtract_OutputFolderLabel" xml:space="preserve">
-    <value>Dossier de sortie :</value>
-  </data>
-  <data name="LobExtract_FilenameLabel" xml:space="preserve">
-    <value>Nom du fichier :</value>
-  </data>
-  <data name="LobExtract_ExtensionLabel" xml:space="preserve">
-    <value>Extension :</value>
-  </data>
-  <data name="LobExtract_SettingsGroup" xml:space="preserve">
-    <value>Paramètres d'extraction</value>
-  </data>
-  <data name="LobExtract_Sequential" xml:space="preserve">
-    <value>Séquentiel</value>
-  </data>
-  <data name="LobExtract_ColumnValue" xml:space="preserve">
-    <value>Valeur de colonne</value>
-  </data>
-  <data name="LobExtract_BrowseTitle" xml:space="preserve">
-    <value>Sélectionner le dossier de sortie pour les fichiers LOB</value>
-  </data>
+  <data name="LobExtract_FormTitle" xml:space="preserve"><value>Extraction de fichiers LOB - {0}</value></data>
+  <data name="LobExtract_LobColumnLabel" xml:space="preserve"><value>Colonne LOB :</value></data>
+  <data name="LobExtract_OutputFolderLabel" xml:space="preserve"><value>Dossier de sortie :</value></data>
+  <data name="LobExtract_FilenameLabel" xml:space="preserve"><value>Nom du fichier :</value></data>
+  <data name="LobExtract_ExtensionLabel" xml:space="preserve"><value>Extension :</value></data>
+  <data name="LobExtract_SettingsGroup" xml:space="preserve"><value>Paramètres d'extraction</value></data>
+  <data name="LobExtract_Sequential" xml:space="preserve"><value>Séquentiel</value></data>
+  <data name="LobExtract_ColumnValue" xml:space="preserve"><value>Valeur de colonne</value></data>
+  <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>Sélectionner le dossier de sortie pour les fichiers LOB</value></data>
   <data name="LobExtract_ExtractComplete" xml:space="preserve">
     <value>Extraction des fichiers LOB terminée.
 Fichiers extraits : {0}</value>
   </data>
-  <data name="LobExtract_ExtractError" xml:space="preserve">
-    <value>Une erreur s'est produite lors de l'extraction LOB</value>
-  </data>
-  <data name="LobExtract_SelectLobColumn" xml:space="preserve">
-    <value>Veuillez sélectionner une colonne LOB.</value>
-  </data>
-  <data name="LobExtract_SelectOutputFolder" xml:space="preserve">
-    <value>Veuillez spécifier un dossier de sortie.</value>
-  </data>
+  <data name="LobExtract_ExtractError" xml:space="preserve"><value>Une erreur s'est produite lors de l'extraction LOB</value></data>
+  <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>Veuillez sélectionner une colonne LOB.</value></data>
+  <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>Veuillez spécifier un dossier de sortie.</value></data>
   <data name="LobExtract_CreateFolderError" xml:space="preserve">
     <value>Impossible de créer le dossier de sortie :
 {0}</value>
   </data>
 
   <!-- Database Connection Dialog -->
-  <data name="DbConn_FormTitle" xml:space="preserve">
-    <value>Connexion à la base de données</value>
-  </data>
-  <data name="DbConn_ServerNameLabel" xml:space="preserve">
-    <value>Nom du serveur :</value>
-  </data>
-  <data name="DbConn_AuthLabel" xml:space="preserve">
-    <value>Authentification :</value>
-  </data>
-  <data name="DbConn_UserNameLabel" xml:space="preserve">
-    <value>Nom d'utilisateur :</value>
-  </data>
-  <data name="DbConn_PasswordLabel" xml:space="preserve">
-    <value>Mot de passe :</value>
-  </data>
-  <data name="DbConn_DatabaseNameLabel" xml:space="preserve">
-    <value>Nom de la base de données :</value>
-  </data>
-  <data name="DbConn_SystemDsnLabel" xml:space="preserve">
-    <value>DSN système :</value>
-  </data>
-  <data name="DbConn_ConnectionStringLabel" xml:space="preserve">
-    <value>Chaîne de connexion (saisie directe) :</value>
-  </data>
-  <data name="DbConn_AuthWindows" xml:space="preserve">
-    <value>Authentification Windows</value>
-  </data>
-  <data name="DbConn_AuthSqlServer" xml:space="preserve">
-    <value>Authentification SQL Server</value>
-  </data>
-  <data name="DbConn_Connecting" xml:space="preserve">
-    <value>Connexion en cours...</value>
-  </data>
-  <data name="DbConn_Success" xml:space="preserve">
-    <value>Connexion réussie</value>
-  </data>
-  <data name="DbConn_Failed" xml:space="preserve">
-    <value>Échec de la connexion : {0}</value>
-  </data>
-  <data name="DbConn_EnterServerAndDb" xml:space="preserve">
-    <value>Veuillez entrer le nom du serveur et le nom de la base de données.</value>
-  </data>
-  <data name="DbConn_EnterDsnOrConnStr" xml:space="preserve">
-    <value>Veuillez sélectionner un DSN ou entrer une chaîne de connexion.</value>
-  </data>
+  <data name="DbConn_FormTitle" xml:space="preserve"><value>Connexion à la base de données</value></data>
+  <data name="DbConn_ServerNameLabel" xml:space="preserve"><value>Nom du serveur :</value></data>
+  <data name="DbConn_AuthLabel" xml:space="preserve"><value>Authentification :</value></data>
+  <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Nom d'utilisateur :</value></data>
+  <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Mot de passe :</value></data>
+  <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Nom de la base de données :</value></data>
+  <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>DSN système :</value></data>
+  <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Chaîne de connexion (saisie directe) :</value></data>
+  <data name="DbConn_AuthWindows" xml:space="preserve"><value>Authentification Windows</value></data>
+  <data name="DbConn_AuthSqlServer" xml:space="preserve"><value>Authentification SQL Server</value></data>
+  <data name="DbConn_Connecting" xml:space="preserve"><value>Connexion en cours...</value></data>
+  <data name="DbConn_Success" xml:space="preserve"><value>Connexion réussie</value></data>
+  <data name="DbConn_Failed" xml:space="preserve"><value>Échec de la connexion : {0}</value></data>
+  <data name="DbConn_EnterServerAndDb" xml:space="preserve"><value>Veuillez entrer le nom du serveur et le nom de la base de données.</value></data>
+  <data name="DbConn_EnterDsnOrConnStr" xml:space="preserve"><value>Veuillez sélectionner un DSN ou entrer une chaîne de connexion.</value></data>
 
   <!-- Export Logic Errors -->
-  <data name="CsvExport_Error" xml:space="preserve">
-    <value>Erreur d'export CSV : {0}</value>
-  </data>
-  <data name="CsvExport_ErrorRc" xml:space="preserve">
-    <value>Erreur d'export CSV (rc={0})</value>
-  </data>
-  <data name="SqlExport_Error" xml:space="preserve">
-    <value>Erreur d'export SQL : {0}</value>
-  </data>
-  <data name="SqlExport_ErrorRc" xml:space="preserve">
-    <value>Erreur d'export SQL (rc={0})</value>
-  </data>
-  <data name="ExcelExport_Error" xml:space="preserve">
-    <value>Erreur d'export Excel : {0}</value>
-  </data>
-  <data name="ExcelExport_RowLimitExceeded" xml:space="preserve">
-    <value>Le nombre de lignes ({0}) dépasse la limite Excel ({1}). Envisagez d'utiliser l'export CSV.</value>
-  </data>
-  <data name="AccessExport_Error" xml:space="preserve">
-    <value>Erreur d'export Access : {0}</value>
-  </data>
+  <data name="CsvExport_Error" xml:space="preserve"><value>Erreur d'export CSV : {0}</value></data>
+  <data name="CsvExport_ErrorRc" xml:space="preserve"><value>Erreur d'export CSV (rc={0})</value></data>
+  <data name="SqlExport_Error" xml:space="preserve"><value>Erreur d'export SQL : {0}</value></data>
+  <data name="SqlExport_ErrorRc" xml:space="preserve"><value>Erreur d'export SQL (rc={0})</value></data>
+  <data name="ExcelExport_Error" xml:space="preserve"><value>Erreur d'export Excel : {0}</value></data>
+  <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Le nombre de lignes ({0}) dépasse la limite Excel ({1}). Envisagez d'utiliser l'export CSV.</value></data>
+  <data name="AccessExport_Error" xml:space="preserve"><value>Erreur d'export Access : {0}</value></data>
   <data name="AccessExport_AceNotInstalled" xml:space="preserve">
     <value>Microsoft Access Database Engine n'est pas installé.
 
 Veuillez le télécharger et l'installer depuis :
 https://www.microsoft.com/en-us/download/details.aspx?id=54920</value>
   </data>
-  <data name="AccessExport_AdoxUnavailable" xml:space="preserve">
-    <value>ADOX.Catalog n'est pas disponible. Veuillez installer Microsoft Access Database Engine.</value>
-  </data>
-  <data name="SqlServerExport_Error" xml:space="preserve">
-    <value>Erreur d'export SQL Server : {0}</value>
-  </data>
-  <data name="OdbcExport_Error" xml:space="preserve">
-    <value>Erreur d'export ODBC : {0}</value>
-  </data>
-  <data name="BulkExcelExport_Error" xml:space="preserve">
-    <value>Erreur d'export Excel en masse : {0}</value>
-  </data>
-  <data name="TablePreview_NoColumns" xml:space="preserve">
-    <value>Aucune information de colonne disponible.</value>
-  </data>
-  <data name="TablePreview_DisplayError" xml:space="preserve">
-    <value>Une erreur s'est produite lors de l'affichage des données : {0}</value>
-  </data>
+  <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog n'est pas disponible. Veuillez installer Microsoft Access Database Engine.</value></data>
+  <data name="SqlServerExport_Error" xml:space="preserve"><value>Erreur d'export SQL Server : {0}</value></data>
+  <data name="OdbcExport_Error" xml:space="preserve"><value>Erreur d'export ODBC : {0}</value></data>
+  <data name="BulkExcelExport_Error" xml:space="preserve"><value>Erreur d'export Excel en masse : {0}</value></data>
+  <data name="TablePreview_NoColumns" xml:space="preserve"><value>Aucune information de colonne disponible.</value></data>
+  <data name="TablePreview_DisplayError" xml:space="preserve"><value>Une erreur s'est produite lors de l'affichage des données : {0}</value></data>
 
   <!-- License verification errors -->
-  <data name="License_SignatureVerifyFailed" xml:space="preserve">
-    <value>Échec de la vérification de signature</value>
-  </data>
-  <data name="License_ExpiryParseFailed" xml:space="preserve">
-    <value>Échec de l'analyse de la date d'expiration</value>
-  </data>
-  <data name="License_Expired" xml:space="preserve">
-    <value>Licence expirée</value>
-  </data>
-  <data name="License_VerifyError" xml:space="preserve">
-    <value>Erreur de vérification : {0}</value>
-  </data>
+  <data name="License_SignatureVerifyFailed" xml:space="preserve"><value>Échec de la vérification de signature</value></data>
+  <data name="License_ExpiryParseFailed" xml:space="preserve"><value>Échec de l'analyse de la date d'expiration</value></data>
+  <data name="License_Expired" xml:space="preserve"><value>Licence expirée</value></data>
+  <data name="License_VerifyError" xml:space="preserve"><value>Erreur de vérification : {0}</value></data>
   <data name="License_RevokedByServer" xml:space="preserve">
     <value>Cette licence a été révoquée par le serveur. Veuillez obtenir une nouvelle licence.
 Souhaitez-vous ouvrir la boîte de dialogue d'activation de licence ?</value>
   </data>
 
   <!-- Help Viewer -->
-  <data name="Help_FormTitle" xml:space="preserve">
-    <value>Aide - OraDB DUMP Viewer</value>
-  </data>
-  <data name="Help_Back" xml:space="preserve">
-    <value>Retour</value>
-  </data>
-  <data name="Help_Forward" xml:space="preserve">
-    <value>Suivant</value>
-  </data>
-  <data name="Help_Home" xml:space="preserve">
-    <value>Sommaire</value>
-  </data>
-  <data name="Help_Search" xml:space="preserve">
-    <value>Rechercher</value>
-  </data>
-  <data name="Help_SearchPlaceholder" xml:space="preserve">
-    <value>Rechercher dans la page...</value>
-  </data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>Aide - OraDB DUMP Viewer</value></data>
+  <data name="Help_Back" xml:space="preserve"><value>Retour</value></data>
+  <data name="Help_Forward" xml:space="preserve"><value>Suivant</value></data>
+  <data name="Help_Home" xml:space="preserve"><value>Sommaire</value></data>
+  <data name="Help_Search" xml:space="preserve"><value>Rechercher</value></data>
+  <data name="Help_SearchPlaceholder" xml:space="preserve"><value>Rechercher dans la page...</value></data>
   <data name="Help_WebView2NotAvailable" xml:space="preserve">
     <value>Le runtime WebView2 requis pour afficher l'aide n'est pas installé.
 Veuillez installer le runtime Microsoft Edge WebView2.</value>
   </data>
-  <data name="Help_TOC_GettingStarted" xml:space="preserve">
-    <value>Prise en main</value>
-  </data>
-  <data name="Help_TOC_OpenDump" xml:space="preserve">
-    <value>Ouvrir un fichier Dump</value>
-  </data>
-  <data name="Help_TOC_Workspace" xml:space="preserve">
-    <value>Espace de travail</value>
-  </data>
-  <data name="Help_TOC_TablePreview" xml:space="preserve">
-    <value>Aperçu de la table</value>
-  </data>
-  <data name="Help_TOC_Search" xml:space="preserve">
-    <value>Recherche &amp; filtre</value>
-  </data>
-  <data name="Help_TOC_Export" xml:space="preserve">
-    <value>Exporter</value>
-  </data>
-  <data name="Help_TOC_ExportCsv" xml:space="preserve">
-    <value>Export CSV</value>
-  </data>
-  <data name="Help_TOC_ExportSql" xml:space="preserve">
-    <value>Export SQL</value>
-  </data>
-  <data name="Help_TOC_ExportBatch" xml:space="preserve">
-    <value>Export en masse</value>
-  </data>
-  <data name="Help_TOC_ExportOptions" xml:space="preserve">
-    <value>Options d'exportation</value>
-  </data>
-  <data name="Help_TOC_LobExtract" xml:space="preserve">
-    <value>Extraction de fichiers LOB</value>
-  </data>
-  <data name="Help_TOC_ShortcutKeys" xml:space="preserve">
-    <value>Raccourcis clavier</value>
-  </data>
-  <data name="Help_TOC_SupportedFormats" xml:space="preserve">
-    <value>Formats pris en charge</value>
-  </data>
-  <data name="Help_TOC_About" xml:space="preserve">
-    <value>À propos</value>
-  </data>
+  <data name="Help_TOC_GettingStarted" xml:space="preserve"><value>Prise en main</value></data>
+  <data name="Help_TOC_OpenDump" xml:space="preserve"><value>Ouvrir un fichier Dump</value></data>
+  <data name="Help_TOC_Workspace" xml:space="preserve"><value>Espace de travail</value></data>
+  <data name="Help_TOC_TablePreview" xml:space="preserve"><value>Aperçu de la table</value></data>
+  <data name="Help_TOC_Search" xml:space="preserve"><value>Recherche &amp; filtre</value></data>
+  <data name="Help_TOC_Export" xml:space="preserve"><value>Exporter</value></data>
+  <data name="Help_TOC_ExportCsv" xml:space="preserve"><value>Export CSV</value></data>
+  <data name="Help_TOC_ExportSql" xml:space="preserve"><value>Export SQL</value></data>
+  <data name="Help_TOC_ExportBatch" xml:space="preserve"><value>Export en masse</value></data>
+  <data name="Help_TOC_ExportOptions" xml:space="preserve"><value>Options d'exportation</value></data>
+  <data name="Help_TOC_LobExtract" xml:space="preserve"><value>Extraction de fichiers LOB</value></data>
+  <data name="Help_TOC_ShortcutKeys" xml:space="preserve"><value>Raccourcis clavier</value></data>
+  <data name="Help_TOC_SupportedFormats" xml:space="preserve"><value>Formats pris en charge</value></data>
+  <data name="Help_TOC_About" xml:space="preserve"><value>À propos</value></data>
 
   <!-- DLL parser errors -->
-  <data name="Parser_SessionCreateFailed" xml:space="preserve">
-    <value>Échec de la création de session (rc={0})</value>
-  </data>
-  <data name="Parser_DumpFileSettingError" xml:space="preserve">
-    <value>Erreur de paramétrage du fichier Dump : {0}</value>
-  </data>
-  <data name="Parser_DumpParseError" xml:space="preserve">
-    <value>Erreur d'analyse du Dump : {0}</value>
-  </data>
+  <data name="Parser_SessionCreateFailed" xml:space="preserve"><value>Échec de la création de session (rc={0})</value></data>
+  <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>Erreur de paramétrage du fichier Dump : {0}</value></data>
+  <data name="Parser_DumpParseError" xml:space="preserve"><value>Erreur d'analyse du Dump : {0}</value></data>
 
   <!-- Error report logic -->
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve">
-    <value>Échec de la récupération</value>
-  </data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve">
-    <value>Non ouvert</value>
-  </data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve">
-    <value>EXPDP (Compressé)</value>
-  </data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve">
-    <value>Inconnu</value>
-  </data>
-  <data name="ErrorReport_ServerError" xml:space="preserve">
-    <value>Erreur serveur (HTTP {0})</value>
-  </data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve">
-    <value>Limite de taux d'envoi dépassée. Veuillez réessayer plus tard.</value>
-  </data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve">
-    <value>Format de requête invalide.</value>
-  </data>
-  <data name="ErrorReport_InternalError" xml:space="preserve">
-    <value>Erreur interne du serveur. Veuillez réessayer plus tard.</value>
-  </data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve">
-    <value>Une erreur inconnue s'est produite (HTTP {0})</value>
-  </data>
-  <data name="ErrorReport_Process" xml:space="preserve">
-    <value>Processus :</value>
-  </data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve">
-    <value>Joindre le fichier Dump ({0} Mo)</value>
-  </data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve">
-    <value>Fichier Dump trop volumineux (plus de 50 Mo)</value>
-  </data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve">
-    <value>Aucun fichier Dump ouvert</value>
-  </data>
+  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>Échec de la récupération</value></data>
+  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>Non ouvert</value></data>
+  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (Compressé)</value></data>
+  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="ErrorReport_ServerError" xml:space="preserve"><value>Erreur serveur (HTTP {0})</value></data>
+  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>Limite de taux d'envoi dépassée. Veuillez réessayer plus tard.</value></data>
+  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>Format de requête invalide.</value></data>
+  <data name="ErrorReport_InternalError" xml:space="preserve"><value>Erreur interne du serveur. Veuillez réessayer plus tard.</value></data>
+  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>Une erreur inconnue s'est produite (HTTP {0})</value></data>
+  <data name="ErrorReport_Process" xml:space="preserve"><value>Processus :</value></data>
+  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>Joindre le fichier Dump ({0} Mo)</value></data>
+  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>Fichier Dump trop volumineux (plus de 50 Mo)</value></data>
+  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>Aucun fichier Dump ouvert</value></data>
 
 </root>

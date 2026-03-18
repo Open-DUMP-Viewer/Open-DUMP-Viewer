@@ -165,6 +165,9 @@ static void ddl_xml_callback(const char *tag, const char *value,
         else if (strcmp(tag, "PROPERTY") == 0) {
             col->property = atoi(value);
         }
+        else if (strcmp(tag, "NOT_NULL") == 0) {
+            col->not_null = atoi(value);
+        }
     }
 
     /* End of column definition */
@@ -378,6 +381,8 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
     if (s->table_cb && s->table.name[0] != '\0') {
         const char *col_names[ODV_MAX_COLUMNS];
         const char *col_types[ODV_MAX_COLUMNS];
+        int col_not_nulls[ODV_MAX_COLUMNS];
+        const char *col_defaults[ODV_MAX_COLUMNS];
         int i;
 
         for (i = 0; i < s->table.col_count && i < ODV_MAX_COLUMNS; i++) {
@@ -385,10 +390,13 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
                          conv_col_names_buf[i], sizeof(conv_col_names_buf[i]));
             col_names[i] = conv_col_names_buf[i];
             col_types[i] = s->table.columns[i].type_str;
+            col_not_nulls[i] = s->table.columns[i].not_null;
+            col_defaults[i] = s->table.columns[i].default_val;
         }
 
         s->table_cb(conv_schema, conv_name,
                      s->table.col_count, col_names, col_types,
+                     col_not_nulls, col_defaults,
                      row_count, s->table.ddl_offset, s->table_ud);
     }
 

@@ -18,6 +18,8 @@ Public Class Workspace
     Private _columnNamesMap As New Dictionary(Of String, String())
     ''' <summary>テーブルごとのカラム型 (キー: "schema.table")</summary>
     Private _columnTypesMap As New Dictionary(Of String, String())
+    Private _columnNotNullsMap As New Dictionary(Of String, Boolean())
+    Private _columnDefaultsMap As New Dictionary(Of String, String())
     Private _currentSchema As String = String.Empty
     ''' <summary>除外テーブル (キー: "schema.table")</summary>
     Private _excludedTables As New HashSet(Of String)
@@ -58,9 +60,13 @@ Public Class Workspace
         ' フェーズ1: テーブル一覧のみ取得（高速・メモリ軽量）
         Dim colMap As Dictionary(Of String, String()) = Nothing
         Dim typeMap As Dictionary(Of String, String()) = Nothing
-        Dim tables = AnalyzeLogic.ListTables(DumpFilePath, colMap, typeMap)
+        Dim nnMap As Dictionary(Of String, Boolean()) = Nothing
+        Dim defMap As Dictionary(Of String, String()) = Nothing
+        Dim tables = AnalyzeLogic.ListTables(DumpFilePath, colMap, typeMap, nnMap, defMap)
         If colMap IsNot Nothing Then _columnNamesMap = colMap
         If typeMap IsNot Nothing Then _columnTypesMap = typeMap
+        If nnMap IsNot Nothing Then _columnNotNullsMap = nnMap
+        If defMap IsNot Nothing Then _columnDefaultsMap = defMap
 
         ' テーブル一覧をスキーマ別に整理
         _tableList.Clear()
@@ -195,12 +201,21 @@ Public Class Workspace
             If _columnTypesMap.ContainsKey(tableKey) Then
                 columnTypes = _columnTypesMap(tableKey)
             End If
+            Dim columnNotNulls As Boolean() = Nothing
+            If _columnNotNullsMap.ContainsKey(tableKey) Then
+                columnNotNulls = _columnNotNullsMap(tableKey)
+            End If
+            Dim columnDefaults As String() = Nothing
+            If _columnDefaultsMap.ContainsKey(tableKey) Then
+                columnDefaults = _columnDefaultsMap(tableKey)
+            End If
 
             ' TablePreview を表示（0行の場合も列ヘッダーは表示される）
             TablePreviewLogic.DisplayTableData(Me.MdiParent,
                                                If(tableData, New List(Of String())),
                                                columnNames,
-                                               tableName, _currentSchema, columnTypes)
+                                               tableName, _currentSchema, columnTypes,
+                                               columnNotNulls, columnDefaults)
 
         Catch ex As Exception
             MessageBox.Show(Loc.SF("Workspace_TableDisplayError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -436,6 +451,12 @@ Public Class Workspace
         If _columnTypesMap.ContainsKey(tableKey) Then
             ctx.ColumnTypes = _columnTypesMap(tableKey)
         End If
+        If _columnNotNullsMap.ContainsKey(tableKey) Then
+            ctx.ColumnNotNulls = _columnNotNullsMap(tableKey)
+        End If
+        If _columnDefaultsMap.ContainsKey(tableKey) Then
+            ctx.ColumnDefaults = _columnDefaultsMap(tableKey)
+        End If
 
         If _tableList.ContainsKey(_currentSchema) Then
             Dim entry = _tableList(_currentSchema).Find(Function(x) x.Item1 = tableName)
@@ -476,6 +497,12 @@ Public Class Workspace
             End If
             If _columnTypesMap.ContainsKey(tableKey) Then
                 ctx.ColumnTypes = _columnTypesMap(tableKey)
+            End If
+            If _columnNotNullsMap.ContainsKey(tableKey) Then
+                ctx.ColumnNotNulls = _columnNotNullsMap(tableKey)
+            End If
+            If _columnDefaultsMap.ContainsKey(tableKey) Then
+                ctx.ColumnDefaults = _columnDefaultsMap(tableKey)
             End If
 
             result.Add(ctx)

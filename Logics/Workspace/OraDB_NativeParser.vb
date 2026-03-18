@@ -65,6 +65,8 @@ Public Class OraDB_NativeParser
         colCount As Integer,
         colNames As IntPtr,
         colTypes As IntPtr,
+        colNotNulls As IntPtr,
+        colDefaults As IntPtr,
         rowCount As Long,
         dataOffset As Long,
         userData As IntPtr
@@ -293,6 +295,10 @@ Public Class OraDB_NativeParser
         Public ColumnNames As New Dictionary(Of String, String())
         ''' <summary>テーブルごとのカラム型 (キー: "schema.table")</summary>
         Public ColumnTypes As New Dictionary(Of String, String())
+        ''' <summary>テーブルごとの NOT NULL フラグ (キー: "schema.table")</summary>
+        Public ColumnNotNulls As New Dictionary(Of String, Boolean())
+        ''' <summary>テーブルごとの DEFAULT 値 (キー: "schema.table")</summary>
+        Public ColumnDefaults As New Dictionary(Of String, String())
     End Class
 #End Region
 
@@ -418,7 +424,11 @@ Public Class OraDB_NativeParser
     ''' </summary>
     ''' <param name="filePath">ダンプファイルのパス</param>
     ''' <param name="columnNamesMap">テーブルごとのカラム名辞書 (キー: "schema.table")</param>
-    Public Shared Function ListTables(filePath As String, Optional ByRef columnNamesMap As Dictionary(Of String, String()) = Nothing, Optional ByRef columnTypesMap As Dictionary(Of String, String()) = Nothing) As List(Of Tuple(Of String, String, Integer, Long, Long))
+    Public Shared Function ListTables(filePath As String,
+                                      Optional ByRef columnNamesMap As Dictionary(Of String, String()) = Nothing,
+                                      Optional ByRef columnTypesMap As Dictionary(Of String, String()) = Nothing,
+                                      Optional ByRef columnNotNullsMap As Dictionary(Of String, Boolean()) = Nothing,
+                                      Optional ByRef columnDefaultsMap As Dictionary(Of String, String()) = Nothing) As List(Of Tuple(Of String, String, Integer, Long, Long))
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ListTablesContext()
         ctx.Tables = New List(Of Tuple(Of String, String, Integer, Long, Long))
@@ -440,6 +450,8 @@ Public Class OraDB_NativeParser
             odv_list_tables(session)
             columnNamesMap = ctx.ColumnNames
             columnTypesMap = ctx.ColumnTypes
+            columnNotNullsMap = ctx.ColumnNotNulls
+            columnDefaultsMap = ctx.ColumnDefaults
             Return ctx.Tables
 
         Finally
@@ -720,7 +732,8 @@ Public Class OraDB_NativeParser
     ''' </summary>
     Private Shared Sub OnTableListCallback(schemaPtr As IntPtr, tablePtr As IntPtr,
                                            colCount As Integer, colNamesPtr As IntPtr,
-                                           colTypesPtr As IntPtr, rowCount As Long,
+                                           colTypesPtr As IntPtr, colNotNullsPtr As IntPtr,
+                                           colDefaultsPtr As IntPtr, rowCount As Long,
                                            dataOffset As Long, userData As IntPtr)
         Try
             Dim gcHandle As GCHandle = GCHandle.FromIntPtr(userData)
@@ -728,17 +741,34 @@ Public Class OraDB_NativeParser
 
             Dim schema = PtrToStringUTF8(schemaPtr)
             Dim table = PtrToStringUTF8(tablePtr)
+            Dim key = $"{schema}.{table}"
 
             ctx.Tables.Add(Tuple.Create(schema, table, colCount, rowCount, dataOffset))
 
             ' カラム名を保持（0行テーブルでも列ヘッダーを表示するため）
             If colCount > 0 AndAlso colNamesPtr <> IntPtr.Zero Then
-                ctx.ColumnNames($"{schema}.{table}") = PtrArrayToStrings(colNamesPtr, colCount)
+                ctx.ColumnNames(key) = PtrArrayToStrings(colNamesPtr, colCount)
             End If
 
             ' カラム型を保持
             If colCount > 0 AndAlso colTypesPtr <> IntPtr.Zero Then
-                ctx.ColumnTypes($"{schema}.{table}") = PtrArrayToStrings(colTypesPtr, colCount)
+                ctx.ColumnTypes(key) = PtrArrayToStrings(colTypesPtr, colCount)
+            End If
+
+            ' NOT NULL フラグを保持
+            If colCount > 0 AndAlso colNotNullsPtr <> IntPtr.Zero Then
+                Dim notNulls(colCount - 1) As Boolean
+                Dim intArray(colCount - 1) As Integer
+                Marshal.Copy(colNotNullsPtr, intArray, 0, colCount)
+                For i As Integer = 0 To colCount - 1
+                    notNulls(i) = (intArray(i) <> 0)
+                Next
+                ctx.ColumnNotNulls(key) = notNulls
+            End If
+
+            ' DEFAULT 値を保持
+            If colCount > 0 AndAlso colDefaultsPtr <> IntPtr.Zero Then
+                ctx.ColumnDefaults(key) = PtrArrayToStrings(colDefaultsPtr, colCount)
             End If
 
         Catch

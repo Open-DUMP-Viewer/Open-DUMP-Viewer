@@ -28,6 +28,7 @@ Partial Class ExportOptionsDialog
         chkCsvTypes = New CheckBox()
         grpSqlOptions = New GroupBox()
         chkCreateTable = New CheckBox()
+        chkInferInteger = New CheckBox()
         btnOK = New Button()
         btnCancel = New Button()
         grpDateFormat.SuspendLayout()
@@ -130,9 +131,10 @@ Partial Class ExportOptionsDialog
         ' grpSqlOptions
         '
         grpSqlOptions.Controls.Add(chkCreateTable)
+        grpSqlOptions.Controls.Add(chkInferInteger)
         grpSqlOptions.Location = New Point(15, 255)
         grpSqlOptions.Name = "grpSqlOptions"
-        grpSqlOptions.Size = New Size(380, 55)
+        grpSqlOptions.Size = New Size(380, 80)
         grpSqlOptions.TabIndex = 2
         grpSqlOptions.TabStop = False
         grpSqlOptions.Text = "SQL スクリプトオプション"
@@ -146,9 +148,18 @@ Partial Class ExportOptionsDialog
         chkCreateTable.TabIndex = 0
         chkCreateTable.Text = "CREATE TABLE を出力"
         '
+        ' chkInferInteger
+        '
+        chkInferInteger.AutoSize = True
+        chkInferInteger.Location = New Point(15, 50)
+        chkInferInteger.Name = "chkInferInteger"
+        chkInferInteger.Size = New Size(330, 19)
+        chkInferInteger.TabIndex = 1
+        chkInferInteger.Text = "NUMBER を実データから整数型に推定"
+        '
         ' btnOK
         '
-        btnOK.Location = New Point(195, 325)
+        btnOK.Location = New Point(195, 350)
         btnOK.Name = "btnOK"
         btnOK.Size = New Size(90, 30)
         btnOK.TabIndex = 3
@@ -157,7 +168,7 @@ Partial Class ExportOptionsDialog
         '
         ' btnCancel
         '
-        btnCancel.Location = New Point(305, 325)
+        btnCancel.Location = New Point(305, 350)
         btnCancel.Name = "btnCancel"
         btnCancel.Size = New Size(90, 30)
         btnCancel.TabIndex = 4
@@ -170,7 +181,7 @@ Partial Class ExportOptionsDialog
         CancelButton = btnCancel
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(410, 370)
+        ClientSize = New Size(410, 395)
         Controls.Add(grpDateFormat)
         Controls.Add(grpCsvOptions)
         Controls.Add(grpSqlOptions)
@@ -202,6 +213,7 @@ Partial Class ExportOptionsDialog
     Friend WithEvents chkCsvTypes As CheckBox
     Friend WithEvents grpSqlOptions As GroupBox
     Friend WithEvents chkCreateTable As CheckBox
+    Friend WithEvents chkInferInteger As CheckBox
     Friend WithEvents btnOK As Button
     Friend WithEvents btnCancel As Button
 

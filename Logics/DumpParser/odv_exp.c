@@ -221,6 +221,8 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
     char table_name[ODV_OBJNAME_LEN + 1] = {0};
     char col_name[ODV_OBJNAME_LEN + 1];
     char type_str[256];
+    char default_str[256];
+    int not_null_flag;
     int col_count = 0;
     int paren_depth;
 
@@ -266,6 +268,8 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
     /* Parse column definitions */
     while (*p && col_count < ODV_MAX_COLUMNS) {
         int type_len = 0;
+        not_null_flag = 0;
+        default_str[0] = '\0';
 
         p = skip_ws(p);
         if (*p == ')') break;
@@ -317,12 +321,50 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
                 p++; /* skip comma */
                 break;
             } else if (starts_with_ci(p, "NOT ") || starts_with_ci(p, "DEFAULT ") ||
-                       starts_with_ci(p, "CONSTRAINT ")) {
-                /* Stop at constraint keywords */
-                /* Skip to next comma or closing paren */
+                       starts_with_ci(p, "CONSTRAINT ") || starts_with_ci(p, "ENABLE")) {
+                /* Parse constraint keywords before skipping */
+                type_str[type_len] = '\0';
+                trim_right(type_str);
+                /* Parse NOT NULL, DEFAULT, etc. until comma or closing paren */
                 while (*p && *p != ',' && *p != ')') {
-                    if (*p == '(') {
-                        /* Skip nested parens in DEFAULT expressions */
+                    if (starts_with_ci(p, "NOT NULL")) {
+                        not_null_flag = 1;
+                        p += 8;
+                    } else if (starts_with_ci(p, "DEFAULT ")) {
+                        int dlen = 0;
+                        p += 8;
+                        p = skip_ws(p);
+                        /* Extract DEFAULT value expression */
+                        {
+                            int d = 0;
+                            while (*p && dlen < 250) {
+                                if (*p == '(') { d++; default_str[dlen++] = *p++; }
+                                else if (*p == ')') {
+                                    if (d > 0) { d--; default_str[dlen++] = *p++; }
+                                    else break;
+                                }
+                                else if ((*p == ',' || *p == ' ') && d == 0) {
+                                    /* Check if space is followed by NOT/CONSTRAINT/ENABLE */
+                                    if (*p == ' ') {
+                                        const char *np = skip_ws(p);
+                                        if (starts_with_ci(np, "NOT ") ||
+                                            starts_with_ci(np, "CONSTRAINT ") ||
+                                            starts_with_ci(np, "ENABLE")) {
+                                            p = np;
+                                            break;
+                                        }
+                                        default_str[dlen++] = *p++;
+                                    } else {
+                                        break; /* comma */
+                                    }
+                                }
+                                else { default_str[dlen++] = *p++; }
+                            }
+                            default_str[dlen] = '\0';
+                            trim_right(default_str);
+                        }
+                    } else if (*p == '(') {
+                        /* Skip nested parens in CONSTRAINT expressions */
                         int d = 1;
                         p++;
                         while (*p && d > 0) {
@@ -349,6 +391,8 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
             memset(col, 0, sizeof(ODV_COLUMN));
             odv_strcpy(col->name, col_name, ODV_OBJNAME_LEN);
             parse_column_type(type_str, col);
+            col->not_null = not_null_flag;
+            odv_strcpy(col->default_val, default_str, 255);
             col_count++;
         }
     }
@@ -516,6 +560,8 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
 {
     const char *col_names[ODV_MAX_COLUMNS];
     const char *col_types[ODV_MAX_COLUMNS];
+    int col_not_nulls[ODV_MAX_COLUMNS];
+    const char *col_defaults[ODV_MAX_COLUMNS];
     char conv_schema[ODV_OBJNAME_LEN * 4 + 1];
     char conv_name_buf[ODV_OBJNAME_LEN * 4 + 1];
     char conv_col_names[ODV_MAX_COLUMNS][ODV_OBJNAME_LEN * 4 + 1];
@@ -543,6 +589,8 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
                       conv_col_names[i], sizeof(conv_col_names[i]));
             col_names[i] = conv_col_names[i];
             col_types[i] = s->table.columns[i].type_str;
+            col_not_nulls[i] = s->table.columns[i].not_null;
+            col_defaults[i] = s->table.columns[i].default_val;
         }
         s->table_cb(
             conv_schema,
@@ -550,6 +598,8 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
             s->table.col_count,
             col_names,
             col_types,
+            col_not_nulls,
+            col_defaults,
             row_count,
             s->table.ddl_offset,
             s->table_ud
@@ -1291,6 +1341,60 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         }
                     }
                     /* Other CREATE types (TRIGGER, INDEX...) are ignored */
+
+                } else if (starts_with_ci(word, "ALTER ") && pending_table) {
+                    /* Parse ALTER TABLE ... MODIFY ("col" DEFAULT value)
+                       to capture DEFAULT values for columns */
+                    const char *ap = word;
+                    if (starts_with_ci(ap, "ALTER TABLE") ||
+                        starts_with_ci(ap, "ALTER TABLE")) {
+                        /* Skip to MODIFY keyword */
+                        while (*ap && !starts_with_ci(ap, "MODIFY")) ap++;
+                        if (*ap) {
+                            ap += 6; /* skip "MODIFY" */
+                            while (*ap == ' ' || *ap == '\t' || *ap == '\n' || *ap == '\r') ap++;
+                            /* Skip optional "DEFAULT\n" preamble line */
+                            if (starts_with_ci(ap, "DEFAULT") && (ap[7] == '\0' || ap[7] <= ' ')) {
+                                /* This is just the preamble line, skip */
+                            } else if (*ap == '(') {
+                                /* ("col_name" DEFAULT value) */
+                                char acol[ODV_OBJNAME_LEN + 1] = {0};
+                                char adef[256] = {0};
+                                int alen = 0;
+                                ap++; /* skip ( */
+                                while (*ap == ' ') ap++;
+                                if (*ap == '"') {
+                                    ap++;
+                                    while (*ap && *ap != '"' && alen < ODV_OBJNAME_LEN) {
+                                        acol[alen++] = *ap++;
+                                    }
+                                    acol[alen] = '\0';
+                                    if (*ap == '"') ap++;
+                                }
+                                while (*ap == ' ') ap++;
+                                if (starts_with_ci(ap, "DEFAULT")) {
+                                    ap += 7;
+                                    while (*ap == ' ') ap++;
+                                    alen = 0;
+                                    while (*ap && *ap != ')' && alen < 250) {
+                                        adef[alen++] = *ap++;
+                                    }
+                                    adef[alen] = '\0';
+                                    /* trim trailing spaces */
+                                    while (alen > 0 && adef[alen-1] == ' ') adef[--alen] = '\0';
+                                }
+                                if (acol[0] && adef[0]) {
+                                    int ci;
+                                    for (ci = 0; ci < s->table.col_count; ci++) {
+                                        if (strcmp(s->table.columns[ci].name, acol) == 0) {
+                                            odv_strcpy(s->table.columns[ci].default_val, adef, 255);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                 } else if (starts_with_ci(word, "INSERT INTO ")) {
                     /* Extract table name from INSERT INTO and compare with

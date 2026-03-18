@@ -73,7 +73,11 @@ Public Class AnalyzeLogic
     ''' <param name="columnNamesMap">テーブルごとのカラム名辞書 (キー: "schema.table")</param>
     ''' <param name="columnTypesMap">テーブルごとのカラム型辞書 (キー: "schema.table")</param>
     ''' <returns>テーブル情報のリスト (スキーマ名, テーブル名, カラム数, 行数, データオフセット)</returns>
-    Public Shared Function ListTables(filePath As String, Optional ByRef columnNamesMap As Dictionary(Of String, String()) = Nothing, Optional ByRef columnTypesMap As Dictionary(Of String, String()) = Nothing) As List(Of Tuple(Of String, String, Integer, Long, Long))
+    Public Shared Function ListTables(filePath As String,
+                                      Optional ByRef columnNamesMap As Dictionary(Of String, String()) = Nothing,
+                                      Optional ByRef columnTypesMap As Dictionary(Of String, String()) = Nothing,
+                                      Optional ByRef columnNotNullsMap As Dictionary(Of String, Boolean()) = Nothing,
+                                      Optional ByRef columnDefaultsMap As Dictionary(Of String, String()) = Nothing) As List(Of Tuple(Of String, String, Integer, Long, Long))
         Try
             ValidateFilePath(filePath)
 
@@ -81,7 +85,7 @@ Public Class AnalyzeLogic
             COMMON.Set_StatusLavel(Loc.S("Status_GettingTableList"))
 
             Dim startTime As DateTime = DateTime.Now
-            Dim tables = OraDB_NativeParser.ListTables(filePath, columnNamesMap, columnTypesMap)
+            Dim tables = OraDB_NativeParser.ListTables(filePath, columnNamesMap, columnTypesMap, columnNotNullsMap, columnDefaultsMap)
             Dim elapsed As TimeSpan = DateTime.Now - startTime
 
             COMMON.ResetProgressBar()

@@ -149,12 +149,11 @@ dotnet build "OraDB DUMP Viewer.vbproj"
 
 | ファイル | 項目 | 例 |
 |---|---|---|
-| `OraDB DUMP Viewer.vbproj` | `<Version>` | `2.2.0` |
-| `Logics/DumpParser/odv_api.c` | `ODV_VERSION_STRING` | `"1.5.0"` |
-| `CHANGELOG.md` | 新バージョンセクション追加 | `## [2.2.0] - 2026-03-17` |
+| `OraDB DUMP Viewer.vbproj` | `<Version>` | `2.3.0` |
+| `Logics/DumpParser/odv_api.c` | `ODV_VERSION_STRING` | `"2.3.0"` |
+| `CHANGELOG.md` | 新バージョンセクション追加 | `## [2.3.0] - 2026-03-18` |
 
-- アプリバージョン (`vbproj`): UI・ロジック全体の変更に対してバンプ
-- DLL バージョン (`odv_api.c`): C ネイティブ DLL の変更に対してバンプ
+- アプリバージョンと DLL バージョンは **同一バージョン** を使用
 - セマンティックバージョニング: 破壊的変更=メジャー、機能追加=マイナー、バグ修正=パッチ
 
 ## Release Flow

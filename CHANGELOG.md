@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.3.0] - 2026-03-18
+
+### 新機能
+- **SQL エクスポート: NOT NULL 制約を出力**: EXP / EXPDP 両形式のダンプファイルから NOT NULL 制約を取得し、CREATE TABLE DDL に反映
+- **SQL エクスポート: DEFAULT 値を出力 (EXP 形式)**: EXP ダンプの `ALTER TABLE ... MODIFY DEFAULT` から DEFAULT 値を抽出し、CREATE TABLE DDL に反映
+- **SQL Server 向けフォーマット強化**: `DROP TABLE IF EXISTS` + `GO` 区切り + `ON [PRIMARY]` + `USE [DB名]` 入力欄を追加
+- **SQL Server 向けスキーマを `dbo` に自動変換**: Oracle のスキーマ名を SQL Server の標準スキーマ `dbo` に変換
+- **裸の NUMBER を実データから整数型に推定するオプション**: 精度なしの `NUMBER` カラムの実データと DEFAULT 値を走査し、値の範囲に応じて `SMALLINT` / `INT` / `BIGINT` にマッピング
+
+### 改善
+- **C DLL: ODV_TABLE_CALLBACK 拡張**: NOT NULL フラグと DEFAULT 値をコールバック経由で VB.NET に伝達
+- **ローカライズ: 不足キー13件を修正**: 8言語の `Menu_Help_Language_*` キーと英語の `LobExtract_*` キーを追加
+- **ローカライズ: resx フォーマット統一**: de/es/fr/it の複数行形式を1行形式に統一
+
+### バグ修正
+- **エラー報告: 内容欄で Enter キーが改行にならない問題を修正**
+- **エラー報告: テーブルプレビュー表示中にダンプファイルが未開扱いになる問題を修正**
+- **SQL エクスポート: NUMBER(p,0) を整数型にマッピング**: 精度に応じて `SMALLINT` / `INT` / `BIGINT` に適切にマッピング
+
 ## [2.2.1] - 2026-03-18
 
 ### バグ修正

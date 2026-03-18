@@ -148,6 +148,8 @@ typedef struct {
     int    flags;
     int    property;
     char   type_str[64];         /* "VARCHAR2(100)" etc. */
+    int    not_null;             /* 1=NOT NULL constraint */
+    char   default_val[256];     /* DEFAULT value expression */
 } ODV_COLUMN;
 
 /* Table definition */
@@ -248,6 +250,8 @@ typedef void (__stdcall *ODV_TABLE_CALLBACK)(
     int col_count,
     const char **col_names,
     const char **col_types,
+    const int *col_not_nulls,    /* 1=NOT NULL, 0=nullable (per column) */
+    const char **col_defaults,   /* DEFAULT value expression (per column, "" if none) */
     int64_t row_count,
     int64_t data_offset,         /* File position of table DDL (for fast seek) */
     void *user_data
