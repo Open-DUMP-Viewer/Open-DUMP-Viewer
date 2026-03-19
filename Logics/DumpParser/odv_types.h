@@ -277,10 +277,17 @@ typedef struct {
     int     data_step;           /* Sub-state: DS_* constants */
 
     /* Column tracking */
-    int     col_idx;             /* Current column index (among non-LOB columns) */
+    int     col_idx;             /* Current non-LOB column counter (0..non_lob_cols-1) */
     int     lob_col_idx;         /* Current LOB column index (0-based among LOBs) */
     int     col_len;             /* Current column data length */
     int     col_remaining;       /* Bytes remaining in current column */
+
+    /* Non-LOB column → absolute column index mapping.
+     * In EXPDP LOB records, column data is packed without LOB columns.
+     * non_lob_map[i] gives the absolute column index for the i-th
+     * non-LOB column in the binary stream. */
+    int     non_lob_map[ODV_MAX_COLUMNS];
+    int     non_lob_count;       /* Number of entries in non_lob_map */
 
     /* Record header */
     int     record_header;       /* Last record header byte (0x01/0x04/0x08/0x09/0x0c) */

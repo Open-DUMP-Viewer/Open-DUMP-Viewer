@@ -446,13 +446,239 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
 }
 
 /*---------------------------------------------------------------------------
-    Parse EXPDP binary records for one table
+    Decode a completed column value (type-specific conversion)
+
+    Called after all bytes of a column have been accumulated in v->data.
+    Converts raw Oracle wire format to display string.
+ ---------------------------------------------------------------------------*/
+static void decode_column_value(ODV_SESSION *s, int col_idx)
+{
+    ODV_VALUE  *v;
+    ODV_COLUMN *col;
+    char decode_buf[ODV_VARCHAR_LEN + 4];
+
+    if (col_idx >= s->table.col_count) return;
+
+    v   = &s->record.values[col_idx];
+    col = &s->table.columns[col_idx];
+    v->type    = col->type;
+    v->is_null = 0;
+
+    switch (col->type) {
+    case COL_NUMBER:
+    case COL_FLOAT:
+        decode_oracle_number(v->data, v->data_len,
+                             decode_buf, sizeof(decode_buf));
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_DATE:
+        decode_oracle_date(v->data, v->data_len,
+                           decode_buf, sizeof(decode_buf),
+                           s->date_format, s->custom_date_format);
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_TIMESTAMP:
+    case COL_TIMESTAMP_TZ:
+    case COL_TIMESTAMP_LTZ:
+        decode_oracle_timestamp(v->data, v->data_len,
+                                decode_buf, sizeof(decode_buf),
+                                s->date_format, s->custom_date_format,
+                                col->precision);
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_BIN_FLOAT:
+        decode_binary_float(v->data, decode_buf, sizeof(decode_buf));
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_BIN_DOUBLE:
+        decode_binary_double(v->data, decode_buf, sizeof(decode_buf));
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_INTERVAL_YM:
+        decode_interval_ym(v->data, v->data_len,
+                           decode_buf, sizeof(decode_buf));
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_INTERVAL_DS:
+        decode_interval_ds(v->data, v->data_len,
+                           decode_buf, sizeof(decode_buf));
+        set_value_string(v, decode_buf, (int)strlen(decode_buf));
+        v->type = col->type;
+        break;
+
+    case COL_RAW:
+    case COL_ROWID: {
+        int hi;
+        char hex_buf[ODV_VARCHAR_LEN];
+        int hlen = 0;
+        for (hi = 0; hi < v->data_len && hlen < (int)sizeof(hex_buf) - 3; hi++) {
+            snprintf(hex_buf + hlen, 3, "%02X", v->data[hi]);
+            hlen += 2;
+        }
+        hex_buf[hlen] = '\0';
+        set_value_string(v, hex_buf, hlen);
+        v->type = col->type;
+        break;
+    }
+
+    case COL_NCHAR:
+    case COL_NVARCHAR: {
+        char conv_buf[ODV_VARCHAR_LEN];
+        int conv_len = 0;
+        if (v->data && v->data_len > 0 &&
+            convert_charset((const char *)v->data, v->data_len,
+                            CHARSET_UTF16BE,
+                            conv_buf, sizeof(conv_buf),
+                            CHARSET_UTF8, &conv_len) == ODV_OK) {
+            set_value_string(v, conv_buf, conv_len);
+        } else if (v->data) {
+            v->data[v->data_len] = '\0';
+        }
+        v->type = col->type;
+        break;
+    }
+
+    case COL_CHAR:
+    case COL_VARCHAR:
+    default:
+        if (v->data) v->data[v->data_len] = '\0';
+        if (s->dump_charset != s->out_charset &&
+            s->dump_charset != CHARSET_UNKNOWN) {
+            char conv_buf[ODV_VARCHAR_LEN];
+            int conv_len = 0;
+            if (convert_charset((const char *)v->data, v->data_len,
+                                s->dump_charset,
+                                conv_buf, sizeof(conv_buf),
+                                s->out_charset, &conv_len) == ODV_OK) {
+                set_value_string(v, conv_buf, conv_len);
+            }
+        }
+        v->type = col->type;
+        break;
+    }
+}
+
+/*---------------------------------------------------------------------------
+    Accumulate LOB preview data for GUI display.
+
+    For BLOB: hex-encode into the column value (max ODV_LOB_PREVIEW_LEN/2 bytes)
+    For CLOB: copy text into the column value (max ODV_LOB_PREVIEW_LEN bytes)
+    Only accumulates if the LOB column is within the table's column range.
+ ---------------------------------------------------------------------------*/
+static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
+                                   const unsigned char *data, int len)
+{
+    int abs_col;    /* Absolute column index in the table */
+    int non_lob_cols;
+    int i, lob_i;
+    ODV_VALUE *v;
+    int col_type;
+
+    if (!data || len <= 0) return;
+
+    non_lob_cols = s->table.col_count - s->table.lob_col_count;
+    if (non_lob_cols < 0) non_lob_cols = 0;
+
+    /* Find the absolute column index for this LOB column */
+    abs_col = -1;
+    lob_i = 0;
+    for (i = 0; i < s->table.col_count; i++) {
+        int t = s->table.columns[i].type;
+        if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB ||
+            t == COL_LONG || t == COL_LONG_RAW) {
+            if (lob_i == lob_col_idx) {
+                abs_col = i;
+                break;
+            }
+            lob_i++;
+        }
+    }
+    if (abs_col < 0 || abs_col >= s->table.col_count) return;
+
+    col_type = s->table.columns[abs_col].type;
+    v = &s->record.values[abs_col];
+    v->type = col_type;
+    v->is_null = 0;
+
+    if (col_type == COL_BLOB || col_type == COL_LONG_RAW) {
+        /* BLOB: hex-encode (each source byte → 2 hex chars) */
+        int max_src = ODV_LOB_PREVIEW_LEN / 2;  /* max source bytes */
+        int already = v->data_len / 2;           /* source bytes already encoded */
+        int avail = max_src - already;
+        int to_encode = (len < avail) ? len : avail;
+        int hi;
+
+        if (to_encode <= 0) return;
+        ensure_value_buf(v, v->data_len + to_encode * 2 + 1);
+        if (!v->data) return;
+
+        for (hi = 0; hi < to_encode; hi++) {
+            snprintf((char *)v->data + v->data_len, 3, "%02X", data[hi]);
+            v->data_len += 2;
+        }
+        v->data[v->data_len] = '\0';
+    } else if (col_type == COL_CLOB || col_type == COL_NCLOB) {
+        /* CLOB/NCLOB: Oracle EXPDP stores LOB data in AL16UTF16 (UTF-16BE).
+         * Convert to UTF-8 for display. */
+        int max_bytes = ODV_LOB_PREVIEW_LEN;
+        int avail = max_bytes - v->data_len;
+        char conv_buf[ODV_LOB_PREVIEW_LEN + 4];
+        int conv_len = 0;
+        int src_len = (len < avail * 2) ? len : avail * 2; /* UTF-16 is ~2x */
+
+        if (avail <= 0 || src_len <= 0) return;
+
+        /* Ensure even byte count for UTF-16 */
+        src_len &= ~1;
+        if (src_len <= 0) return;
+
+        if (convert_charset((const char *)data, src_len,
+                            CHARSET_UTF16BE,
+                            conv_buf, sizeof(conv_buf),
+                            CHARSET_UTF8, &conv_len) == ODV_OK && conv_len > 0) {
+            int to_copy = (conv_len < avail) ? conv_len : avail;
+            ensure_value_buf(v, v->data_len + to_copy + 1);
+            if (!v->data) return;
+            memcpy(v->data + v->data_len, conv_buf, to_copy);
+            v->data_len += to_copy;
+            v->data[v->data_len] = '\0';
+        }
+    } else {
+        /* LONG: copy text directly (stored in DB charset) */
+        int max_bytes = ODV_LOB_PREVIEW_LEN;
+        int avail = max_bytes - v->data_len;
+        int to_copy = (len < avail) ? len : avail;
+
+        if (to_copy <= 0) return;
+        ensure_value_buf(v, v->data_len + to_copy + 1);
+        if (!v->data) return;
+
+        memcpy(v->data + v->data_len, data, to_copy);
+        v->data_len += to_copy;
+        v->data[v->data_len] = '\0';
+    }
+}
+
+/*---------------------------------------------------------------------------
+    Parse EXPDP binary records for one table (ARK-style state machine)
 
     Record header byte values:
-      0x01, 0x04   = normal record
-      0x08, 0x09   = LOB record
+      0x01, 0x04   = normal record (for LOB tables: non-LOB columns only)
+      0x08, 0x09   = LOB record (multi-chunk LOB data)
       0x18, 0x19   = >255 columns record
-      0x0c         = single-chunk LOB
+      0x0c         = single-chunk LOB record
       0xff         = end of table data
       0x00         = end of table (when between records)
 
@@ -461,28 +687,63 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
       0x01-0xfd    = direct length (1-253 bytes)
       0xfe         = 2-byte length follows (LE)
       0xff         = NULL
+
+    LOB chunk marker (data_step = DS_LOB_MARKER):
+      0x00         = empty/end of LOB column
+      0x01-0x06    = continuation marker (filler)
+      0x07-0xfd    = direct chunk size (except 0x08/0x09/0x0c)
+      0x08/0x09    = new LOB record header (end current LOB)
+      0x0c         = new single-chunk LOB header (end current LOB)
+      0xfe         = 2-byte chunk length follows
+      0xff         = NULL LOB column
  ---------------------------------------------------------------------------*/
 static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                                int list_only)
 {
+    ODV_PARSE_STATE *st = &s->state;
     unsigned char b;
-    int step = 1;       /* 1=expect header, 2=reading columns */
-    int data_step = 0;
-    int col_idx = 0;
-    int col_len = 0;
-    int col_remaining = 0;
-    int is_over255 = 0;
-    int over255_count = 0;
-    int record_count = 0;
-    int is_between_record = 0; /* 0=before first record, 1=after at least one record header */
-    int seg_remaining = -1;   /* bytes left in current 3c-segment (-1 = no limit) */
     int non_lob_cols;
+    int chunk_size = 0;
+    int record_count = 0;
+    int progress_counter = 0;
     int rc;
-    int progress_counter = 0; /* throttle progress reporting */
-    char decode_buf[ODV_VARCHAR_LEN + 4];
 
     non_lob_cols = s->table.col_count - s->table.lob_col_count;
     if (non_lob_cols <= 0) non_lob_cols = s->table.col_count;
+
+    /* Initialize parse state */
+    st->step             = 1;
+    st->data_step        = DS_COL_LENGTH;
+    st->col_idx          = 0;
+    st->lob_col_idx      = 0;
+    st->col_len          = 0;
+    st->col_remaining    = 0;
+    st->record_header    = 0;
+    st->is_lob_record    = 0;
+    st->is_between_record = 0;
+    st->is_last_chunk    = 0;
+    st->is_end_lob       = 0;
+    st->lob_length       = 0;
+    st->lob_preview_len  = 0;
+    st->is_over255       = 0;
+    st->over255_count    = 0;
+    st->filler_length    = 2;
+    st->seg_remaining    = -1;
+
+    /* Build non-LOB column → absolute column index mapping.
+     * In EXPDP LOB records, column data is packed without LOB columns.
+     * For tables with no LOBs, this is a trivial identity mapping. */
+    {
+        int mi, mc = 0;
+        for (mi = 0; mi < s->table.col_count && mc < ODV_MAX_COLUMNS; mi++) {
+            int t = s->table.columns[mi].type;
+            if (t != COL_BLOB && t != COL_CLOB && t != COL_NCLOB &&
+                t != COL_LONG && t != COL_LONG_RAW) {
+                st->non_lob_map[mc++] = mi;
+            }
+        }
+        st->non_lob_count = mc;
+    }
 
     /* In LOB extraction mode, validate the target column exists */
     if (s->lob_extract_mode) {
@@ -499,46 +760,42 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
     while (!s->cancelled) {
         /* Segment boundary check: Oracle omits trailing NULL columns.
-         * When a 3c-segment is exhausted (seg_remaining==0) while we are
-         * still in step 2, treat every unread column as NULL and deliver
-         * the record.  The next byte belongs to the following segment. */
-        if (step == 2 && seg_remaining == 0 && data_step == 0) {
-            while (col_idx < non_lob_cols) {
-                if (col_idx < s->table.col_count)
-                    set_value_null(&s->record.values[col_idx]);
-                col_idx++;
+         * When a 3c-segment is exhausted while we are still reading
+         * normal columns, treat unread columns as NULL and deliver. */
+        if (st->step == 2 && st->seg_remaining == 0
+            && st->data_step == DS_COL_LENGTH) {
+            while (st->col_idx < non_lob_cols) {
+                int ac = st->non_lob_map[st->col_idx];
+                if (ac < s->table.col_count)
+                    set_value_null(&s->record.values[ac]);
+                st->col_idx++;
             }
-            s->record.col_count = col_idx;
-            if (!list_only) {
+            s->record.col_count = s->table.col_count;
+            if (!list_only && !st->is_lob_record) {
                 rc = deliver_row(s);
                 if (rc != ODV_OK) return rc;
                 odv_report_progress(s, fp);
+                record_count++;
+                s->table.record_count++;
             }
-            record_count++;
-            s->table.record_count++;
-            step = 1;
-            seg_remaining = -1;
-            continue; /* next byte is the start of a new segment or padding */
+            st->step = 1;
+            st->seg_remaining = -1;
+            continue;
         }
 
         /* Read one byte */
         if (fread(&b, 1, 1, fp) != 1) break;
         (*address)++;
 
-        /* Safety check: if we've just read byte at block offset 2 and
-         * it's '<', peek ahead to see if this is "<?xml" — the start of
-         * the next table's DDL.  If so, seek back and stop.  This prevents
-         * record parsing bugs from overrunning into adjacent DDL blocks. */
+        /* Safety check: detect XML DDL overrun */
         if (b == '<' && (*address % ODV_DUMP_BLOCK_LEN) == 3) {
             unsigned char peek[4];
             if (fread(peek, 1, 4, fp) == 4) {
                 if (memcmp(peek, "?xml", 4) == 0) {
-                    /* Overrun detected — rewind to block offset 0 */
                     odv_fseek(fp, *address - 3, SEEK_SET);
                     *address -= 3;
                     break;
                 }
-                /* Not XML — rewind the peek bytes */
                 odv_fseek(fp, -4, SEEK_CUR);
             }
         }
@@ -550,425 +807,498 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
         }
 
         /* Track bytes consumed inside a 3c segment */
-        if (step == 2 && seg_remaining > 0)
-            seg_remaining--;
+        if (st->step == 2 && st->seg_remaining > 0)
+            st->seg_remaining--;
 
-        if (step == 1) {
-            /* Expecting record header byte */
+        /* ===== step 1: Expect record header byte ===== */
+        if (st->step == 1) {
             switch (b) {
             case 0x00:
-                /* End of table data only if we've already seen records.
-                   Before the first record, 0x00 bytes are padding after </ROWSET>. */
-                if (is_between_record) {
+                if (st->is_between_record)
                     return ODV_OK;
-                }
-                /* Padding byte before first record - skip */
+                /* Padding before first record — skip */
                 break;
 
             case 0x3c: {
-                /* DataPump segment wrapper: 3c 00 NN
-                 * NN = total segment length (including 3-byte header).
-                 * The actual column data is (NN - 4) bytes:
-                 *   NN - 3 (header) - 1 (record header byte that follows).
-                 * Track this in seg_remaining so that trailing NULL columns
-                 * (which Oracle omits) are handled correctly. */
-                unsigned char _nn = 0;
-                /* skip the 0x00 byte */
+                /* DataPump segment wrapper: 3c 00 NN */
+                unsigned char nn;
                 if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
                 (*address)++;
-                /* read NN */
-                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                if (fread(&nn, 1, 1, fp) != 1) return ODV_OK;
                 (*address)++;
-                _nn = b;
-                /* column data bytes = NN - 3 (header) - 1 (record hdr) */
-                seg_remaining = (int)_nn - 4;
-                if (seg_remaining < 0) seg_remaining = 0;
-                /* step stays 1 — next byte is the real record header */
+                st->seg_remaining = (int)nn - 4;
+                if (st->seg_remaining < 0) st->seg_remaining = 0;
                 break;
             }
 
             case 0x08: case 0x09:
-                /* LOB record (BLOB/CLOB): only valid OUTSIDE 3c segments.
-                 * Inside segments, 0x08/0x09 = column count (8 or 9).
-                 * A sub-byte (non-LOB column count) follows the header. */
-                if (seg_remaining >= 0) goto normal_record;
-                is_between_record = 1;
-                is_over255 = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
+                /* LOB record: only valid OUTSIDE 3c segments */
+                if (st->seg_remaining >= 0) goto normal_record;
+                st->is_between_record = 1;
+                st->record_header  = b;
+                st->is_lob_record  = 1;
+                st->is_over255     = 1;
+                st->filler_length  = 2;
+                st->is_last_chunk  = 0;
+                st->is_end_lob     = 0;
+                st->lob_length     = 0;
+                st->lob_col_idx    = 0;
+                st->step           = 2;
+                st->data_step      = DS_COL_LENGTH;
+                st->col_idx        = 0;
                 reset_record(&s->record);
-                /* Skip the non-LOB column count sub-byte */
+                /* Read non-LOB column count sub-byte */
                 if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
                 (*address)++;
                 break;
 
             case 0x0c:
-                /* LONG column record: only valid OUTSIDE 3c segments.
-                 * Inside segments, 0x0c = column count (12).
-                 * A sub-byte (column count) follows the header. */
-                if (seg_remaining >= 0) goto normal_record;
-                is_between_record = 1;
-                is_over255 = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
+                /* Single-chunk LOB record: only valid OUTSIDE 3c segments */
+                if (st->seg_remaining >= 0) goto normal_record;
+                st->is_between_record = 1;
+                st->record_header  = b;
+                st->is_lob_record  = 1;
+                st->is_over255     = 0;
+                st->is_last_chunk  = 0;
+                st->is_end_lob     = 0;
+                st->lob_length     = 0;
+                st->lob_col_idx    = 0;
+                st->step           = 2;
+                st->data_step      = DS_COL_LENGTH;
+                st->col_idx        = 0;
                 reset_record(&s->record);
-                /* Skip the column count sub-byte */
+                /* Read column count sub-byte */
                 if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
                 (*address)++;
                 break;
 
             case 0x18: case 0x19: case 0x1c: case 0x2c:
-                /* Special record format (cluster/IOT/over-255 columns).
-                 * Inside 3c segments, these are column counts. */
-                if (seg_remaining >= 0) goto normal_record;
-                is_between_record = 1;
-                is_over255 = 1;
-                over255_count = 0;
-                step = 2;
-                data_step = 0;
-                col_idx = 0;
+                /* Over-255 columns record */
+                if (st->seg_remaining >= 0) goto normal_record;
+                st->is_between_record = 1;
+                st->record_header  = b;
+                st->is_lob_record  = 0;
+                st->is_over255     = 1;
+                st->over255_count  = 0;
+                st->step           = 2;
+                st->data_step      = DS_COL_LENGTH;
+                st->col_idx        = 0;
                 reset_record(&s->record);
                 break;
 
             case 0xff:
-                /* End of table data */
                 return ODV_OK;
 
             default:
-                /* Inside a 3c segment, any byte value is a valid column
-                 * count for a normal record.  Outside segments, bytes
-                 * 0x01-0x07 are also normal records. */
-                if (seg_remaining >= 0 || (b >= 0x01 && b <= 0x07)) {
+                if (st->seg_remaining >= 0 || (b >= 0x01 && b <= 0x07)) {
             normal_record:
-                    if (seg_remaining < 0 && b >= 0x01 && b <= 0x07) {
-                        /* Outside segment: only 0x01-0x07 are valid.
-                         * Other values may be LOB payload — skip. */
-                    }
-                    is_between_record = 1;
-                    is_over255 = 0;
-                    step = 2;
-                    data_step = 0;
-                    col_idx = 0;
+                    st->is_between_record = 1;
+                    st->record_header  = b;
+                    st->is_lob_record  = 0;
+                    st->is_over255     = 0;
+                    st->step           = 2;
+                    st->data_step      = DS_COL_LENGTH;
+                    st->col_idx        = 0;
                     reset_record(&s->record);
                 }
-                /* else: unknown header outside segment - skip */
                 break;
             }
 
-        } else if (step == 2) {
-            /* Reading column data */
+        /* ===== step 2: Reading record data ===== */
+        } else if (st->step == 2) {
 
-            if (data_step == 0) {
-                /* Read column length marker */
+            switch (st->data_step) {
+
+            /* --- Normal column reading states --- */
+
+            case DS_COL_LENGTH: /* 0: Column length marker */
+            {
+                /* Map non-LOB sequential index to absolute column index */
+                int ac = (st->col_idx < st->non_lob_count)
+                         ? st->non_lob_map[st->col_idx]
+                         : st->col_idx;
+
                 if (b == 0xff) {
-                    /* NULL column */
-                    if (col_idx < s->table.col_count) {
-                        set_value_null(&s->record.values[col_idx]);
-                        s->record.values[col_idx].type = s->table.columns[col_idx].type;
+                    /* NULL */
+                    if (ac < s->table.col_count) {
+                        set_value_null(&s->record.values[ac]);
+                        s->record.values[ac].type =
+                            s->table.columns[ac].type;
                     }
-                    col_idx++;
+                    st->col_idx++;
                 } else if (b == 0xfe) {
                     /* 2-byte length follows */
-                    data_step = 1;
-                    col_len = 0;
+                    st->data_step = DS_COL_LEN_HI;
+                    st->col_len = 0;
                 } else if (b == 0x00) {
-                    /* Length 0 = empty string */
-                    if (col_idx < s->table.col_count) {
-                        set_value_string(&s->record.values[col_idx], "", 0);
-                        s->record.values[col_idx].type = s->table.columns[col_idx].type;
+                    /* Empty string */
+                    if (ac < s->table.col_count) {
+                        set_value_string(&s->record.values[ac], "", 0);
+                        s->record.values[ac].type =
+                            s->table.columns[ac].type;
                     }
-                    col_idx++;
+                    st->col_idx++;
                 } else {
                     /* Direct length (1-253) */
-                    col_len = (int)b;
-                    col_remaining = col_len;
-                    data_step = 3;  /* read col_len bytes */
-
-                    /* Prepare value buffer */
-                    if (col_idx < s->table.col_count) {
-                        ensure_value_buf(&s->record.values[col_idx], col_len + 1);
-                        s->record.values[col_idx].data_len = 0;
+                    st->col_len = (int)b;
+                    st->col_remaining = st->col_len;
+                    st->data_step = DS_COL_DATA;
+                    if (ac < s->table.col_count) {
+                        ensure_value_buf(&s->record.values[ac],
+                                         st->col_len + 1);
+                        s->record.values[ac].data_len = 0;
                     }
                 }
 
-                /* Check for 255-column boundary filler */
-                if (is_over255 && col_idx > 0 && (col_idx % 255) == 0 && data_step == 0) {
-                    /* Skip filler byte (already consumed) - handled by next iteration */
-                    over255_count++;
+                /* 255-column boundary filler */
+                if (st->is_over255 && st->col_idx > 0
+                    && (st->col_idx % 255) == 0
+                    && st->data_step == DS_COL_LENGTH) {
+                    st->over255_count++;
                 }
 
-                /* Check if record is complete */
-                if (data_step == 0 && col_idx >= non_lob_cols) {
-                    /* Record complete - deliver */
-                    s->record.col_count = col_idx;
+                /* Check if all non-LOB columns are complete */
+                if (st->data_step == DS_COL_LENGTH
+                    && st->col_idx >= non_lob_cols) {
+                    s->record.col_count = s->table.col_count;
 
-                    if (!list_only) {
-                        rc = deliver_row(s);
-                        if (rc != ODV_OK) return rc;
-                        odv_report_progress(s, fp);
-                    }
-
-                    record_count++;
-                    s->table.record_count++;
-
-                    /* LOB extraction: remaining columns are LOB data */
-                    if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
-                        int lob_i;
-                        for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
-                            /* Read LOB column length byte */
-                            int lb;
-                            int lob_len = 0;
-                            if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
-                            (*address)++;
-                            lb = b;
-                            if (lb == 0xff) {
-                                /* NULL LOB */
-                                continue;
-                            } else if (lb == 0xfe) {
-                                /* 2-byte length */
-                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
-                                (*address)++;
-                                lob_len = b;
-                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
-                                (*address)++;
-                                lob_len |= (b << 8);
-                            } else if (lb == 0x00) {
-                                /* Empty LOB */
-                                continue;
-                            } else {
-                                lob_len = lb;
-                            }
-
-                            /* Read lob_len bytes of LOB data (bulk fread) */
-                            {
-                                unsigned char lob_tmp[4096];
-                                int lob_read = 0;
-                                while (lob_read < lob_len && !s->cancelled) {
-                                    int need = lob_len - lob_read;
-                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
-                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
-                                    if (got <= 0) goto END_LOB_PARSE;
-                                    *address += got;
-                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
-                                    if (rc != ODV_OK) return rc;
-                                    lob_read += got;
-                                }
-                            }
-                        }
-                        /* Write LOB file and reset buffer */
-                        rc = odv_lob_write_file(s);
-                        if (rc != ODV_OK) return rc;
-                    }
-END_LOB_PARSE:
-                    step = 1; /* back to expecting header */
-                }
-
-            } else if (data_step == 1) {
-                /* First byte of 2-byte length */
-                col_len = (int)b;
-                data_step = 2;
-
-            } else if (data_step == 2) {
-                /* Second byte of 2-byte length (little-endian) */
-                col_len |= ((int)b << 8);
-                col_remaining = col_len;
-                data_step = 3;
-
-                if (col_idx < s->table.col_count) {
-                    ensure_value_buf(&s->record.values[col_idx], col_len + 1);
-                    s->record.values[col_idx].data_len = 0;
-                }
-
-            } else if (data_step == 3) {
-                /* Reading column data bytes */
-                if (col_idx < s->table.col_count) {
-                    ODV_VALUE *v = &s->record.values[col_idx];
-                    if (v->data && v->data_len < v->buf_size - 1) {
-                        v->data[v->data_len++] = b;
-                    }
-                }
-                col_remaining--;
-
-                if (col_remaining <= 0) {
-                    /* Column data complete - decode */
-                    if (col_idx < s->table.col_count) {
-                        ODV_VALUE *v = &s->record.values[col_idx];
-                        ODV_COLUMN *col = &s->table.columns[col_idx];
-                        v->type = col->type;
-                        v->is_null = 0;
-
-                        /* Type-specific decoding */
-                        switch (col->type) {
-                        case COL_NUMBER:
-                        case COL_FLOAT:
-                            decode_oracle_number(v->data, v->data_len,
-                                                 decode_buf, sizeof(decode_buf));
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_DATE:
-                            decode_oracle_date(v->data, v->data_len,
-                                              decode_buf, sizeof(decode_buf),
-                                              s->date_format, s->custom_date_format);
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_TIMESTAMP:
-                        case COL_TIMESTAMP_TZ:
-                        case COL_TIMESTAMP_LTZ:
-                            decode_oracle_timestamp(v->data, v->data_len,
-                                                    decode_buf, sizeof(decode_buf),
-                                                    s->date_format, s->custom_date_format,
-                                                    col->precision);
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_BIN_FLOAT:
-                            decode_binary_float(v->data, decode_buf, sizeof(decode_buf));
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_BIN_DOUBLE:
-                            decode_binary_double(v->data, decode_buf, sizeof(decode_buf));
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_INTERVAL_YM:
-                            decode_interval_ym(v->data, v->data_len,
-                                               decode_buf, sizeof(decode_buf));
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_INTERVAL_DS:
-                            decode_interval_ds(v->data, v->data_len,
-                                               decode_buf, sizeof(decode_buf));
-                            set_value_string(v, decode_buf, (int)strlen(decode_buf));
-                            v->type = col->type;
-                            break;
-
-                        case COL_RAW:
-                        case COL_ROWID: {
-                            /* Convert to hex string */
-                            int hi;
-                            char hex_buf[ODV_VARCHAR_LEN];
-                            int hlen = 0;
-                            for (hi = 0; hi < v->data_len && hlen < (int)sizeof(hex_buf) - 3; hi++) {
-                                snprintf(hex_buf + hlen, 3, "%02X", v->data[hi]);
-                                hlen += 2;
-                            }
-                            hex_buf[hlen] = '\0';
-                            set_value_string(v, hex_buf, hlen);
-                            v->type = col->type;
-                            break;
-                        }
-
-                        case COL_NCHAR:
-                        case COL_NVARCHAR: {
-                            /* NCHAR/NVARCHAR2: Oracle stores in national charset
-                             * (AL16UTF16, big-endian). Convert UTF-16BE → UTF-8. */
-                            char conv_buf[ODV_VARCHAR_LEN];
-                            int conv_len = 0;
-                            if (v->data && v->data_len > 0 &&
-                                convert_charset((const char *)v->data, v->data_len,
-                                                CHARSET_UTF16BE,
-                                                conv_buf, sizeof(conv_buf),
-                                                CHARSET_UTF8, &conv_len) == ODV_OK) {
-                                set_value_string(v, conv_buf, conv_len);
-                            } else if (v->data) {
-                                v->data[v->data_len] = '\0';
-                            }
-                            v->type = col->type;
-                            break;
-                        }
-
-                        case COL_CHAR:
-                        case COL_VARCHAR:
-                        default:
-                            /* String data: ensure null-terminated */
-                            if (v->data) v->data[v->data_len] = '\0';
-                            /* Charset conversion if needed */
-                            if (s->dump_charset != s->out_charset &&
-                                s->dump_charset != CHARSET_UNKNOWN) {
-                                char conv_buf[ODV_VARCHAR_LEN];
-                                int conv_len = 0;
-                                if (convert_charset((const char *)v->data, v->data_len,
-                                                    s->dump_charset,
-                                                    conv_buf, sizeof(conv_buf),
-                                                    s->out_charset, &conv_len) == ODV_OK) {
-                                    set_value_string(v, conv_buf, conv_len);
-                                }
-                            }
-                            v->type = col->type;
-                            break;
-                        }
-                    }
-                    col_idx++;
-                    data_step = 0;
-
-                    /* Check for record completion */
-                    if (col_idx >= non_lob_cols) {
-                        s->record.col_count = col_idx;
-
+                    /* LOB table? Transition to LOB state machine */
+                    if (s->table.lob_col_count > 0 && st->is_lob_record) {
+                        /* Do NOT deliver_row yet — LOB data follows.
+                         * Transition to LOB marker reading. */
+                        st->data_step   = DS_LOB_MARKER;
+                        st->lob_col_idx = 0;
+                        st->is_end_lob  = 0;
+                        st->lob_length  = 0;
+                    } else {
+                        /* Non-LOB table or normal record in LOB table:
+                         * deliver the row immediately. */
                         if (!list_only) {
                             rc = deliver_row(s);
                             if (rc != ODV_OK) return rc;
                             odv_report_progress(s, fp);
                         }
-
                         record_count++;
                         s->table.record_count++;
+                        st->step = 1;
+                    }
+                }
+                break;
+            }
 
-                        /* LOB extraction: read remaining LOB columns */
-                        if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
-                            int lob_i;
-                            for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
-                                int lb, lob_len = 0;
-                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
-                                (*address)++;
-                                lb = b;
-                                if (lb == 0xff) continue; /* NULL */
-                                else if (lb == 0xfe) {
-                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
-                                    (*address)++;
-                                    lob_len = b;
-                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
-                                    (*address)++;
-                                    lob_len |= (b << 8);
-                                } else if (lb == 0x00) continue; /* empty */
-                                else lob_len = lb;
+            case DS_COL_LEN_HI: /* 1: First byte of 2-byte length */
+                st->col_len = (int)b;
+                st->data_step = DS_COL_LEN_LO;
+                break;
 
-                                { unsigned char lob_tmp[4096];
-                                int lr = 0;
-                                while (lr < lob_len && !s->cancelled) {
-                                    int need = lob_len - lr;
-                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
-                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
-                                    if (got <= 0) goto END_LOB_PARSE2;
-                                    *address += got;
-                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
-                                    if (rc != ODV_OK) return rc;
-                                    lr += got;
-                                } }
+            case DS_COL_LEN_LO: /* 2: Second byte of 2-byte length (LE) */
+            {
+                int ac = (st->col_idx < st->non_lob_count)
+                         ? st->non_lob_map[st->col_idx]
+                         : st->col_idx;
+                st->col_len |= ((int)b << 8);
+                st->col_remaining = st->col_len;
+                st->data_step = DS_COL_DATA;
+                if (ac < s->table.col_count) {
+                    ensure_value_buf(&s->record.values[ac],
+                                     st->col_len + 1);
+                    s->record.values[ac].data_len = 0;
+                }
+                break;
+            }
+
+            case DS_COL_DATA: /* 3: Reading column data bytes */
+            {
+                int ac = (st->col_idx < st->non_lob_count)
+                         ? st->non_lob_map[st->col_idx]
+                         : st->col_idx;
+                if (ac < s->table.col_count) {
+                    ODV_VALUE *v = &s->record.values[ac];
+                    if (v->data && v->data_len < v->buf_size - 1) {
+                        v->data[v->data_len++] = b;
+                    }
+                }
+                st->col_remaining--;
+                if (st->col_remaining <= 0) {
+                    /* Column complete — decode */
+                    decode_column_value(s, ac);
+                    st->col_idx++;
+                    st->data_step = DS_COL_LENGTH;
+
+                    /* Check record completion */
+                    if (st->col_idx >= non_lob_cols) {
+                        s->record.col_count = s->table.col_count;
+
+                        if (s->table.lob_col_count > 0 && st->is_lob_record) {
+                            st->data_step   = DS_LOB_MARKER;
+                            st->lob_col_idx = 0;
+                            st->is_end_lob  = 0;
+                            st->lob_length  = 0;
+                        } else {
+                            if (!list_only) {
+                                rc = deliver_row(s);
+                                if (rc != ODV_OK) return rc;
+                                odv_report_progress(s, fp);
                             }
+                            record_count++;
+                            s->table.record_count++;
+                            st->step = 1;
+                        }
+                    }
+                }
+                break;
+            }
+
+            /* --- LOB state machine (negative data_step values) --- */
+
+            case DS_LOB_MARKER: /* -12: LOB column marker byte */
+                switch (b) {
+                case 0x00:
+                    /* Empty LOB / end of LOB column */
+                    st->is_last_chunk = 1;
+                    st->data_step++;   /* → DS_LOB_POST (-11) */
+                    break;
+
+                case 0x08: case 0x09: case 0x0c:
+                    /* New LOB/record header encountered inside LOB stream.
+                     * End current LOB processing, deliver row, then
+                     * restart as a new record with this header. */
+
+                    /* Finalize LOB extraction for current record */
+                    if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                        rc = odv_lob_write_file(s);
+                        if (rc != ODV_OK) return rc;
+                    }
+
+                    /* Deliver the completed record */
+                    if (!list_only) {
+                        rc = deliver_row(s);
+                        if (rc != ODV_OK) return rc;
+                        odv_report_progress(s, fp);
+                    }
+                    record_count++;
+                    s->table.record_count++;
+
+                    /* Set up new record with this header */
+                    st->record_header  = b;
+                    st->is_lob_record  = 1;
+                    st->is_last_chunk  = 0;
+                    st->is_end_lob     = 0;
+                    st->lob_length     = 0;
+                    st->lob_col_idx    = 0;
+                    st->col_idx        = 0;
+                    st->data_step      = DS_COL_LENGTH;
+                    reset_record(&s->record);
+
+                    if (b == 0x0c) {
+                        st->is_over255 = 0;
+                    } else {
+                        st->is_over255    = 1;
+                        st->filler_length = 2;
+                    }
+
+                    /* Read column count sub-byte */
+                    if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
+                    (*address)++;
+                    break;
+
+                case 0xfe:
+                    /* 2-byte chunk length follows */
+                    st->data_step = DS_LOB_FE_NEXT;
+                    break;
+
+                case 0xff:
+                    /* NULL LOB column */
+                    if (st->col_idx + st->lob_col_idx < s->table.col_count) {
+                        int abs_idx = non_lob_cols + st->lob_col_idx;
+                        if (abs_idx < s->table.col_count)
+                            set_value_null(&s->record.values[abs_idx]);
+                    }
+                    st->lob_col_idx++;
+                    st->lob_length = 0;
+
+                    /* Check if all LOB columns are done */
+                    if (st->lob_col_idx >= s->table.lob_col_count) {
+                        /* All LOBs processed — deliver row */
+                        if (s->lob_extract_mode && s->lob_column_index >= 0) {
                             rc = odv_lob_write_file(s);
                             if (rc != ODV_OK) return rc;
                         }
-END_LOB_PARSE2:
-                        step = 1;
+                        if (!list_only) {
+                            rc = deliver_row(s);
+                            if (rc != ODV_OK) return rc;
+                            odv_report_progress(s, fp);
+                        }
+                        record_count++;
+                        s->table.record_count++;
+                        st->step = 1;
+                        st->data_step = DS_COL_LENGTH;
+                    }
+                    /* else: stay at DS_LOB_MARKER for next LOB column */
+                    break;
+
+                case 0x01: case 0x02: case 0x03:
+                case 0x04: case 0x05: case 0x06:
+                    /* Continuation / filler markers */
+                    st->data_step++;   /* → DS_LOB_POST (-11) */
+                    break;
+
+                default:
+                    /* Direct chunk size (0x07-0xFD excluding 0x08/0x09/0x0c) */
+                    chunk_size = (int)b;
+                    st->is_last_chunk = 1;
+                    st->is_end_lob    = 1;
+                    st->data_step     = DS_LOB_CHUNK;
+                    goto LOB_READ_CHUNK;
+                }
+                break;
+
+            case DS_LOB_POST: /* -11: Filler/separator after LOB marker */
+                switch (b) {
+                case 0x00:
+                    /* End of table data during LOB */
+                    if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                        rc = odv_lob_write_file(s);
+                        if (rc != ODV_OK) return rc;
+                    }
+                    if (!list_only) {
+                        rc = deliver_row(s);
+                        if (rc != ODV_OK) return rc;
+                    }
+                    record_count++;
+                    s->table.record_count++;
+                    return ODV_OK;
+                default:
+                    break;
+                }
+                st->data_step++;   /* → DS_LOB_FE_NEXT (-10) */
+                break;
+
+            case DS_LOB_FE_NEXT: /* -10: After 0xFE or filler sequence */
+                switch (b) {
+                case 0xfe:
+                    /* 2-byte LOB chunk length follows */
+                    break;
+                case 0xff:
+                case 0x00:
+                    /* NULL/empty LOB column after filler */
+                    st->lob_col_idx++;
+                    st->lob_length = 0;
+
+                    if (st->lob_col_idx >= s->table.lob_col_count) {
+                        /* All LOBs done */
+                        if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                            rc = odv_lob_write_file(s);
+                            if (rc != ODV_OK) return rc;
+                        }
+                        if (!list_only) {
+                            rc = deliver_row(s);
+                            if (rc != ODV_OK) return rc;
+                            odv_report_progress(s, fp);
+                        }
+                        record_count++;
+                        s->table.record_count++;
+                        st->step = 1;
+                        st->data_step = DS_COL_LENGTH;
+                        break;
+                    }
+                    st->data_step = DS_LOB_MARKER;
+                    st->is_last_chunk = 0;
+                    break;
+                default:
+                    /* Direct chunk size */
+                    chunk_size = (int)b;
+                    st->is_last_chunk = 1;
+                    st->data_step     = DS_LOB_CHUNK;
+                    goto LOB_READ_CHUNK;
+                }
+                if (st->data_step == DS_LOB_FE_NEXT)
+                    st->data_step++;  /* → DS_LOB_LEN_HI (-9) */
+                break;
+
+            case DS_LOB_LEN_HI: /* -9: First byte of 2-byte LOB chunk length */
+                st->len_buf[0] = b;
+                st->data_step++;   /* → DS_LOB_LEN_LO (-8) */
+                break;
+
+            case DS_LOB_LEN_LO: /* -8: Second byte of 2-byte LOB chunk length */
+                st->len_buf[1] = b;
+                chunk_size = (int)st->len_buf[0] * 0x100 + (int)st->len_buf[1];
+                st->data_step = DS_LOB_CHUNK;
+                goto LOB_READ_CHUNK;
+
+            case DS_LOB_CHUNK: /* 4: Read chunk data (bulk fread) */
+            LOB_READ_CHUNK:
+            {
+                unsigned char lob_tmp[4096];
+                int lob_read = 0;
+                unsigned char next_buf[2];
+
+                /* Bulk-read chunk_size bytes */
+                while (lob_read < chunk_size && !s->cancelled) {
+                    int need = chunk_size - lob_read;
+                    int blk  = (need < (int)sizeof(lob_tmp))
+                                ? need : (int)sizeof(lob_tmp);
+                    int got  = (int)fread(lob_tmp, 1, blk, fp);
+                    if (got <= 0) goto END_PARSE;
+                    *address += got;
+
+                    /* LOB extraction accumulation */
+                    if (s->lob_extract_mode && s->lob_column_index >= 0) {
+                        rc = odv_lob_accumulate(s, st->lob_col_idx,
+                                                lob_tmp, got);
+                        if (rc != ODV_OK) return rc;
+                    }
+
+                    /* LOB preview accumulation */
+                    if (!list_only) {
+                        accumulate_lob_preview(s, st->lob_col_idx,
+                                               lob_tmp, got);
+                    }
+
+                    lob_read += got;
+                }
+                st->lob_length += chunk_size;
+
+                /* Peek ahead 2 bytes to determine is_last_chunk */
+                if (fread(next_buf, 2, 1, fp) != 1) {
+                    /* EOF — treat as last chunk */
+                    st->is_last_chunk = 1;
+                } else {
+                    odv_fseek(fp, -2, SEEK_CUR);
+                    switch (next_buf[0]) {
+                    case 0xfe: case 0xff:
+                        st->is_last_chunk = 1;
+                        break;
+                    case 0x01: case 0x08: case 0x09: case 0x0c:
+                        st->is_last_chunk = 1;
+                        break;
+                    case 0x02: case 0x03: case 0x04:
+                    case 0x05: case 0x06:
+                        st->is_last_chunk = 0;
+                        break;
+                    default:
+                        /* Keep whatever was set */
+                        break;
                     }
                 }
-            }
-        }
-    }
 
+                /* Back to LOB marker for next chunk or next LOB column */
+                st->data_step = DS_LOB_MARKER;
+                break;
+            }
+
+            default:
+                /* Unexpected data_step — safety fallback */
+                st->step = 1;
+                st->data_step = DS_COL_LENGTH;
+                break;
+
+            } /* end switch(data_step) */
+        } /* end step==2 */
+    } /* end while */
+
+END_PARSE:
     if (s->cancelled) return ODV_ERROR_CANCELLED;
     return ODV_OK;
 }
