@@ -113,7 +113,6 @@
 #define ODV_EXP_RECORD_LEN  6144000
 #define ODV_DDL_BUF_LEN    1048576   /* 1MB for DDL */
 #define ODV_LOB_CHUNK_LEN   131072   /* 128KB LOB chunk */
-#define ODV_LOB_PREVIEW_LEN   4096   /* Max LOB preview bytes for row callback */
 #define ODV_MAX_TABLES        1000
 #define ODV_MAX_COLUMNS       1000
 #define ODV_MAX_CONSTRAINTS     50

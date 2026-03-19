@@ -446,129 +446,6 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
 }
 
 /*---------------------------------------------------------------------------
-    Read LOB columns and store preview data into record values.
-    For BLOB: hex-encode first ODV_LOB_PREVIEW_LEN bytes.
-    For CLOB: store first ODV_LOB_PREVIEW_LEN chars as text.
-    Also handles LOB extraction mode (file writing).
-    Returns ODV_OK or error code. Sets *done=1 if parsing should stop.
- ---------------------------------------------------------------------------*/
-static int read_lob_columns_with_preview(ODV_SESSION *s, FILE *fp, int64_t *address,
-                                          int non_lob_cols, int *done)
-{
-    unsigned char b;
-    int lob_i, rc;
-    *done = 0;
-
-    for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
-        int lb, lob_len = 0;
-        int col_pos = non_lob_cols + lob_i; /* Column index in full table */
-
-        if (fread(&b, 1, 1, fp) != 1) { *done = 1; return ODV_OK; }
-        (*address)++;
-        lb = b;
-
-        if (lb == 0xff) {
-            /* NULL LOB */
-            if (col_pos < s->table.col_count && col_pos < s->record.max_columns) {
-                set_value_null(&s->record.values[col_pos]);
-            }
-            continue;
-        } else if (lb == 0xfe) {
-            if (fread(&b, 1, 1, fp) != 1) { *done = 1; return ODV_OK; }
-            (*address)++;
-            lob_len = b;
-            if (fread(&b, 1, 1, fp) != 1) { *done = 1; return ODV_OK; }
-            (*address)++;
-            lob_len |= (b << 8);
-        } else if (lb == 0x00) {
-            /* Empty LOB */
-            if (col_pos < s->table.col_count && col_pos < s->record.max_columns) {
-                set_value_string(&s->record.values[col_pos], "", 0);
-            }
-            continue;
-        } else {
-            lob_len = lb;
-        }
-
-        /* Read LOB data: accumulate preview + handle extraction */
-        {
-            unsigned char lob_tmp[4096];
-            int lr = 0;
-            int preview_len = 0;
-            int col_type = (col_pos < s->table.col_count) ? s->table.columns[col_pos].type : COL_BLOB;
-
-            /* Prepare preview buffer in record value */
-            if (col_pos < s->table.col_count && col_pos < s->record.max_columns) {
-                ODV_VALUE *v = &s->record.values[col_pos];
-                /* For BLOB: hex needs 2x space. For CLOB: direct text */
-                int preview_max = (col_type == COL_BLOB || col_type == COL_LONG_RAW)
-                    ? ODV_LOB_PREVIEW_LEN * 2 + 64  /* hex + "(BLOB:NNNbytes)" prefix space */
-                    : ODV_LOB_PREVIEW_LEN + 1;
-                ensure_value_buf(v, preview_max);
-                v->data_len = 0;
-                v->is_null = 0;
-            }
-
-            while (lr < lob_len && !s->cancelled) {
-                int need = lob_len - lr;
-                int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
-                int got = (int)fread(lob_tmp, 1, chunk, fp);
-                if (got <= 0) { *done = 1; return ODV_OK; }
-                *address += got;
-
-                /* Store preview data into record value */
-                if (preview_len < ODV_LOB_PREVIEW_LEN &&
-                    col_pos < s->table.col_count && col_pos < s->record.max_columns) {
-                    ODV_VALUE *v = &s->record.values[col_pos];
-                    int avail = ODV_LOB_PREVIEW_LEN - preview_len;
-                    int use = (got < avail) ? got : avail;
-
-                    if (col_type == COL_BLOB || col_type == COL_LONG_RAW) {
-                        /* Hex-encode BLOB preview */
-                        static const char hex[] = "0123456789ABCDEF";
-                        int j;
-                        for (j = 0; j < use && v->data_len < v->buf_size - 2; j++) {
-                            v->data[v->data_len++] = hex[(lob_tmp[j] >> 4) & 0x0f];
-                            v->data[v->data_len++] = hex[lob_tmp[j] & 0x0f];
-                        }
-                    } else {
-                        /* CLOB/NCLOB: store text directly */
-                        if (v->data_len + use < v->buf_size - 1) {
-                            memcpy(v->data + v->data_len, lob_tmp, use);
-                            v->data_len += use;
-                        }
-                    }
-                    preview_len += use;
-                }
-
-                /* LOB extraction mode: accumulate for file output */
-                if (s->lob_extract_mode && s->lob_column_index >= 0) {
-                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
-                    if (rc != ODV_OK) return rc;
-                }
-
-                lr += got;
-            }
-
-            /* Null-terminate preview string */
-            if (col_pos < s->table.col_count && col_pos < s->record.max_columns) {
-                ODV_VALUE *v = &s->record.values[col_pos];
-                if (v->data) v->data[v->data_len] = '\0';
-                v->type = col_type;
-            }
-        }
-    }
-
-    /* Write LOB file if in extraction mode */
-    if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
-        rc = odv_lob_write_file(s);
-        if (rc != ODV_OK) return rc;
-    }
-
-    return ODV_OK;
-}
-
-/*---------------------------------------------------------------------------
     Parse EXPDP binary records for one table
 
     Record header byte values:
@@ -824,15 +701,8 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                 /* Check if record is complete */
                 if (data_step == 0 && col_idx >= non_lob_cols) {
-                    /* Non-LOB columns complete */
-                    s->record.col_count = s->table.col_count; /* Include LOB columns in count */
-
-                    /* Read LOB preview data into record values before delivery */
-                    if (s->table.lob_col_count > 0) {
-                        int lob_done = 0;
-                        rc = read_lob_columns_with_preview(s, fp, address, non_lob_cols, &lob_done);
-                        if (rc != ODV_OK) return rc;
-                    }
+                    /* Record complete - deliver */
+                    s->record.col_count = col_idx;
 
                     if (!list_only) {
                         rc = deliver_row(s);
@@ -842,6 +712,56 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                     record_count++;
                     s->table.record_count++;
+
+                    /* LOB extraction: remaining columns are LOB data */
+                    if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
+                        int lob_i;
+                        for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
+                            /* Read LOB column length byte */
+                            int lb;
+                            int lob_len = 0;
+                            if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                            (*address)++;
+                            lb = b;
+                            if (lb == 0xff) {
+                                /* NULL LOB */
+                                continue;
+                            } else if (lb == 0xfe) {
+                                /* 2-byte length */
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                                (*address)++;
+                                lob_len = b;
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE;
+                                (*address)++;
+                                lob_len |= (b << 8);
+                            } else if (lb == 0x00) {
+                                /* Empty LOB */
+                                continue;
+                            } else {
+                                lob_len = lb;
+                            }
+
+                            /* Read lob_len bytes of LOB data (bulk fread) */
+                            {
+                                unsigned char lob_tmp[4096];
+                                int lob_read = 0;
+                                while (lob_read < lob_len && !s->cancelled) {
+                                    int need = lob_len - lob_read;
+                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
+                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
+                                    if (got <= 0) goto END_LOB_PARSE;
+                                    *address += got;
+                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
+                                    if (rc != ODV_OK) return rc;
+                                    lob_read += got;
+                                }
+                            }
+                        }
+                        /* Write LOB file and reset buffer */
+                        rc = odv_lob_write_file(s);
+                        if (rc != ODV_OK) return rc;
+                    }
+END_LOB_PARSE:
                     step = 1; /* back to expecting header */
                 }
 
@@ -995,14 +915,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                     /* Check for record completion */
                     if (col_idx >= non_lob_cols) {
-                        s->record.col_count = s->table.col_count;
-
-                        /* Read LOB preview data into record values before delivery */
-                        if (s->table.lob_col_count > 0) {
-                            int lob_done = 0;
-                            rc = read_lob_columns_with_preview(s, fp, address, non_lob_cols, &lob_done);
-                            if (rc != ODV_OK) return rc;
-                        }
+                        s->record.col_count = col_idx;
 
                         if (!list_only) {
                             rc = deliver_row(s);
@@ -1012,6 +925,43 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
                         record_count++;
                         s->table.record_count++;
+
+                        /* LOB extraction: read remaining LOB columns */
+                        if (s->lob_extract_mode && s->table.lob_col_count > 0 && s->lob_column_index >= 0) {
+                            int lob_i;
+                            for (lob_i = 0; lob_i < s->table.lob_col_count && !s->cancelled; lob_i++) {
+                                int lb, lob_len = 0;
+                                if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                (*address)++;
+                                lb = b;
+                                if (lb == 0xff) continue; /* NULL */
+                                else if (lb == 0xfe) {
+                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                    (*address)++;
+                                    lob_len = b;
+                                    if (fread(&b, 1, 1, fp) != 1) goto END_LOB_PARSE2;
+                                    (*address)++;
+                                    lob_len |= (b << 8);
+                                } else if (lb == 0x00) continue; /* empty */
+                                else lob_len = lb;
+
+                                { unsigned char lob_tmp[4096];
+                                int lr = 0;
+                                while (lr < lob_len && !s->cancelled) {
+                                    int need = lob_len - lr;
+                                    int chunk = (need < (int)sizeof(lob_tmp)) ? need : (int)sizeof(lob_tmp);
+                                    int got = (int)fread(lob_tmp, 1, chunk, fp);
+                                    if (got <= 0) goto END_LOB_PARSE2;
+                                    *address += got;
+                                    rc = odv_lob_accumulate(s, lob_i, lob_tmp, got);
+                                    if (rc != ODV_OK) return rc;
+                                    lr += got;
+                                } }
+                            }
+                            rc = odv_lob_write_file(s);
+                            if (rc != ODV_OK) return rc;
+                        }
+END_LOB_PARSE2:
                         step = 1;
                     }
                 }
