@@ -134,9 +134,12 @@ static void ddl_xml_callback(const char *tag, const char *value,
         ODV_COLUMN *col = &s->table.columns[dc->col_idx];
 
         if (strcmp(tag, "COL_NAME") == 0 || strcmp(tag, "NAME") == 0) {
-            /* Skip system-generated columns (SYS_NC*****$) */
-            if (strncmp(value, "SYS_NC", 6) == 0 &&
-                value[strlen(value) - 1] == '$') {
+            /* Skip Oracle system-generated internal columns:
+               - SYS_NC*****$ : In-Database Archiving / function-based index columns
+               - SYS_IME_*    : JSON binary storage (In-Memory Expression) columns */
+            if ((strncmp(value, "SYS_NC", 6) == 0 &&
+                 value[strlen(value) - 1] == '$') ||
+                strncmp(value, "SYS_IME_", 8) == 0) {
                 /* Mark to skip */
                 col->type = -1;
             } else {
@@ -144,8 +147,11 @@ static void ddl_xml_callback(const char *tag, const char *value,
             }
         }
         else if (strcmp(tag, "TYPE_NUM") == 0) {
-            int tn = atoi(value);
-            col->type = type_num_to_col_type(tn, col->length, col->flags);
+            /* Don't overwrite -1 marker for system-generated columns */
+            if (col->type != -1) {
+                int tn = atoi(value);
+                col->type = type_num_to_col_type(tn, col->length, col->flags);
+            }
         }
         else if (strcmp(tag, "LENGTH") == 0) {
             col->length = atoi(value);

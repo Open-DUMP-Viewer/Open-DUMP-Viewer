@@ -46,5 +46,11 @@ set RELDIR=..\..\bin\Release\net10.0-windows7.0
 if not exist "%RELDIR%" mkdir "%RELDIR%"
 copy /y "%OUTDIR%\OraDB_DumpParser.dll" "%RELDIR%\OraDB_DumpParser.dll" >nul
 
+REM Copy to test_dumps for DumpParserTest project
+set TESTDIR=..\..\test_dumps
+if exist "%TESTDIR%" (
+    copy /y "%OUTDIR%\OraDB_DumpParser.dll" "%TESTDIR%\OraDB_DumpParser.dll" >nul
+)
+
 REM Cleanup intermediate files
 del /q *.obj *.exp *.lib 2>nul
