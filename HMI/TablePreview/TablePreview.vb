@@ -667,14 +667,16 @@ Public Class TablePreview
         Dim cellValue = row(e.ColumnIndex)
 
         ' BLOB カラム: hex 文字列から画像サムネイルを生成
-        If _blobColumnIndices.Contains(e.ColumnIndex) AndAlso Not String.IsNullOrEmpty(cellValue) Then
-            Dim img = TryCreateThumbnailFromHex(cellValue)
-            If img IsNot Nothing Then
-                e.Value = img
-                Return
+        If _blobColumnIndices.Contains(e.ColumnIndex) Then
+            If Not String.IsNullOrEmpty(cellValue) Then
+                Dim img = TryCreateThumbnailFromHex(cellValue)
+                If img IsNot Nothing Then
+                    e.Value = img
+                    Return
+                End If
             End If
-            ' 画像として認識できない場合はサイズ表示
-            e.Value = $"(BLOB: {cellValue.Length / 2} bytes)"
+            ' 画像でない or 空の場合は Nothing（ImageColumn はテキスト不可）
+            e.Value = Nothing
             Return
         End If
 
@@ -728,6 +730,13 @@ Public Class TablePreview
             Return Nothing
         End Try
     End Function
+
+    ''' <summary>
+    ''' DataError を抑制（ImageColumn に不正な値が入った場合のダイアログを防止）
+    ''' </summary>
+    Private Sub dataGridViewData_DataError(sender As Object, e As DataGridViewDataErrorEventArgs) Handles dataGridViewData.DataError
+        e.ThrowException = False
+    End Sub
 
     ''' <summary>
     ''' セルダブルクリック: LOB データのポップアッププレビュー
