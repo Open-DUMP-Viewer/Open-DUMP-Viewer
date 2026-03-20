@@ -515,6 +515,96 @@ static void write_indexes(SQL_CONTEXT *ctx, const char *schema,
 }
 
 /*---------------------------------------------------------------------------
+    write_comments
+
+    Outputs COMMENT ON TABLE/COLUMN statements.
+    Called after parse completes (comments may appear after data in EXP format).
+    Oracle/PostgreSQL: COMMENT ON TABLE/COLUMN ... IS '...'
+    MySQL: ALTER TABLE ... COMMENT = '...' (table), not standard for columns
+    SQL Server: sp_addextendedproperty (non-standard, skip for now)
+ ---------------------------------------------------------------------------*/
+static void write_comments(SQL_CONTEXT *ctx, const char *schema,
+                           const char *table, int dbms)
+{
+    FILE *fp = ctx->fp;
+    int i;
+    int has_any = 0;
+
+    if (!ctx->session) return;
+
+    /* Check if any comments exist */
+    if (ctx->session->table.comment[0]) has_any = 1;
+    if (!has_any) {
+        for (i = 0; i < ctx->session->table.col_count; i++) {
+            if (ctx->session->table.columns[i].comment[0]) { has_any = 1; break; }
+        }
+    }
+    if (!has_any) return;
+
+    /* Table comment */
+    if (ctx->session->table.comment[0]) {
+        switch (dbms) {
+        case DBMS_MYSQL:
+            fprintf(fp, "ALTER TABLE ");
+            if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
+            sql_write_identifier(fp, table, dbms);
+            fprintf(fp, " COMMENT = ");
+            sql_write_string(fp, ctx->session->table.comment);
+            fprintf(fp, ";\n");
+            break;
+        case DBMS_SQLSERVER:
+            /* SQL Server uses sp_addextendedproperty — output as comment */
+            fprintf(fp, "-- COMMENT ON TABLE %s: ", table);
+            sql_write_string(fp, ctx->session->table.comment);
+            fputc('\n', fp);
+            break;
+        default: /* Oracle, PostgreSQL */
+            fprintf(fp, "COMMENT ON TABLE ");
+            if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
+            sql_write_identifier(fp, table, dbms);
+            fprintf(fp, " IS ");
+            sql_write_string(fp, ctx->session->table.comment);
+            fprintf(fp, ";\n");
+            break;
+        }
+    }
+
+    /* Column comments */
+    for (i = 0; i < ctx->session->table.col_count; i++) {
+        if (!ctx->session->table.columns[i].comment[0]) continue;
+
+        switch (dbms) {
+        case DBMS_MYSQL:
+            /* MySQL: column comments set via ALTER TABLE MODIFY COLUMN ... COMMENT '...'
+               This requires full column definition — too complex. Output as SQL comment. */
+            fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
+            fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
+            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            fputc('\n', fp);
+            break;
+        case DBMS_SQLSERVER:
+            fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
+            fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
+            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            fputc('\n', fp);
+            break;
+        default: /* Oracle, PostgreSQL */
+            fprintf(fp, "COMMENT ON COLUMN ");
+            if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
+            sql_write_identifier(fp, table, dbms);
+            fputc('.', fp);
+            sql_write_identifier(fp, ctx->session->table.columns[i].name, dbms);
+            fprintf(fp, " IS ");
+            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            fprintf(fp, ";\n");
+            break;
+        }
+    }
+
+    fputc('\n', fp);
+}
+
+/*---------------------------------------------------------------------------
     build_insert_prefix
 
     Builds the "INSERT INTO schema.table (col1, col2, ...) VALUES (" prefix
@@ -738,9 +828,11 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         break;
     }
 
-    /* Write CREATE INDEX after parse completes (EXP has INDEX DDL after data) */
+    /* Write CREATE INDEX and COMMENT ON after parse completes
+       (EXP has INDEX/COMMENT DDL after data records) */
     if (ctx.create_table && ctx.header_written && ctx.last_table[0]) {
         write_indexes(&ctx, ctx.last_schema, ctx.last_table, ctx.dbms_type);
+        write_comments(&ctx, ctx.last_schema, ctx.last_table, ctx.dbms_type);
     }
 
     fclose(ctx.fp);

@@ -165,6 +165,7 @@ typedef struct {
     char   type_str[64];         /* "VARCHAR2(100)" etc. */
     int    not_null;             /* 1=NOT NULL constraint */
     char   default_val[256];     /* DEFAULT value expression */
+    char   comment[512];         /* Column comment (COMMENT ON COLUMN) */
 } ODV_COLUMN;
 
 /* Constraint definition */
@@ -201,6 +202,7 @@ typedef struct {
     int         is_partition;
     ODV_CONSTRAINT constraints[ODV_MAX_CONSTRAINTS];
     int         constraint_count;
+    char        comment[512];    /* Table comment (COMMENT ON TABLE) */
 } ODV_TABLE;
 
 /* Partition list entry (built from EXPDP dictionary table) */

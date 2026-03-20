@@ -392,6 +392,65 @@ static char *serialize_constraints_json(ODV_SESSION *s)
 
         buf[pos++] = '}';
     }
+
+    /* Append comments entry (type=5) if table or any column has a comment */
+    {
+        int has_comment = (s->table.comment[0] != '\0');
+        if (!has_comment) {
+            for (i = 0; i < s->table.col_count; i++) {
+                if (s->table.columns[i].comment[0]) { has_comment = 1; break; }
+            }
+        }
+        if (has_comment) {
+            /* Ensure buffer space (generous: 512 per col + 512 for table) */
+            int needed = (s->table.col_count + 1) * 600 + 128;
+            if (pos + needed > buf_size) {
+                buf_size = pos + needed;
+                buf = (char *)realloc(buf, buf_size);
+                if (!buf) return NULL;
+            }
+
+            if (s->table.constraint_count > 0 || pos > 1) buf[pos++] = ',';
+
+            /* JSON-escape helper inline */
+            #define JSON_ESC_COMMENT(src, dst, dst_size) do { \
+                int _ei = 0; const char *_cp = (src); \
+                while (*_cp && _ei < (dst_size) - 2) { \
+                    if (*_cp == '"' || *_cp == '\\') (dst)[_ei++] = '\\'; \
+                    (dst)[_ei++] = *_cp++; \
+                } (dst)[_ei] = '\0'; \
+            } while(0)
+
+            char esc[1024];
+            int n;
+
+            /* table_comment */
+            JSON_ESC_COMMENT(s->table.comment, esc, sizeof(esc));
+            n = snprintf(buf + pos, buf_size - pos,
+                "{\"type\":5,\"table_comment\":\"%s\",\"col_comments\":{", esc);
+            pos += n;
+
+            /* col_comments */
+            int first_col = 1;
+            for (i = 0; i < s->table.col_count; i++) {
+                if (s->table.columns[i].comment[0]) {
+                    char col_esc[256], cmt_esc[1024];
+                    JSON_ESC_COMMENT(s->table.columns[i].name, col_esc, sizeof(col_esc));
+                    JSON_ESC_COMMENT(s->table.columns[i].comment, cmt_esc, sizeof(cmt_esc));
+                    if (!first_col) buf[pos++] = ',';
+                    n = snprintf(buf + pos, buf_size - pos,
+                        "\"%s\":\"%s\"", col_esc, cmt_esc);
+                    pos += n;
+                    first_col = 0;
+                }
+            }
+            n = snprintf(buf + pos, buf_size - pos, "}}");
+            pos += n;
+
+            #undef JSON_ESC_COMMENT
+        }
+    }
+
     buf[pos++] = ']';
     buf[pos] = '\0';
     return buf;
@@ -1480,6 +1539,18 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         }
                     }
                 }
+                /* 26ai COMMENT ON: "COMMENT ON TABLE ... IS\n'text'\n"
+                 * Accumulate fragments until closing quote is found. */
+                if (wlen > 0 && starts_with_ci(word, "COMMENT ON ")) {
+                    word[wlen] = '\0';
+                    /* Check if comment text is complete (ends with ') */
+                    if (wlen >= 2 && word[wlen - 1] == '\'') {
+                        /* Complete — fall through to handle_ddl */
+                    } else {
+                        if (wlen < ODV_WORD_LEN - 1) word[wlen++] = ' ';
+                        break;
+                    }
+                }
                 if (wlen == 0) break;
                 word[wlen] = '\0';
 
@@ -1877,6 +1948,92 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         null_count = 0;
                     }
                     /* else: DDL INSERT, ignore and stay in step 2 */
+
+                } else if (starts_with_ci(word, "COMMENT ON ") && pending_table) {
+                    /* COMMENT ON TABLE "schema"."table" IS 'comment text'
+                       COMMENT ON COLUMN "schema"."table"."column" IS 'comment text' */
+                    const char *cp = word + 11;
+                    if (starts_with_ci(cp, "TABLE")) {
+                        cp += 5; cp = skip_ws(cp);
+                        /* Skip schema.table reference */
+                        if (*cp == '"') { cp++; while (*cp && *cp != '"') cp++; if (*cp == '"') cp++; }
+                        cp = skip_ws(cp);
+                        if (*cp == '.') { cp++; cp = skip_ws(cp);
+                            if (*cp == '"') { cp++; while (*cp && *cp != '"') cp++; if (*cp == '"') cp++; }
+                        }
+                        cp = skip_ws(cp);
+                        if (starts_with_ci(cp, "IS")) {
+                            cp += 2; cp = skip_ws(cp);
+                            if (*cp == '\'') {
+                                cp++;
+                                int ci = 0;
+                                int maxlen = (int)sizeof(s->table.comment) - 1;
+                                while (*cp && ci < maxlen) {
+                                    if (*cp == '\'' && *(cp + 1) == '\'') {
+                                        s->table.comment[ci++] = '\'';
+                                        cp += 2;
+                                    } else if (*cp == '\'') {
+                                        break;
+                                    } else {
+                                        s->table.comment[ci++] = *cp++;
+                                    }
+                                }
+                                s->table.comment[ci] = '\0';
+                            }
+                        }
+                    } else if (starts_with_ci(cp, "COLUMN")) {
+                        cp += 6; cp = skip_ws(cp);
+                        /* Skip schema.table prefix, extract column name */
+                        /* Format: "schema"."table"."column" or "table"."column" */
+                        char ids[4][ODV_OBJNAME_LEN + 1];
+                        int id_count = 0;
+                        while (id_count < 4) {
+                            if (*cp == '"') {
+                                cp++;
+                                int nl = 0;
+                                while (*cp && *cp != '"' && nl < ODV_OBJNAME_LEN) ids[id_count][nl++] = *cp++;
+                                ids[id_count][nl] = '\0';
+                                if (*cp == '"') cp++;
+                                id_count++;
+                            } else break;
+                            cp = skip_ws(cp);
+                            if (*cp == '.') { cp++; cp = skip_ws(cp); }
+                            else break;
+                        }
+                        /* Last identifier is column name */
+                        char col_name[ODV_OBJNAME_LEN + 1] = {0};
+                        if (id_count > 0) odv_strcpy(col_name, ids[id_count - 1], ODV_OBJNAME_LEN);
+
+                        cp = skip_ws(cp);
+                        if (starts_with_ci(cp, "IS") && col_name[0]) {
+                            cp += 2; cp = skip_ws(cp);
+                            if (*cp == '\'') {
+                                cp++;
+                                char cmt[512] = {0};
+                                int ci = 0;
+                                while (*cp && ci < 511) {
+                                    if (*cp == '\'' && *(cp + 1) == '\'') {
+                                        cmt[ci++] = '\''; cp += 2;
+                                    } else if (*cp == '\'') {
+                                        break;
+                                    } else {
+                                        cmt[ci++] = *cp++;
+                                    }
+                                }
+                                cmt[ci] = '\0';
+                                /* Find matching column and set comment */
+                                { int ki;
+                                  for (ki = 0; ki < s->table.col_count; ki++) {
+                                    if (strcmp(s->table.columns[ki].name, col_name) == 0) {
+                                        odv_strcpy(s->table.columns[ki].comment, cmt,
+                                                   (int)sizeof(s->table.columns[ki].comment) - 1);
+                                        break;
+                                    }
+                                  }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 wlen = 0;

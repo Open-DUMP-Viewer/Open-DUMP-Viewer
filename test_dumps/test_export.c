@@ -109,6 +109,19 @@ static int has_create_table(const char *path) {
     return 0;
 }
 
+/* Count COMMENT ON statements in a SQL file */
+static int count_comment_on(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    int count = 0;
+    char buf[65536];
+    while (fgets(buf, sizeof(buf), f)) {
+        if (strncmp(buf, "COMMENT ON", 10) == 0) count++;
+    }
+    fclose(f);
+    return count;
+}
+
 /* Count CREATE INDEX statements in a SQL file */
 static int count_create_indexes(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -437,6 +450,56 @@ int main(int argc, char *argv[]) {
             }
         } else {
             printf("  IDX SQL [%-10s] -> FAIL: %s\n", dbms_name(dbms),
+                   fn_get_error ? fn_get_error(s) : "unknown error");
+            fail++;
+        }
+        fn_destroy(s);
+    }
+
+    /* ================================================================
+       Phase 6: EXP COMMENT Export Test (exp_comment_test.dmp)
+       ================================================================ */
+    const char *cmt_file = "./11g/exp_comment_test.dmp";
+    printf("\nPhase 6: COMMENT Export Test (%s)\n", cmt_file);
+    printf("========================================\n");
+
+    /* Oracle and PostgreSQL should have COMMENT ON statements */
+    for (int d = 0; d < 4; d++) {
+        int dbms = dbms_types[d];
+        char out_path[512];
+        snprintf(out_path, 512, "export_output/cmt_T_COMMENT_TEST_%s.sql",
+                 dbms_name(dbms));
+
+        s = NULL;
+        fn_create(&s);
+        fn_set_file(s, cmt_file);
+        fn_check_kind(s, &dump_type);
+        fn_set_table_cb(s, on_table, &tables);
+        fn_list_tables(s);
+        if (fn_set_sql_opts) fn_set_sql_opts(s, 1);
+
+        int rc = fn_export_sql(s, "T_COMMENT_TEST", out_path, dbms);
+        if (rc == 0) {
+            int inserts = count_inserts(out_path);
+            int comments = count_comment_on(out_path);
+            int has_ddl = has_create_table(out_path);
+            printf("  CMT SQL [%-10s] -> %d INSERTs, DDL=%s, %d COMMENT ON",
+                   dbms_name(dbms), inserts, has_ddl ? "YES" : "NO", comments);
+            /* Oracle/PostgreSQL: 1 table comment + 4 column comments = 5 */
+            if ((dbms == 0 || dbms == 4) && comments == 5) {
+                printf(" OK\n");
+                pass++;
+            } else if ((dbms == 5 || dbms == 6) && comments == 0) {
+                /* MySQL/SQL Server: comments as SQL comments, not COMMENT ON */
+                printf(" OK (as SQL comments)\n");
+                pass++;
+            } else {
+                printf(" FAIL (expected %d COMMENT ON)\n",
+                       (dbms == 0 || dbms == 4) ? 5 : 0);
+                fail++;
+            }
+        } else {
+            printf("  CMT SQL [%-10s] -> FAIL: %s\n", dbms_name(dbms),
                    fn_get_error ? fn_get_error(s) : "unknown error");
             fail++;
         }

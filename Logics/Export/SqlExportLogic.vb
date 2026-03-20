@@ -315,6 +315,34 @@ Public Class SqlExportLogic
                         End If
                         Dim nameClause = If(Not String.IsNullOrEmpty(idxName), " " & ExportHelper.EscapeSqlIdentifier(idxName, dbmsType), "")
                         sw.WriteLine($"CREATE INDEX{nameClause} ON {fullName} {colExpr};")
+
+                    Case 5 ' COMMENT
+                        Dim tblComment = If(c.table_comment, "")
+                        Dim colComments = c.col_comments
+
+                        ' Table comment
+                        If Not String.IsNullOrEmpty(tblComment) Then
+                            Select Case dbmsType
+                                Case ExportHelper.DBMS_MYSQL
+                                    sw.WriteLine($"ALTER TABLE {fullName} COMMENT = {ExportHelper.EscapeSqlString(tblComment)};")
+                                Case ExportHelper.DBMS_SQLSERVER
+                                    sw.WriteLine($"-- COMMENT ON TABLE {tableName}: {ExportHelper.EscapeSqlString(tblComment)}")
+                                Case Else ' Oracle, PostgreSQL
+                                    sw.WriteLine($"COMMENT ON TABLE {fullName} IS {ExportHelper.EscapeSqlString(tblComment)};")
+                            End Select
+                        End If
+
+                        ' Column comments
+                        If colComments IsNot Nothing Then
+                            For Each kvp In colComments
+                                Select Case dbmsType
+                                    Case ExportHelper.DBMS_MYSQL, ExportHelper.DBMS_SQLSERVER
+                                        sw.WriteLine($"-- COMMENT ON COLUMN {tableName}.{kvp.Key}: {ExportHelper.EscapeSqlString(kvp.Value)}")
+                                    Case Else ' Oracle, PostgreSQL
+                                        sw.WriteLine($"COMMENT ON COLUMN {fullName}.{ExportHelper.EscapeSqlIdentifier(kvp.Key, dbmsType)} IS {ExportHelper.EscapeSqlString(kvp.Value)};")
+                                End Select
+                            Next
+                        End If
                 End Select
             Next
         Catch
@@ -332,6 +360,8 @@ Public Class SqlExportLogic
         Public Property ref_columns As String()
         Public Property condition As String
         Public Property index_expr As String
+        Public Property table_comment As String
+        Public Property col_comments As Dictionary(Of String, String)
     End Class
 
 End Class
