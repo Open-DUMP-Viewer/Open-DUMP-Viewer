@@ -1555,6 +1555,14 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                         rc = parse_expdp_records(s, fp, &address, list_only);
                         notify_table(s, s->table.record_count);
                         if (rc != ODV_OK && rc != ODV_ERROR_CANCELLED) { /* non-fatal */ }
+
+                        /* When seek_offset was used, we parsed exactly one partition's
+                         * data at the target position. Exit now to avoid parsing
+                         * subsequent partitions of the same table name. */
+                        if (s->filter_active && s->seek_offset > 0 && filter_found) {
+                            in_ddl = 0;
+                            goto expdp_done;
+                        }
                     } else {
                         /* Filtered out in full parse: skip records */
                         notify_table(s, 0);

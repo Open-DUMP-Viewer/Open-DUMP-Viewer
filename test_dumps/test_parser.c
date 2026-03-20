@@ -244,6 +244,51 @@ static int test_dump(const char *path, int expected_type) {
         }
     }
 
+    /* Phase 5: Test per-partition parsing (for EXPDP partitioned tables).
+       Must run BEFORE Phase 3 (parse_dump) because parse_dump resets the session's
+       table_list. We need the list_tables state for table_entry lookups. */
+    if (fn_get_table_entry) {
+        int tc = g_state.table_count;
+        int tested = 0;
+        int ti;
+        for (ti = 0; ti < tc && tested < 3; ti++) {
+            const char *sch = NULL, *nm = NULL, *part = NULL, *ppart = NULL;
+            int ty = 0; __int64 rc2 = 0;
+            if (fn_get_table_entry(s, ti, &sch, &nm, &part, &ppart, &ty, &rc2) != 0) continue;
+            if (ty != 2 || !part || !part[0]) continue;
+            if (ti >= 200 || g_state.table_offsets[ti] == 0) continue;
+
+            ODV_SESSION *sp = NULL;
+            fn_create(&sp);
+            fn_set_file(sp, path);
+            fn_check_kind(sp, &dump_type);
+
+            int prev_total = g_state.total_rows;
+            g_state.total_rows = 0;
+            g_state.current_table[0] = '\0';
+
+            fn_set_row_cb(sp, on_row, &g_state);
+            fn_set_filter(sp, sch, nm);
+            fn_set_offset(sp, g_state.table_offsets[ti]);
+
+            int prc = fn_parse_dump(sp);
+            if (prc == 0) {
+                printf("  Partition %s.%s:%s -> %d rows (expected %lld)%s\n",
+                       sch, nm, part, g_state.total_rows, rc2,
+                       (g_state.total_rows == (int)rc2) ? " OK" : " MISMATCH");
+                if (g_state.total_rows != (int)rc2) {
+                    g_state.warnings++;
+                }
+            } else {
+                printf("  Partition %s.%s:%s -> FAIL rc=%d\n", sch, nm, part, prc);
+            }
+
+            g_state.total_rows = prev_total;
+            fn_destroy(sp);
+            tested++;
+        }
+    }
+
     /* Phase 3: Parse all data */
     fn_set_row_cb(s, on_row, &g_state);
     fn_set_progress_cb(s, on_progress, &g_state);
