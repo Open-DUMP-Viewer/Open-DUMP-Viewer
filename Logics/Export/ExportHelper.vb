@@ -373,6 +373,13 @@ Public Module ExportHelper
         Dim workspace = TryCast(mainForm.ActiveMdiChild, Workspace)
         If workspace Is Nothing Then Return Nothing
 
+        ' 複数選択がある場合は選択テーブルのみ返す
+        Dim selected = workspace.GetSelectedTableContexts()
+        If selected IsNot Nothing AndAlso selected.Count > 1 Then
+            Return selected
+        End If
+
+        ' 選択なし or 1件のみ → 全可視テーブルを返す
         Return workspace.GetVisibleTableContexts()
     End Function
 

@@ -453,37 +453,49 @@ Public Class Workspace
         If lstTableList.SelectedItems.Count = 0 Then Return Nothing
         If String.IsNullOrEmpty(_currentSchema) Then Return Nothing
 
-        Dim tableName = lstTableList.SelectedItems(0).Text
+        Dim entry = TryCast(lstTableList.SelectedItems(0).Tag, OraDB_NativeParser.TableEntry)
+        If entry Is Nothing Then Return Nothing
+
+        Return BuildExportContext(entry)
+    End Function
+
+    ''' <summary>
+    ''' Workspace で選択中の全テーブルのエクスポートコンテキストを返す（複数選択対応）
+    ''' 2件以上選択時に一括エクスポートとして使用
+    ''' </summary>
+    Public Function GetSelectedTableContexts() As List(Of ExportHelper.TableExportContext)
+        Dim result As New List(Of ExportHelper.TableExportContext)
+        If lstTableList.SelectedItems.Count = 0 Then Return result
+        If String.IsNullOrEmpty(_currentSchema) Then Return result
+
+        For Each item As ListViewItem In lstTableList.SelectedItems
+            Dim entry = TryCast(item.Tag, OraDB_NativeParser.TableEntry)
+            If entry Is Nothing Then Continue For
+            result.Add(BuildExportContext(entry))
+        Next
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' TableEntry からエクスポートコンテキストを構築するヘルパー
+    ''' </summary>
+    Private Function BuildExportContext(entry As OraDB_NativeParser.TableEntry) As ExportHelper.TableExportContext
+        Dim tableName = entry.TableName
         Dim tableKey = $"{_currentSchema}.{tableName}"
 
         Dim ctx As New ExportHelper.TableExportContext()
         ctx.DumpFilePath = DumpFilePath
         ctx.Schema = _currentSchema
         ctx.TableName = tableName
+        ctx.RowCount = entry.RowCount
+        ctx.DataOffset = entry.DataOffset
 
-        If _columnNamesMap.ContainsKey(tableKey) Then
-            ctx.ColumnNames = _columnNamesMap(tableKey)
-        End If
-        If _columnTypesMap.ContainsKey(tableKey) Then
-            ctx.ColumnTypes = _columnTypesMap(tableKey)
-        End If
-        If _columnNotNullsMap.ContainsKey(tableKey) Then
-            ctx.ColumnNotNulls = _columnNotNullsMap(tableKey)
-        End If
-        If _columnDefaultsMap.ContainsKey(tableKey) Then
-            ctx.ColumnDefaults = _columnDefaultsMap(tableKey)
-        End If
-        If _constraintsJsonMap.ContainsKey(tableKey) Then
-            ctx.ConstraintsJson = _constraintsJsonMap(tableKey)
-        End If
-
-        If _tableList.ContainsKey(_currentSchema) Then
-            Dim entry = _tableList(_currentSchema).Find(Function(x) x.TableName = tableName)
-            If entry IsNot Nothing Then
-                ctx.RowCount = entry.RowCount
-                ctx.DataOffset = entry.DataOffset
-            End If
-        End If
+        If _columnNamesMap.ContainsKey(tableKey) Then ctx.ColumnNames = _columnNamesMap(tableKey)
+        If _columnTypesMap.ContainsKey(tableKey) Then ctx.ColumnTypes = _columnTypesMap(tableKey)
+        If _columnNotNullsMap.ContainsKey(tableKey) Then ctx.ColumnNotNulls = _columnNotNullsMap(tableKey)
+        If _columnDefaultsMap.ContainsKey(tableKey) Then ctx.ColumnDefaults = _columnDefaultsMap(tableKey)
+        If _constraintsJsonMap.ContainsKey(tableKey) Then ctx.ConstraintsJson = _constraintsJsonMap(tableKey)
 
         Return ctx
     End Function
