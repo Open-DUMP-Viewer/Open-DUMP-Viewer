@@ -1,5 +1,32 @@
 # Changelog
 
+## [3.0.0] - 2026-03-20
+
+### 新機能
+- **パーティションテーブル完全対応**: EXP / EXPDP 両形式でパーティション検出・階層表示・パーティション単位プレビュー・エクスポートに対応
+- **BLOB/CLOB プレビュー表示**: LOB カラムの内容をテーブルプレビュー内に表示（BLOB は hex、CLOB は UTF-8 テキスト、最大 4KB）
+- **CHECK 制約エクスポート**: CHECK 制約を `ALTER TABLE ... ADD CONSTRAINT` として DDL に反映
+- **INDEX 定義エクスポート**: 通常 INDEX・複合 INDEX・関数 INDEX の `CREATE INDEX` 文を生成
+- **テーブル・カラムコメントエクスポート**: `COMMENT ON TABLE/COLUMN` 文を SQL エクスポートに含める
+- **カスタム CSV デリミタ**: タブ、セミコロン、パイプ等のデリミタを選択可能に
+- **EXPDP メタデータ高信頼化**: マスターテーブルスキャンによる制約名・INDEX 名の自動取得
+- **impdp SQLFILE 連携**: Oracle Client 環境で impdp を使った完全な DDL 生成（オプション機能）
+- **複数テーブル選択エクスポート**: 複数テーブルを一括で CSV/SQL/Excel/Access にエクスポート
+- **エクスポート進捗表示**: テーブル数・処理行数・経過時間をリアルタイム表示
+- **Access エクスポート**: Microsoft Access (.accdb) 形式への一括エクスポート
+- **起動時アップデートチェック**: 新バージョンの自動検出と通知
+- **ライセンス認証サーバー検証**: オンラインでのライセンス有効性確認
+
+### 改善
+- **EXPDP パーサ全面書き直し**: ステートマシン方式に刷新し、LOB カラムの正確な解析を実現
+- **文字セット対応拡充**: WE8MSWIN1252、WE8ISO8859P15、ZHS16GBK を追加
+- **SYS_IME_* 内部カラムフィルタリング**: OSON 内部カラムを自動除外
+- **26ai EXP 形式対応**: DDL 行分割・COMMENT ON・ALTER TABLE MODIFY DEFAULT の蓄積処理
+
+### セキュリティ
+- **C DLL**: バッファオーバーフロー修正（odv_number.c）、整数オーバーフローガード（LOB バッファ）、realloc メモリリーク修正、境界チェック追加
+- **VB.NET**: パストラバーサル防止（BulkExportLogic）、コマンドインジェクション対策（AboutDialog, ImpdpHelper）、SQL インジェクション軽減（DEFAULT 値）、TLS 暗号化強制（SQL Server 接続）
+
 ## [2.3.1] - 2026-03-18
 
 ### 新機能
