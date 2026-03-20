@@ -148,6 +148,7 @@ ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, c
         s->filter_active = 0;
         s->filter_schema[0] = '\0';
         s->filter_table[0] = '\0';
+        s->filter_partition[0] = '\0';
         return ODV_OK;
     }
 
@@ -158,9 +159,21 @@ ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, c
         s->filter_schema[0] = '\0';
     }
     odv_strcpy(s->filter_table, table, ODV_OBJNAME_LEN);
+    s->filter_partition[0] = '\0';
     s->filter_active = 1;
     s->pass_flg = 0;
 
+    return ODV_OK;
+}
+
+ODV_API int __stdcall odv_set_partition_filter(ODV_SESSION *s, const char *partition)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    if (partition && partition[0]) {
+        odv_strcpy(s->filter_partition, partition, ODV_OBJNAME_LEN);
+    } else {
+        s->filter_partition[0] = '\0';
+    }
     return ODV_OK;
 }
 

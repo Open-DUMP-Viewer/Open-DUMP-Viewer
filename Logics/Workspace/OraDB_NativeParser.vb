@@ -121,6 +121,11 @@ Public Class OraDB_NativeParser
         <MarshalAs(UnmanagedType.LPUTF8Str)> table As String) As Integer
     End Function
 
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_partition_filter(session As IntPtr,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> partition As String) As Integer
+    End Function
+
     ' エクスポートオプション
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_set_date_format(session As IntPtr, fmt As Integer,
@@ -414,7 +419,8 @@ Public Class OraDB_NativeParser
                                       Optional filterSchema As String = Nothing,
                                       Optional filterTable As String = Nothing,
                                       Optional dataOffset As Long = 0,
-                                      Optional expectedRowCount As Long = 0) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
+                                      Optional expectedRowCount As Long = 0,
+                                      Optional filterPartition As String = Nothing) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ParseContext()
         ctx.ProgressAction = progressAction
@@ -453,6 +459,11 @@ Public Class OraDB_NativeParser
             ' テーブルフィルタ設定（DLL側で文字セット変換後に比較）
             If filterTable IsNot Nothing AndAlso filterTable.Length > 0 Then
                 odv_set_table_filter(session, If(filterSchema, ""), filterTable)
+            End If
+
+            ' パーティションフィルタ設定
+            If filterPartition IsNot Nothing AndAlso filterPartition.Length > 0 Then
+                odv_set_partition_filter(session, filterPartition)
             End If
 
             ' データオフセット設定（高速シーク: list_tablesで取得したDDL位置にジャンプ）

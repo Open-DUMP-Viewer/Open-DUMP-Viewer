@@ -43,6 +43,7 @@ typedef int (__stdcall *FN_GET_TABLE_COUNT)(ODV_SESSION *s);
 typedef int (__stdcall *FN_GET_TABLE_ENTRY)(ODV_SESSION *s, int index,
     const char **schema, const char **name, const char **partition,
     const char **parent_partition, int *type, __int64 *row_count);
+typedef int (__stdcall *FN_SET_PARTITION_FILTER)(ODV_SESSION *s, const char *partition);
 
 /* --- Globals --- */
 static FN_CREATE        fn_create;
@@ -61,6 +62,7 @@ static FN_GET_ERROR     fn_get_error;
 static FN_GET_PCT       fn_get_pct;
 static FN_GET_TABLE_COUNT fn_get_table_count;
 static FN_GET_TABLE_ENTRY fn_get_table_entry;
+static FN_SET_PARTITION_FILTER fn_set_part_filter;
 
 /* --- Test state --- */
 typedef struct {
@@ -270,6 +272,7 @@ static int test_dump(const char *path, int expected_type) {
             fn_set_row_cb(sp, on_row, &g_state);
             fn_set_filter(sp, sch, nm);
             fn_set_offset(sp, g_state.table_offsets[ti]);
+            if (fn_set_part_filter) fn_set_part_filter(sp, part);
 
             int prc = fn_parse_dump(sp);
             if (prc == 0) {
@@ -420,6 +423,7 @@ int main(int argc, char *argv[]) {
         fn_get_pct      = (FN_GET_PCT)GetProcAddress(dll, "odv_get_progress_pct");
         fn_get_table_count = (FN_GET_TABLE_COUNT)GetProcAddress(dll, "odv_get_table_count");
         fn_get_table_entry = (FN_GET_TABLE_ENTRY)GetProcAddress(dll, "odv_get_table_entry");
+        fn_set_part_filter = (FN_SET_PARTITION_FILTER)GetProcAddress(dll, "odv_set_partition_filter");
     }
 
     if (!fn_create || !fn_destroy || !fn_set_file || !fn_check_kind ||

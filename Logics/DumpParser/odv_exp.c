@@ -1661,7 +1661,11 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                 if (filter_found && s->pass_flg) {
                                     goto done;
                                 }
-                                if (match) {
+                                if (match && !s->filter_partition[0]) {
+                                    /* Only set filter_found here when NOT using
+                                     * partition filter. With partition filter,
+                                     * filter_found is set by the PARTITION marker
+                                     * handler when the matching partition is found. */
                                     filter_found = 1;
                                 }
                             }
@@ -1964,9 +1968,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     }
 
                     if (part_name[0]) {
-                        /* Set ddl_offset to this PARTITION marker's position
-                         * so each partition has a unique seek target */
-                        s->table.ddl_offset = address - wlen - 1;
+                        /* Keep ddl_offset at the CREATE TABLE position
+                         * (shared by all partitions). The partition filter
+                         * (filter_partition) is used to select which partition. */
 
                         if (!s->table.is_partition) {
                             /* First partition marker for this table → mark as partitioned */
@@ -1979,6 +1983,17 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                             pending_row_count = 0;
                             s->table.record_count = 0;
                             odv_strcpy(s->table.partition, part_name, ODV_OBJNAME_LEN);
+                        }
+
+                        /* Apply partition filter: if filter_partition is set,
+                         * skip partitions that don't match */
+                        if (s->filter_active && s->filter_partition[0]) {
+                            if (_stricmp(part_name, s->filter_partition) != 0) {
+                                s->pass_flg = 1;  /* Skip this partition's data */
+                            } else {
+                                s->pass_flg = 0;  /* Parse this partition */
+                                filter_found = 1;
+                            }
                         }
                     }
 
@@ -2374,10 +2389,11 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     if (rc == ODV_ERROR_CANCELLED) goto done;
                     rc = ODV_OK;
 
-                    /* When seek_offset was used, we parsed exactly one
-                     * partition's data. Exit now to avoid parsing
-                     * subsequent partitions of the same table. */
-                    if (s->filter_active && s->seek_offset > 0 && filter_found)
+                    /* When parsing a specific partition (via seek_offset or
+                     * filter_partition), exit after the first match to avoid
+                     * parsing subsequent partitions of the same table. */
+                    if (s->filter_active && filter_found &&
+                        (s->seek_offset > 0 || s->filter_partition[0]))
                         goto done;
                 }
                 break;

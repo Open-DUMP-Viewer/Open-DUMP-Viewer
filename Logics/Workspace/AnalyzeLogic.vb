@@ -165,7 +165,8 @@ Public Class AnalyzeLogic
     ''' </summary>
     Public Shared Async Function AnalyzeTableAsync(filePath As String, schemaName As String, tableName As String,
                                                     Optional dataOffset As Long = 0,
-                                                    Optional expectedRowCount As Long = 0) As Task(Of List(Of String()))
+                                                    Optional expectedRowCount As Long = 0,
+                                                    Optional partitionName As String = Nothing) As Task(Of List(Of String()))
         Try
             ValidateFilePath(filePath)
 
@@ -185,7 +186,7 @@ Public Class AnalyzeLogic
 
             ' バックグラウンドスレッドで解析実行
             Dim result = Await Task.Run(Function()
-                                            Return OraDB_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount)
+                                            Return OraDB_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount, partitionName)
                                         End Function)
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime

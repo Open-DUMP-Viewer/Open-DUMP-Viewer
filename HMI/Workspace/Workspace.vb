@@ -175,9 +175,10 @@ Public Class Workspace
             Dim tableName As String = entry.TableName
             Dim dataOffset As Long = entry.DataOffset
             Dim expectedRowCount As Long = entry.RowCount
+            Dim partitionName As String = entry.PartitionName
 
             ' フェーズ2: 選択テーブルのみ非同期解析（UIスレッドをブロックしない）
-            Dim tableData = Await AnalyzeLogic.AnalyzeTableAsync(DumpFilePath, _currentSchema, tableName, dataOffset, expectedRowCount)
+            Dim tableData = Await AnalyzeLogic.AnalyzeTableAsync(DumpFilePath, _currentSchema, tableName, dataOffset, expectedRowCount, partitionName)
 
             ' 列名を取得（Phase1のListTablesで取得済みのキャッシュから）
             Dim columnNames As New List(Of String)
