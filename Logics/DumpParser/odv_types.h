@@ -406,6 +406,7 @@ struct _odv_session {
     /* Table filter for selective parsing */
     char            filter_schema[ODV_OBJNAME_LEN + 1];
     char            filter_table[ODV_OBJNAME_LEN + 1];
+    char            filter_partition[ODV_OBJNAME_LEN + 1]; /* Partition name filter (empty=all) */
     int             filter_active;   /* 0=no filter, 1=filter active */
     int             pass_flg;        /* 1=skip current table's records */
     int64_t         seek_offset;     /* If >0, seek here after header to skip DDL scan */

@@ -470,6 +470,9 @@ int main(int argc, char *argv[]) {
     snprintf(path, 512, "%s/11g/exp_comment_test.dmp", base);
     if (test_dump(path, 10)) pass++; else fail++;  /* COMMENT test: table + 4 column comments */
 
+    snprintf(path, 512, "%s/11g/exp_partition_test.dmp", base);
+    if (test_dump(path, 10)) pass++; else fail++;  /* PARTITION test: HASH(4) + RANGE(4) */
+
     /* Summary */
     printf("\n========================================\n");
     printf("RESULTS: %d passed, %d failed (total %d)\n", pass, fail, pass + fail);

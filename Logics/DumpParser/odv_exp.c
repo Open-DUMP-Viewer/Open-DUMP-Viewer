@@ -825,9 +825,34 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
         ODV_TABLE_ENTRY *e = &s->table_list[s->table_count];
         odv_strcpy(e->schema, conv_schema, ODV_OBJNAME_LEN);
         odv_strcpy(e->name, conv_name_buf, ODV_OBJNAME_LEN);
-        e->type = 0;
         e->col_count = s->table.col_count;
         e->row_count = row_count;
+
+        /* Set partition info from EXP PARTITION marker */
+        if (s->table.is_partition && s->table.partition[0]) {
+            odv_strcpy(e->partition, s->table.partition, ODV_OBJNAME_LEN);
+            /* Detect partition type: first occurrence = PARTITION_TABLE,
+               subsequent = PARTITION (same as EXPDP logic) */
+            {
+                int k, found_prev = 0;
+                for (k = 0; k < s->table_count; k++) {
+                    if (strcmp(s->table_list[k].schema, e->schema) == 0 &&
+                        strcmp(s->table_list[k].name, e->name) == 0) {
+                        found_prev = 1;
+                        if (s->table_list[k].type == TABLE_TYPE_TABLE) {
+                            s->table_list[k].type = TABLE_TYPE_PARTITION_TABLE;
+                        }
+                        break;
+                    }
+                }
+                e->type = found_prev ? TABLE_TYPE_PARTITION : TABLE_TYPE_PARTITION_TABLE;
+            }
+        } else {
+            e->type = TABLE_TYPE_TABLE;
+            e->partition[0] = '\0';
+        }
+        e->parent_partition[0] = '\0';
+
         s->table_count++;
     }
 
@@ -1919,6 +1944,44 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         }
                     }
 
+                } else if (pending_table &&
+                           (starts_with_ci(word, "PARTITION \"") ||
+                            starts_with_ci(word, "SUBPARTITION \""))) {
+                    /* EXP partition marker: PARTITION "name" appears before each
+                     * partition's INSERT INTO statement.
+                     * First occurrence: the table is partitioned.
+                     * Subsequent: each is a new partition of the same table. */
+                    const char *pp = word;
+                    int is_sub = starts_with_ci(pp, "SUBPARTITION");
+                    pp += is_sub ? 13 : 10;
+                    pp = skip_ws(pp);
+                    char part_name[ODV_OBJNAME_LEN + 1] = {0};
+                    if (*pp == '"') {
+                        pp++;
+                        int pn = 0;
+                        while (*pp && *pp != '"' && pn < ODV_OBJNAME_LEN) part_name[pn++] = *pp++;
+                        part_name[pn] = '\0';
+                    }
+
+                    if (part_name[0]) {
+                        /* Set ddl_offset to this PARTITION marker's position
+                         * so each partition has a unique seek target */
+                        s->table.ddl_offset = address - wlen - 1;
+
+                        if (!s->table.is_partition) {
+                            /* First partition marker for this table → mark as partitioned */
+                            s->table.is_partition = 1;
+                            odv_strcpy(s->table.partition, part_name, ODV_OBJNAME_LEN);
+                        } else {
+                            /* Subsequent partition: notify the previous partition,
+                             * then start a new partition entry with same table structure */
+                            notify_exp_table(s, pending_row_count > 0 ? pending_row_count : s->table.record_count);
+                            pending_row_count = 0;
+                            s->table.record_count = 0;
+                            odv_strcpy(s->table.partition, part_name, ODV_OBJNAME_LEN);
+                        }
+                    }
+
                 } else if (starts_with_ci(word, "INSERT INTO ")) {
                     /* Extract table name from INSERT INTO and compare with
                        the table from the most recent CREATE TABLE.
@@ -2310,6 +2373,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     wlen = 0;
                     if (rc == ODV_ERROR_CANCELLED) goto done;
                     rc = ODV_OK;
+
+                    /* When seek_offset was used, we parsed exactly one
+                     * partition's data. Exit now to avoid parsing
+                     * subsequent partitions of the same table. */
+                    if (s->filter_active && s->seek_offset > 0 && filter_found)
+                        goto done;
                 }
                 break;
             } /* switch data_step */
