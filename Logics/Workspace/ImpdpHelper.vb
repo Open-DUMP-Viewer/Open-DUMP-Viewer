@@ -35,7 +35,7 @@ Public Class ImpdpHelper
 
         If Not IsAvailable() Then Return result
 
-        Dim tempDir = Path.Combine(Path.GetTempPath(), "OraDB_DUMP_Viewer_impdp")
+        Dim tempDir = Path.Combine(Path.GetTempPath(), $"OraDB_DUMP_Viewer_impdp_{Guid.NewGuid():N}")
         Dim sqlFile = Path.Combine(tempDir, "expdp_ddl.sql")
 
         Try
@@ -60,9 +60,9 @@ Public Class ImpdpHelper
         Catch
             ' impdp 実行エラーは無視（オプション機能のため）
         Finally
-            ' 一時ファイルクリーンアップ
+            ' 一時ディレクトリごとクリーンアップ（GUID 付きで一意のため安全に削除可能）
             Try
-                If File.Exists(sqlFile) Then File.Delete(sqlFile)
+                If Directory.Exists(tempDir) Then Directory.Delete(tempDir, True)
             Catch
             End Try
         End Try
@@ -77,6 +77,17 @@ Public Class ImpdpHelper
                                       sqlFileName As String, schemaName As String) As Boolean
         Try
             Dim impdpPath = ExportOptions.ImpdpPath
+
+            ' Validate impdp path
+            If String.IsNullOrEmpty(impdpPath) Then Return False
+            If Not impdpPath.EndsWith("impdp.exe", StringComparison.OrdinalIgnoreCase) Then Return False
+            If Not File.Exists(impdpPath) Then Return False
+
+            ' Reject shell metacharacters in file/schema names
+            Dim badChars = New Char() {""""c, "'"c, "&"c, "|"c, ">"c, "<"c, ";"c}
+            If dumpFileName.IndexOfAny(badChars) >= 0 Then Return False
+            If schemaName.IndexOfAny(badChars) >= 0 Then Return False
+
             Dim oracleHome = Path.GetDirectoryName(Path.GetDirectoryName(impdpPath))
 
             ' impdp は DIRECTORY オブジェクトが必要だが、SQLFILE モードでは

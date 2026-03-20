@@ -19,7 +19,8 @@ Public Class BulkExportLogic
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
             Dim ctx = contexts(i)
-            Dim outputPath = Path.Combine(outputFolder, $"{ctx.TableName}.csv")
+            Dim safeName = String.Join("_", ctx.TableName.Split(Path.GetInvalidFileNameChars()))
+            Dim outputPath = Path.Combine(outputFolder, $"{safeName}.csv")
 
             ' C DLL ストリーミング (進捗表示付き)
             Dim ok = CsvExportLogic.ExportFromDump(ctx, outputPath, worker)
@@ -42,7 +43,8 @@ Public Class BulkExportLogic
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
             Dim ctx = contexts(i)
-            Dim outputPath = Path.Combine(outputFolder, $"{ctx.TableName}.sql")
+            Dim safeName = String.Join("_", ctx.TableName.Split(Path.GetInvalidFileNameChars()))
+            Dim outputPath = Path.Combine(outputFolder, $"{safeName}.sql")
 
             Dim ok As Boolean
             If ExportOptions.SqlInferInteger Then
@@ -133,6 +135,11 @@ Public Class BulkExportLogic
     Public Shared Function ExportAccess(contexts As List(Of ExportHelper.TableExportContext),
                                          outputPath As String,
                                          worker As BackgroundWorker) As Boolean
+        ' 既存ファイルを削除 (新規作成のため)
+        If IO.File.Exists(outputPath) Then
+            IO.File.Delete(outputPath)
+        End If
+
         ' 最初のテーブルで .accdb を新規作成、以降はテーブル追加
         For i As Integer = 0 To contexts.Count - 1
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
@@ -145,7 +152,8 @@ Public Class BulkExportLogic
             Dim columnList = New List(Of String)(colNames)
 
             Dim ok = AccessExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
-                                              ctx.TableName, outputPath, worker)
+                                              ctx.TableName, outputPath, worker,
+                                              i + 1, contexts.Count)
             If Not ok Then Return False
 
             tableData = Nothing

@@ -203,12 +203,23 @@ Partial Public Class AboutDialog
     ''' バッチファイルを作成し、アプリ終了後にインストーラーを起動する
     ''' </summary>
     Private Sub LaunchInstallerAndExit(installerPath As String)
+        ' インストーラーパスを検証（パストラバーサル・コマンドインジェクション防止）
+        Dim fullPath = Path.GetFullPath(installerPath)
+        If Not fullPath.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) Then
+            Throw New InvalidOperationException("Invalid installer path")
+        End If
+        If Not File.Exists(fullPath) Then
+            Throw New FileNotFoundException("Installer not found", fullPath)
+        End If
+
         Dim batPath = Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_Update", "update.bat")
+        Dim escapedPath = fullPath.Replace("^", "^^").Replace("&", "^&").Replace("|", "^|").
+                                   Replace("<", "^<").Replace(">", "^>").Replace("%", "%%")
         Dim batContent =
             "@echo off" & vbCrLf &
             Loc.S("About_UpdateBatchMessage") & vbCrLf &
             "timeout /t 2 /nobreak >nul" & vbCrLf &
-            $"start """" ""{installerPath}""" & vbCrLf &
+            $"start """" ""{escapedPath}""" & vbCrLf &
             "exit"
 
         File.WriteAllText(batPath, batContent, New System.Text.UTF8Encoding(False))

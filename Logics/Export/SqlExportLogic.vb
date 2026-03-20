@@ -211,10 +211,13 @@ Public Class SqlExportLogic
                 sb.Append(" NOT NULL")
             End If
 
-            ' DEFAULT
+            ' DEFAULT (sanitize to prevent SQL injection from malicious dump files)
             If columnDefaults IsNot Nothing AndAlso i < columnDefaults.Length AndAlso
                Not String.IsNullOrEmpty(columnDefaults(i)) Then
-                sb.Append($" DEFAULT {columnDefaults(i)}")
+                Dim defaultVal = columnDefaults(i).Trim().TrimEnd(";"c)
+                If Not String.IsNullOrWhiteSpace(defaultVal) Then
+                    sb.Append($" DEFAULT {defaultVal}")
+                End If
             End If
         Next
 

@@ -73,7 +73,8 @@ Public Class DatabaseConnectionDialog
         Dim builder As New SqlConnectionStringBuilder()
         builder.DataSource = txtServer.Text.Trim()
         builder.InitialCatalog = txtDatabase.Text.Trim()
-        builder.TrustServerCertificate = True
+        builder.TrustServerCertificate = False
+        builder.Encrypt = True
 
         If cboAuth.SelectedIndex = 0 Then
             ' Windows 認証
