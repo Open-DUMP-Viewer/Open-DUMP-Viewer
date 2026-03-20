@@ -178,6 +178,9 @@ var
 begin
   if CurUninstallStep = usPostUninstall then
   begin
+    { Oracle Client キャッシュを無条件削除 }
+    DelTree(ExpandConstant('{localappdata}\OraDB_DUMP_Viewer\oracle_client'), True, True, True);
+
     SettingsDir := ExpandConstant('{userappdata}\OraDBDUMPViewer');
     if DirExists(SettingsDir) then
     begin
