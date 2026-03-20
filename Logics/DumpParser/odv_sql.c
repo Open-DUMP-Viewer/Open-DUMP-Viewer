@@ -816,8 +816,11 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
 
     switch (s->dump_type) {
     case DUMP_EXPDP:
-    case DUMP_EXPDP_COMPRESS:
         rc = parse_expdp_dump(s, 0);
+        break;
+    case DUMP_EXPDP_COMPRESS:
+        odv_strcpy(s->last_error, "Compressed EXPDP dumps are not supported", ODV_MSG_LEN);
+        rc = ODV_ERROR_UNSUPPORTED;
         break;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:

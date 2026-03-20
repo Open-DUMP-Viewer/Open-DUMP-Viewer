@@ -261,8 +261,11 @@ ODV_API int __stdcall odv_list_tables(ODV_SESSION *s)
 
     switch (s->dump_type) {
     case DUMP_EXPDP:
-    case DUMP_EXPDP_COMPRESS:
         return parse_expdp_dump(s, 1 /* list_only */);
+    case DUMP_EXPDP_COMPRESS:
+        set_error(s, "Compressed EXPDP dumps (COMPRESSION=ALL) are not supported. "
+                     "Please re-export with COMPRESSION=NONE.");
+        return ODV_ERROR_UNSUPPORTED;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
         return parse_exp_dump(s, 1 /* list_only */);
@@ -352,8 +355,11 @@ ODV_API int __stdcall odv_parse_dump(ODV_SESSION *s)
 
     switch (s->dump_type) {
     case DUMP_EXPDP:
-    case DUMP_EXPDP_COMPRESS:
         return parse_expdp_dump(s, 0 /* full parse */);
+    case DUMP_EXPDP_COMPRESS:
+        set_error(s, "Compressed EXPDP dumps (COMPRESSION=ALL) are not supported. "
+                     "Please re-export with COMPRESSION=NONE.");
+        return ODV_ERROR_UNSUPPORTED;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
         return parse_exp_dump(s, 0 /* full parse */);
@@ -590,8 +596,11 @@ ODV_API int __stdcall odv_extract_lob(
     /* Run the parse (LOB accumulation happens inside parse_*_dump) */
     switch (s->dump_type) {
     case DUMP_EXPDP:
-    case DUMP_EXPDP_COMPRESS:
         rc = parse_expdp_dump(s, 0);
+        break;
+    case DUMP_EXPDP_COMPRESS:
+        set_error(s, "Compressed EXPDP dumps are not supported.");
+        rc = ODV_ERROR_UNSUPPORTED;
         break;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
