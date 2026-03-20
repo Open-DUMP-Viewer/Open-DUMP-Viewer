@@ -446,10 +446,7 @@ https://www.odv.dev/
   <data name="ExcelExport_Error" xml:space="preserve"><value>Excel 导出错误: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>行数 ({0}) 超过 Excel 限制 ({1})。建议改用 CSV 导出。</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Access 导出错误: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>未安装 Microsoft Access Database Engine。
-
-请从以下地址下载并安装:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>未安装 Microsoft Access Database Engine。</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog 不可用。请安装 Microsoft Access Database Engine。</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server 导出错误: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC 导出错误: {0}</value></data>
@@ -515,5 +512,6 @@ https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>是否下载并安装 Oracle Instant Client（约 200MB）？&#xA;从 EXPDP 转储中提取完整的约束信息时需要。</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>正在下载...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>Oracle Instant Client 安装完成。</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>是否打开下载页面？</value></data>
 
 </root>

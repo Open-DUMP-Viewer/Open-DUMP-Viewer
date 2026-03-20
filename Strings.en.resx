@@ -447,10 +447,7 @@ Output file count: {0}</value></data>
   <data name="ExcelExport_Error" xml:space="preserve"><value>Excel export error: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Row count ({0}) exceeds Excel limit ({1}). Consider using CSV export instead.</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Access export error: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine is not installed.
-
-Please download and install it from:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine is not installed.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog is not available. Please install Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server export error: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC export error: {0}</value></data>
@@ -516,5 +513,6 @@ Please install the Microsoft Edge WebView2 Runtime.</value></data>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>Download and install Oracle Instant Client (~200MB)?&#xA;Required to extract full constraint details from EXPDP dumps.</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>Downloading...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>Oracle Instant Client setup completed.</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>Open the download page?</value></data>
 
 </root>

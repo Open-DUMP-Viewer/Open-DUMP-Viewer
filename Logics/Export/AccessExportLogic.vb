@@ -25,7 +25,14 @@ Public Class AccessExportLogic
         Try
             ' ACE ドライバチェック
             If Not IsAceDriverAvailable() Then
-                Throw New Exception(Loc.S("AccessExport_AceNotInstalled"))
+                Dim result = MessageBox.Show(
+                    Loc.S("AccessExport_AceNotInstalled") & vbCrLf & vbCrLf &
+                    Loc.S("AccessExport_OpenDownloadPage"),
+                    Loc.S("Title_Error"), MessageBoxButtons.YesNo, MessageBoxIcon.Error)
+                If result = DialogResult.Yes Then
+                    Process.Start(New ProcessStartInfo("https://www.microsoft.com/download/details.aspx?id=54920") With {.UseShellExecute = True})
+                End If
+                Return False
             End If
 
             ' 既存ファイルを削除 (新規作成のため)

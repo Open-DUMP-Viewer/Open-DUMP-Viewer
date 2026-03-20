@@ -441,12 +441,7 @@ File estratti: {0}</value>
   <data name="ExcelExport_Error" xml:space="preserve"><value>Errore esportazione Excel: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Il numero di righe ({0}) supera il limite di Excel ({1}). Considerare l'uso dell'esportazione CSV.</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Errore esportazione Access: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve">
-    <value>Microsoft Access Database Engine non è installato.
-
-Scaricarlo e installarlo da:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value>
-  </data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine non è installato.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog non è disponibile. Installare Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Errore esportazione SQL Server: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Errore esportazione ODBC: {0}</value></data>
@@ -512,4 +507,5 @@ Installare il runtime Microsoft Edge WebView2.</value>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>Scaricare e installare Oracle Instant Client (~200 MB)?&#xA;Necessario per estrarre i dettagli completi dei vincoli dai dump EXPDP.</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>Download in corso...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>La configurazione di Oracle Instant Client è stata completata.</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>Aprire la pagina di download?</value></data>
 </root>

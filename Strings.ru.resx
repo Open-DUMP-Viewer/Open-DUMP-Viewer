@@ -447,10 +447,7 @@ https://www.odv.dev/
   <data name="ExcelExport_Error" xml:space="preserve"><value>Ошибка экспорта Excel: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Количество строк ({0}) превышает лимит Excel ({1}). Рекомендуется использовать экспорт в CSV.</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Ошибка экспорта Access: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine не установлен.
-
-Загрузите и установите его с:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine не установлен.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog недоступен. Установите Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Ошибка экспорта SQL Server: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Ошибка экспорта ODBC: {0}</value></data>
@@ -516,5 +513,6 @@ https://www.microsoft.com/en-us/download/details.aspx?id=54920</value></data>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>Загрузить и установить Oracle Instant Client (~200 МБ)?&#xA;Требуется для извлечения полной информации об ограничениях из дампов EXPDP.</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>Загрузка...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>Установка Oracle Instant Client завершена.</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>Открыть страницу загрузки?</value></data>
 
 </root>

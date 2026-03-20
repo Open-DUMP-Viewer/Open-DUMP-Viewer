@@ -411,12 +411,7 @@ Extrahierte Dateien: {0}</value>
   <data name="ExcelExport_Error" xml:space="preserve"><value>Excel-Exportfehler: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>Zeilenanzahl ({0}) überschreitet das Excel-Limit ({1}). Verwenden Sie stattdessen den CSV-Export.</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Access-Exportfehler: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve">
-    <value>Microsoft Access Database Engine ist nicht installiert.
-
-Bitte laden Sie es herunter und installieren Sie es von:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value>
-  </data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine ist nicht installiert.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog ist nicht verfügbar. Bitte installieren Sie Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server-Exportfehler: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC-Exportfehler: {0}</value></data>
@@ -478,4 +473,5 @@ Bitte installieren Sie die Microsoft Edge WebView2-Laufzeit.</value>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>Oracle Instant Client (~200MB) herunterladen und installieren?&#xA;Erforderlich zum Extrahieren vollständiger Constraint-Details aus EXPDP-Dumps.</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>Wird heruntergeladen...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>Oracle Instant Client wurde erfolgreich eingerichtet.</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>Download-Seite öffnen?</value></data>
 </root>

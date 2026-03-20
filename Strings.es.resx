@@ -411,12 +411,7 @@ Archivos extraídos: {0}</value>
   <data name="ExcelExport_Error" xml:space="preserve"><value>Error de exportación Excel: {0}</value></data>
   <data name="ExcelExport_RowLimitExceeded" xml:space="preserve"><value>El número de filas ({0}) excede el límite de Excel ({1}). Considere usar la exportación CSV.</value></data>
   <data name="AccessExport_Error" xml:space="preserve"><value>Error de exportación Access: {0}</value></data>
-  <data name="AccessExport_AceNotInstalled" xml:space="preserve">
-    <value>Microsoft Access Database Engine no está instalado.
-
-Por favor, descárguelo e instálelo desde:
-https://www.microsoft.com/en-us/download/details.aspx?id=54920</value>
-  </data>
+  <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine no está instalado.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog no está disponible. Por favor, instale Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Error de exportación SQL Server: {0}</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Error de exportación ODBC: {0}</value></data>
@@ -478,4 +473,5 @@ Por favor, instale el runtime Microsoft Edge WebView2.</value>
   <data name="ExportOptions_AutoSetupConfirm" xml:space="preserve"><value>¿Descargar e instalar Oracle Instant Client (~200MB)?&#xA;Necesario para extraer detalles completos de restricciones de volcados EXPDP.</value></data>
   <data name="ExportOptions_AutoSetupProgress" xml:space="preserve"><value>Descargando...</value></data>
   <data name="ExportOptions_AutoSetupComplete" xml:space="preserve"><value>La configuración de Oracle Instant Client se ha completado.</value></data>
+  <data name="AccessExport_OpenDownloadPage" xml:space="preserve"><value>¿Abrir la página de descarga?</value></data>
 </root>
