@@ -425,7 +425,7 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
            retroactively as TABLE_TYPE_PARTITION_TABLE. */
         {
             int k;
-            for (k = 0; k < s->table_count - 1; k++) {
+            for (k = 0; k < s->table_count; k++) {
                 if (strcmp(s->table_list[k].schema, e->schema) == 0 &&
                     strcmp(s->table_list[k].name, e->name) == 0) {
                     /* Found a previous occurrence — this table is partitioned */
