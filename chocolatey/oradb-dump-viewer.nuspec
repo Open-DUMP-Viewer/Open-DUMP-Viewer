@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>oradb-dump-viewer</id>
+    <version>3.1.1</version>
+    <title>OraDB DUMP Viewer</title>
+    <authors>Taketo Yanai</authors>
+    <owners>YANAi</owners>
+    <projectUrl>https://www.odv.dev/</projectUrl>
+    <projectSourceUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues</bugTrackerUrl>
+    <docsUrl>https://www.odv.dev/en/blog</docsUrl>
+    <releaseNotes>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/tag/v3.1.1</releaseNotes>
+    <iconUrl>https://raw.githubusercontent.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/main/app.ico</iconUrl>
+    <licenseUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/blob/main/EULA.md</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>oracle database dump dmp viewer expdp datapump export csv sql migration dba</tags>
+    <summary>View Oracle .dmp files (EXP &amp; EXPDP) without Oracle — free for personal use</summary>
+    <description><![CDATA[## OraDB DUMP Viewer
+
+View and export Oracle database dump files (.dmp) **without Oracle Database or Client**.
+
+### Features
+
+- **No Oracle required** — parse EXP (Oracle 7–11g) and EXPDP / Data Pump (Oracle 10g–23ai) files directly
+- **Schema tree** — hierarchical schema → table browsing
+- **Data preview** — paginated viewing for tables with millions of rows
+- **Advanced search** — 12 operator types with AND/OR compound conditions
+- **Export** — CSV, SQL (Oracle/PostgreSQL/MySQL/SQL Server), Excel, Access, ODBC, SQL Server direct import
+- **LOB extraction** — extract BLOB/CLOB data as individual files
+- **10 languages** — Japanese, English, Chinese, Korean, German, French, Spanish, Italian, Russian, Portuguese
+- **Partition support** — view partitioned table structures and individual partition data
+
+### Licensing
+
+- **Free** for personal and educational use (all features included)
+- Professional: ¥4,900/year ($32) — freelancers & sole proprietors
+- Business: ¥9,800/year ($65) — companies & commercial use
+
+Get your license at [https://www.odv.dev/](https://www.odv.dev/)
+
+### Notes
+
+- This package installs the EXE installer which includes shortcuts and .dmp file association
+- .NET runtime is bundled — no additional runtime installation needed
+]]></description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
