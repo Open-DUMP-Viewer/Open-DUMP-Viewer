@@ -412,3 +412,46 @@ jobs:
 
           Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
           .\wingetcreate.exe submit --token "${{ secrets.WINGET_TOKEN }}" $dir
+
+      # ─────────────────────────────────────
+      # 7. Chocolatey パッケージのビルド & プッシュ (Beta)
+      #    プレリリース版として公開
+      # ─────────────────────────────────────
+      - name: Publish to Chocolatey (Beta)
+        shell: pwsh
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $fileVer = "${{ steps.get_version.outputs.FILE_VERSION }}"
+          $chocoVersion = "${version}-beta"
+          $baseUrl = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/download/${fileVer}"
+
+          # インストーラーのチェックサムを取得
+          $exeX64   = "./artifacts/OraDBDumpViewer_${fileVer}_installer_x64.exe"
+          $exeArm64 = "./artifacts/OraDBDumpViewer_${fileVer}_installer_arm64.exe"
+          $hashX64   = (Get-FileHash $exeX64 -Algorithm SHA256).Hash.ToLower()
+          $hashArm64 = (Get-FileHash $exeArm64 -Algorithm SHA256).Hash.ToLower()
+
+          # nuspec のバージョンを更新 (プレリリース)
+          $nuspec = Get-Content "chocolatey/oradb-dump-viewer.nuspec" -Raw
+          $nuspec = $nuspec -replace '<version>[^<]+</version>', "<version>${chocoVersion}</version>"
+          Set-Content "chocolatey/oradb-dump-viewer.nuspec" $nuspec -NoNewline
+
+          # chocolateyinstall.ps1 のバージョンとチェックサムを更新
+          $install = Get-Content "chocolatey/tools/chocolateyinstall.ps1" -Raw
+          $install = $install -replace "\`$version\s*=\s*'[^']+'", "`$version     = '${version}'"
+          $install = $install -replace "\`$checksum_x64\s*=\s*'[^']+'", "`$checksum_x64   = '${hashX64}'"
+          $install = $install -replace "\`$checksum_arm64\s*=\s*'[^']+'", "`$checksum_arm64 = '${hashArm64}'"
+          Set-Content "chocolatey/tools/chocolateyinstall.ps1" $install -NoNewline
+
+          # パッケージをビルド
+          choco pack "chocolatey/oradb-dump-viewer.nuspec" --output-directory "./artifacts"
+
+          # Chocolatey Community Repository にプッシュ
+          if ($env:CHOCOLATEY_API_KEY) {
+            choco push "./artifacts/oradb-dump-viewer.${chocoVersion}.nupkg" --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
+            Write-Host "Chocolatey beta package v${chocoVersion} published successfully"
+          } else {
+            Write-Warning "CHOCOLATEY_API_KEY not set — skipping push"
+          }
