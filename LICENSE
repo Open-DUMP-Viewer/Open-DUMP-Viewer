@@ -1,0 +1,38 @@
+Copyright (c) 2025 YANAI Taketo (柳井建人)
+All rights reserved.
+
+OraDB DUMP Viewer Proprietary License
+
+This software and its source code are the proprietary property of
+YANAI Taketo. The source code is made available for reference purposes
+only ("Source-Available") and is NOT open-source software.
+
+PERMITTED:
+  - Viewing and studying the source code for personal learning
+  - Contributing via Pull Requests (requires CLA signature)
+  - Using the software with a valid license key obtained from
+    https://www.odv.dev/
+
+NOT PERMITTED:
+  - Modifying, adapting, or creating derivative works
+  - Redistributing the software or source code, in whole or in part
+  - Reverse engineering, decompiling, or disassembling the software
+  - Circumventing or tampering with the license authentication mechanism
+  - Developing competing products using this software or its source code
+  - Incorporating any part of this software into other software
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For full terms, see EULA.md in this repository.
+For license pricing and acquisition, visit https://www.odv.dev/
+For terms of service and privacy policy, visit https://www.ta-yan.ai/rules
+
+This agreement is governed by and construed in accordance with the laws
+of Japan. Any disputes shall be subject to the exclusive jurisdiction
+of the courts of Japan.
