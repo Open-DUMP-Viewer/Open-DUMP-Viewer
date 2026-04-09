@@ -273,7 +273,8 @@ dotnet build "OraDB DUMP Viewer.vbproj"
 - [CLA](CLA.md) — コントリビューターライセンス同意書
 - [SECURITY](SECURITY.md) — 脆弱性報告
 - [CHANGELOG](CHANGELOG.md) — 更新履歴
-- [利用規約・プライバシーポリシー](https://www.ta-yan.ai/rules)
+- [利用規約](https://www.odv.dev/legal#terms)
+- [プライバシーポリシー](https://www.odv.dev/legal#privacy)
 
 ### 免責事項
 

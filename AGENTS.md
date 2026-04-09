@@ -279,7 +279,8 @@ git push origin main:release
 | [EULA.md](EULA.md) | エンドユーザー使用許諾契約書 |
 | [CLA.md](CLA.md) | コントリビューターライセンス同意書 |
 | [SECURITY.md](SECURITY.md) | セキュリティポリシー |
-| [利用規約・プライバシーポリシー](https://www.ta-yan.ai/rules) | Web版 |
+| [利用規約](https://www.odv.dev/legal#terms) | Web版 |
+| [プライバシーポリシー](https://www.odv.dev/legal#privacy) | Web版 |
 
 ## Contact & Support
 

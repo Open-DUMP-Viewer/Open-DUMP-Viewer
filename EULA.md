@@ -118,7 +118,8 @@
 - 本契約は本ソフトウェアの使用に関するユーザーとライセンサー間の完全な合意です
 - ライセンサーは本契約を事前の通知なく改定する権利を有します
 - 本契約のいずれかの条項が無効と判断された場合でも、残りの条項は引き続き有効です
-- 利用規約およびプライバシーポリシーの詳細は [https://www.ta-yan.ai/rules](https://www.ta-yan.ai/rules) をご参照ください
+- 利用規約の詳細は [https://www.odv.dev/legal#terms](https://www.odv.dev/legal#terms) をご参照ください
+- プライバシーポリシーの詳細は [https://www.odv.dev/legal#privacy](https://www.odv.dev/legal#privacy) をご参照ください
 
 ---
 
@@ -133,5 +134,6 @@
 <p align="center">
   <strong>YANAI Taketo</strong><br>
   <a href="https://www.odv.dev/">https://www.odv.dev/</a> |
-  <a href="https://www.ta-yan.ai/rules">利用規約・プライバシーポリシー</a>
+  <a href="https://www.odv.dev/legal#terms">利用規約</a> |
+  <a href="https://www.odv.dev/legal#privacy">プライバシーポリシー</a>
 </p>
