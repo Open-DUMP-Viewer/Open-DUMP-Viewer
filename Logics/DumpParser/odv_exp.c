@@ -2333,25 +2333,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     {
                         int64_t rec_start = odv_ftell(fp) - 1;
 
-                        if (s->table.lob_col_count > 0) {
-                            /* EXP LOB tables use chunk-based binary format
-                               that is incompatible with parse_exp_records.
-                               Scan past the record data to the 0xFFFF table-end
-                               marker so that subsequent tables in the same dump
-                               are still correctly parsed. */
-                            {
-                                int skip_ct = 0;
-                                while (!s->cancelled) {
-                                    unsigned char scan[2];
-                                    if (fread(scan, 1, 2, fp) != 2) goto done;
-                                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                                    odv_fseek(fp, -1, SEEK_CUR);
-                                    if ((++skip_ct & 0x7FFF) == 0)
-                                        odv_report_progress(s, fp);
-                                }
-                            }
-                            pending_row_count = 0;
-                        } else if (list_only && s->filter_active && s->pass_flg) {
+                        if (list_only && s->filter_active && s->pass_flg) {
                             /* Filtered out in list_only: skip records entirely */
                             /* Scan forward to find 0xFFFF end marker */
                             {
