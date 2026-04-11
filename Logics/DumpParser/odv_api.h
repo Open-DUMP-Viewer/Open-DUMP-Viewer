@@ -17,12 +17,25 @@ extern "C" {
 #endif
 
 /*---------------------------------------------------------------------------
-    DLL Export Macro
+    Platform Abstraction
  ---------------------------------------------------------------------------*/
-#ifdef ODV_DLL_MODE
-  #define ODV_API __declspec(dllexport)
+
+/* Calling convention: __stdcall on Windows, default on POSIX */
+#ifdef WINDOWS
+  #define ODV_CALL __stdcall
 #else
-  #define ODV_API __declspec(dllimport)
+  #define ODV_CALL
+#endif
+
+/* DLL export/import */
+#if defined(WINDOWS)
+  #ifdef ODV_DLL_MODE
+    #define ODV_API __declspec(dllexport)
+  #else
+    #define ODV_API __declspec(dllimport)
+  #endif
+#else
+  #define ODV_API __attribute__((visibility("default")))
 #endif
 
 /*---------------------------------------------------------------------------
@@ -51,7 +64,7 @@ typedef struct _odv_session ODV_SESSION;
  ---------------------------------------------------------------------------*/
 
 /* Row data delivery callback (called per row during parse) */
-typedef void (__stdcall *ODV_ROW_CALLBACK)(
+typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char *schema,
     const char *table,
     int col_count,
@@ -66,7 +79,7 @@ typedef void (__stdcall *ODV_ROW_CALLBACK)(
    user_data:      user context pointer
    Note: Called when file-position percentage changes (0-100), at most 101 times.
          Use odv_get_progress_pct() after callback to get the current percentage. */
-typedef void (__stdcall *ODV_PROGRESS_CALLBACK)(
+typedef void (ODV_CALL *ODV_PROGRESS_CALLBACK)(
     int64_t rows_processed,
     const char *current_table,
     void *user_data
@@ -75,7 +88,7 @@ typedef void (__stdcall *ODV_PROGRESS_CALLBACK)(
 /* Table discovery callback (called per table during list_tables)
    data_offset: file position of the table DDL, usable with odv_set_data_offset
    for fast seeking on subsequent parse_dump calls. */
-typedef void (__stdcall *ODV_TABLE_CALLBACK)(
+typedef void (ODV_CALL *ODV_TABLE_CALLBACK)(
     const char *schema,
     const char *table,
     int col_count,
@@ -94,82 +107,82 @@ typedef void (__stdcall *ODV_TABLE_CALLBACK)(
     Session Lifecycle
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_create_session(ODV_SESSION **session);
-ODV_API int __stdcall odv_destroy_session(ODV_SESSION *session);
+ODV_API int ODV_CALL odv_create_session(ODV_SESSION **session);
+ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session);
 
 /*---------------------------------------------------------------------------
     Configuration
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_set_dump_file(ODV_SESSION *s, const char *path);
-ODV_API int __stdcall odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data);
-ODV_API int __stdcall odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data);
-ODV_API int __stdcall odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data);
+ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path);
+ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data);
+ODV_API int ODV_CALL odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data);
+ODV_API int ODV_CALL odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data);
 
 /* Set table filter for selective parsing.
    schema/table names in UTF-8. DLL reverse-converts to dump charset for comparison.
    Pass NULL to clear filter and parse all tables. */
-ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, const char *table);
+ODV_API int ODV_CALL odv_set_table_filter(ODV_SESSION *s, const char *schema, const char *table);
 
 /* Set file seek offset for fast table access.
    Use the data_offset value from the table callback to skip DDL scan.
    Set to 0 to disable (default: scan from beginning). */
-ODV_API int __stdcall odv_set_data_offset(ODV_SESSION *s, int64_t offset);
+ODV_API int ODV_CALL odv_set_data_offset(ODV_SESSION *s, int64_t offset);
 
 /* Set date format for export output.
    fmt: 0=YYYY/MM/DD HH:MI:SS, 1=YYYYMMDD, 2=YYYYMMDDHHMMSS, 3=Custom
    custom_fmt: format string for fmt=3 (tokens: YYYY,MM,DD,HH24,MI,SS)
                Pass NULL for non-custom formats. */
-ODV_API int __stdcall odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt);
+ODV_API int ODV_CALL odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt);
 
 /* Set CSV export options.
    write_header: 1=output column name header row (default), 0=skip
    write_types:  1=output column type row after header, 0=skip (default) */
-ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types);
+ODV_API int ODV_CALL odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types);
 
 /* Set SQL export options.
    create_table: 1=output CREATE TABLE DDL before INSERTs, 0=skip (default) */
-ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table);
+ODV_API int ODV_CALL odv_set_sql_options(ODV_SESSION *s, int create_table);
 
 /* Set application version string (displayed in export comments).
    ver: UTF-8 version string e.g. "1.1.0". Pass NULL to clear. */
-ODV_API int __stdcall odv_set_app_version(ODV_SESSION *s, const char *ver);
+ODV_API int ODV_CALL odv_set_app_version(ODV_SESSION *s, const char *ver);
 
 /*---------------------------------------------------------------------------
     Operations
  ---------------------------------------------------------------------------*/
 
 /* Detect dump file format (EXP / EXPDP / compressed) */
-ODV_API int __stdcall odv_check_dump_kind(ODV_SESSION *s, int *dump_type);
+ODV_API int ODV_CALL odv_check_dump_kind(ODV_SESSION *s, int *dump_type);
 
 /* List all tables in the dump (fires table_callback per table) */
-ODV_API int __stdcall odv_list_tables(ODV_SESSION *s);
+ODV_API int ODV_CALL odv_list_tables(ODV_SESSION *s);
 
 /* Get partition count after list_tables has been called */
-ODV_API int __stdcall odv_get_partition_count(ODV_SESSION *s);
+ODV_API int ODV_CALL odv_get_partition_count(ODV_SESSION *s);
 
 /* Get partition info by index (0-based).
    Returns ODV_OK on success, ODV_ERROR if index out of range.
    type: TABLE_TYPE_PARTITION or TABLE_TYPE_SUBPARTITION
    All string pointers are valid until the session is destroyed or
    list_tables is called again. */
-ODV_API int __stdcall odv_get_table_entry(ODV_SESSION *s, int index,
+ODV_API int ODV_CALL odv_get_table_entry(ODV_SESSION *s, int index,
     const char **schema, const char **name, const char **partition,
     const char **parent_partition, int *type, int64_t *row_count);
 
 /* Parse all data (fires row_callback per row, progress_callback periodically) */
-ODV_API int __stdcall odv_parse_dump(ODV_SESSION *s);
+ODV_API int ODV_CALL odv_parse_dump(ODV_SESSION *s);
 
 /* Set CSV field delimiter character (default: ',')
    Common values: ',' (comma), '\t' (tab), ';' (semicolon), '|' (pipe) */
-ODV_API void __stdcall odv_set_csv_delimiter(ODV_SESSION *s, char delimiter);
+ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter);
 
 /* Export a specific table to CSV file */
-ODV_API int __stdcall odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path);
+ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path);
 
 /* Export a specific table to SQL INSERT statements
    dbms_type: 0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server */
-ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
+ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
 
 /* Extract LOB column data to individual files.
    schema/table: target table (UTF-8)
@@ -178,7 +191,7 @@ ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, con
    filename_col: column whose value is used as filename (NULL=sequential numbering)
    extension:    file extension (NULL="lob")
    data_offset:  DDL offset for fast seek (0=scan from beginning) */
-ODV_API int __stdcall odv_extract_lob(
+ODV_API int ODV_CALL odv_extract_lob(
     ODV_SESSION *s,
     const char *schema, const char *table,
     const char *lob_column,
@@ -188,23 +201,23 @@ ODV_API int __stdcall odv_extract_lob(
     int64_t data_offset);
 
 /* Get number of LOB files written by the last odv_extract_lob call */
-ODV_API int64_t __stdcall odv_get_lob_files_written(ODV_SESSION *s);
+ODV_API int64_t ODV_CALL odv_get_lob_files_written(ODV_SESSION *s);
 
 /* Request cancellation of a running operation */
-ODV_API int __stdcall odv_cancel(ODV_SESSION *s);
+ODV_API int ODV_CALL odv_cancel(ODV_SESSION *s);
 
 /*---------------------------------------------------------------------------
     Utilities
  ---------------------------------------------------------------------------*/
 
 /* Get DLL version string */
-ODV_API const char * __stdcall odv_get_version(void);
+ODV_API const char * ODV_CALL odv_get_version(void);
 
 /* Get last error message for the session */
-ODV_API const char * __stdcall odv_get_last_error(ODV_SESSION *s);
+ODV_API const char * ODV_CALL odv_get_last_error(ODV_SESSION *s);
 
 /* Get current progress percentage (0-100), call from progress callback */
-ODV_API int __stdcall odv_get_progress_pct(ODV_SESSION *s);
+ODV_API int ODV_CALL odv_get_progress_pct(ODV_SESSION *s);
 
 #ifdef __cplusplus
 }

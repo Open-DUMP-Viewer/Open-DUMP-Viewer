@@ -162,7 +162,7 @@ static void convert_meta_string(const char *src, int src_cs, int dst_cs,
     odv_strcpy(dst, src, dst_size - 1);
 }
 
-static void update_meta_cache(ODV_SESSION *s)
+void update_meta_cache(ODV_SESSION *s)
 {
     int i;
 

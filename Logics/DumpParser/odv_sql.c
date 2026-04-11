@@ -690,7 +690,7 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
 /*---------------------------------------------------------------------------
     sql_row_callback
  ---------------------------------------------------------------------------*/
-static void __stdcall sql_row_callback(
+static void ODV_CALL sql_row_callback(
     const char *schema, const char *table,
     int col_count, const char **col_names, const char **col_values,
     void *user_data)

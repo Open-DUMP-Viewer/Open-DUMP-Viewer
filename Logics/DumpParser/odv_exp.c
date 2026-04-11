@@ -1831,7 +1831,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                             odv_strcpy(ft, tmp, ODV_OBJNAME_LEN);
                                         }
                                     }
-                                    if (_stricmp(s->table.name, ft) != 0)
+                                    if (odv_stricmp(s->table.name, ft) != 0)
                                         match = 0;
                                 }
                                 if (match && s->filter_schema[0]) {
@@ -1850,7 +1850,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                             odv_strcpy(fs, tmp, ODV_OBJNAME_LEN);
                                         }
                                     }
-                                    if (_stricmp(s->table.schema, fs) != 0)
+                                    if (odv_stricmp(s->table.schema, fs) != 0)
                                         match = 0;
                                 }
                                 s->pass_flg = match ? 0 : 1;
@@ -2186,7 +2186,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         /* Apply partition filter: if filter_partition is set,
                          * skip partitions that don't match */
                         if (s->filter_active && s->filter_partition[0]) {
-                            if (_stricmp(part_name, s->filter_partition) != 0) {
+                            if (odv_stricmp(part_name, s->filter_partition) != 0) {
                                 s->pass_flg = 1;  /* Skip this partition's data */
                             } else {
                                 s->pass_flg = 0;  /* Parse this partition */

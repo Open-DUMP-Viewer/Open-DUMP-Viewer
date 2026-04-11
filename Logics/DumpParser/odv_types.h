@@ -14,10 +14,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 
 #ifdef WINDOWS
 #include <windows.h>
 #pragma warning(disable:4996)
+#endif
+
+/* Calling convention: __stdcall on Windows, default on POSIX */
+#ifndef ODV_CALL
+  #ifdef WINDOWS
+    #define ODV_CALL __stdcall
+  #else
+    #define ODV_CALL
+  #endif
 #endif
 
 /*---------------------------------------------------------------------------
@@ -351,7 +361,7 @@ typedef struct {
 typedef struct _odv_session ODV_SESSION;
 
 /* Callback types */
-typedef void (__stdcall *ODV_ROW_CALLBACK)(
+typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char *schema,
     const char *table,
     int col_count,
@@ -360,13 +370,13 @@ typedef void (__stdcall *ODV_ROW_CALLBACK)(
     void *user_data
 );
 
-typedef void (__stdcall *ODV_PROGRESS_CALLBACK)(
+typedef void (ODV_CALL *ODV_PROGRESS_CALLBACK)(
     int64_t rows_processed,
     const char *current_table,
     void *user_data
 );
 
-typedef void (__stdcall *ODV_TABLE_CALLBACK)(
+typedef void (ODV_CALL *ODV_TABLE_CALLBACK)(
     const char *schema,
     const char *table,
     int col_count,
@@ -459,6 +469,16 @@ struct _odv_session {
 /*---------------------------------------------------------------------------
     Utility macros
  ---------------------------------------------------------------------------*/
+
+/* Case-insensitive string comparison */
+#ifdef WINDOWS
+  #define odv_stricmp(a, b)       _stricmp((a), (b))
+  #define odv_strnicmp(a, b, n)   _strnicmp((a), (b), (n))
+#else
+  #include <strings.h>
+  #define odv_stricmp(a, b)       strcasecmp((a), (b))
+  #define odv_strnicmp(a, b, n)   strncasecmp((a), (b), (n))
+#endif
 
 /* 64-bit file I/O */
 #ifdef WINDOWS

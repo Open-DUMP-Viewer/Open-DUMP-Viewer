@@ -77,7 +77,7 @@ typedef struct {
     Called for each row during dump parsing.
     Writes the row to the CSV file.
  ---------------------------------------------------------------------------*/
-static void __stdcall csv_row_callback(
+static void ODV_CALL csv_row_callback(
     const char *schema, const char *table,
     int col_count, const char **col_names, const char **col_values,
     void *user_data)

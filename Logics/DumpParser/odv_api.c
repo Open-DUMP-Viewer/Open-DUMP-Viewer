@@ -47,7 +47,7 @@ static void clear_session(ODV_SESSION *s)
     Session Lifecycle
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_create_session(ODV_SESSION **session)
+ODV_API int ODV_CALL odv_create_session(ODV_SESSION **session)
 {
     ODV_SESSION *s;
 
@@ -68,7 +68,7 @@ ODV_API int __stdcall odv_create_session(ODV_SESSION **session)
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_destroy_session(ODV_SESSION *session)
+ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
 {
     if (!session) return ODV_ERROR_INVALID_ARG;
 
@@ -88,7 +88,7 @@ ODV_API int __stdcall odv_destroy_session(ODV_SESSION *session)
     Configuration
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_set_dump_file(ODV_SESSION *s, const char *path)
+ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path)
 {
     FILE *fp;
 
@@ -115,7 +115,7 @@ ODV_API int __stdcall odv_set_dump_file(ODV_SESSION *s, const char *path)
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data)
+ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->row_cb = cb;
@@ -123,7 +123,7 @@ ODV_API int __stdcall odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, 
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data)
+ODV_API int ODV_CALL odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->progress_cb = cb;
@@ -131,7 +131,7 @@ ODV_API int __stdcall odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CAL
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data)
+ODV_API int ODV_CALL odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->table_cb = cb;
@@ -139,7 +139,7 @@ ODV_API int __stdcall odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK 
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, const char *table)
+ODV_API int ODV_CALL odv_set_table_filter(ODV_SESSION *s, const char *schema, const char *table)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
 
@@ -166,7 +166,7 @@ ODV_API int __stdcall odv_set_table_filter(ODV_SESSION *s, const char *schema, c
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_partition_filter(ODV_SESSION *s, const char *partition)
+ODV_API int ODV_CALL odv_set_partition_filter(ODV_SESSION *s, const char *partition)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     if (partition && partition[0]) {
@@ -177,14 +177,14 @@ ODV_API int __stdcall odv_set_partition_filter(ODV_SESSION *s, const char *parti
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_data_offset(ODV_SESSION *s, int64_t offset)
+ODV_API int ODV_CALL odv_set_data_offset(ODV_SESSION *s, int64_t offset)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->seek_offset = offset;
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt)
+ODV_API int ODV_CALL odv_set_date_format(ODV_SESSION *s, int fmt, const char *custom_fmt)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->date_format = fmt;
@@ -196,7 +196,7 @@ ODV_API int __stdcall odv_set_date_format(ODV_SESSION *s, int fmt, const char *c
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types)
+ODV_API int ODV_CALL odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->csv_write_header = write_header;
@@ -204,14 +204,14 @@ ODV_API int __stdcall odv_set_csv_options(ODV_SESSION *s, int write_header, int 
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_sql_options(ODV_SESSION *s, int create_table)
+ODV_API int ODV_CALL odv_set_sql_options(ODV_SESSION *s, int create_table)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->sql_create_table = create_table;
     return ODV_OK;
 }
 
-ODV_API int __stdcall odv_set_app_version(ODV_SESSION *s, const char *ver)
+ODV_API int ODV_CALL odv_set_app_version(ODV_SESSION *s, const char *ver)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     if (ver) {
@@ -226,7 +226,7 @@ ODV_API int __stdcall odv_set_app_version(ODV_SESSION *s, const char *ver)
     Operations
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_check_dump_kind(ODV_SESSION *s, int *dump_type)
+ODV_API int ODV_CALL odv_check_dump_kind(ODV_SESSION *s, int *dump_type)
 {
     int rc;
 
@@ -243,7 +243,7 @@ ODV_API int __stdcall odv_check_dump_kind(ODV_SESSION *s, int *dump_type)
     return rc;
 }
 
-ODV_API int __stdcall odv_list_tables(ODV_SESSION *s)
+ODV_API int ODV_CALL odv_list_tables(ODV_SESSION *s)
 {
     int rc;
 
@@ -275,13 +275,13 @@ ODV_API int __stdcall odv_list_tables(ODV_SESSION *s)
     }
 }
 
-ODV_API int __stdcall odv_get_partition_count(ODV_SESSION *s)
+ODV_API int ODV_CALL odv_get_partition_count(ODV_SESSION *s)
 {
     if (!s) return 0;
     return s->partition_count;
 }
 
-ODV_API int __stdcall odv_get_table_entry(ODV_SESSION *s, int index,
+ODV_API int ODV_CALL odv_get_table_entry(ODV_SESSION *s, int index,
     const char **schema, const char **name, const char **partition,
     const char **parent_partition, int *type, int64_t *row_count)
 {
@@ -300,7 +300,7 @@ ODV_API int __stdcall odv_get_table_entry(ODV_SESSION *s, int index,
 
 /* Build constraints JSON for a table_list entry (EXPDP metadata).
  * Returns pointer to static buffer (overwritten on each call). */
-ODV_API const char * __stdcall odv_get_table_constraints_json(ODV_SESSION *s, int index)
+ODV_API const char * ODV_CALL odv_get_table_constraints_json(ODV_SESSION *s, int index)
 {
     static char json_buf[8192];
     int pos = 0, i;
@@ -338,7 +338,7 @@ ODV_API const char * __stdcall odv_get_table_constraints_json(ODV_SESSION *s, in
     return json_buf;
 }
 
-ODV_API int __stdcall odv_parse_dump(ODV_SESSION *s)
+ODV_API int ODV_CALL odv_parse_dump(ODV_SESSION *s)
 {
     int rc;
 
@@ -369,18 +369,18 @@ ODV_API int __stdcall odv_parse_dump(ODV_SESSION *s)
     }
 }
 
-ODV_API void __stdcall odv_set_csv_delimiter(ODV_SESSION *s, char delimiter)
+ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter)
 {
     if (s) s->csv_delimiter = delimiter;
 }
 
-ODV_API int __stdcall odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path)
+ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path)
 {
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
     return write_csv_file(s, table_name, output_path);
 }
 
-ODV_API int __stdcall odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type)
+ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type)
 {
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
     return write_sql_file(s, table_name, output_path, dbms_type);
@@ -403,11 +403,7 @@ int odv_lob_check_column(ODV_SESSION *s)
     for (i = 0; i < s->table.col_count; i++) {
         int t = s->table.columns[i].type;
         if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB) {
-#ifdef WINDOWS
-            if (_stricmp(s->table.columns[i].name, s->lob_column) == 0) {
-#else
-            if (strcasecmp(s->table.columns[i].name, s->lob_column) == 0) {
-#endif
+            if (odv_stricmp(s->table.columns[i].name, s->lob_column) == 0) {
                 s->lob_column_index = lob_idx;
                 odv_lob_reset_buffer(s);
                 return ODV_OK;
@@ -474,11 +470,7 @@ int odv_lob_write_file(ODV_SESSION *s)
         /* Find the column value for filename */
         int i;
         for (i = 0; i < s->table.col_count; i++) {
-#ifdef WINDOWS
-            if (_stricmp(s->table.columns[i].name, s->lob_filename_col) == 0) {
-#else
-            if (strcasecmp(s->table.columns[i].name, s->lob_filename_col) == 0) {
-#endif
+            if (odv_stricmp(s->table.columns[i].name, s->lob_filename_col) == 0) {
                 if (i < s->record.col_count && !s->record.values[i].is_null &&
                     s->record.values[i].data_len > 0 && s->record.values[i].data_len < (int)sizeof(fname) - 1) {
                     memcpy(fname, s->record.values[i].data, s->record.values[i].data_len);
@@ -549,7 +541,7 @@ void odv_lob_reset_buffer(ODV_SESSION *s)
     LOB Extraction API
  ---------------------------------------------------------------------------*/
 
-ODV_API int __stdcall odv_extract_lob(
+ODV_API int ODV_CALL odv_extract_lob(
     ODV_SESSION *s,
     const char *schema, const char *table,
     const char *lob_column,
@@ -623,13 +615,13 @@ cleanup:
     return rc;
 }
 
-ODV_API int64_t __stdcall odv_get_lob_files_written(ODV_SESSION *s)
+ODV_API int64_t ODV_CALL odv_get_lob_files_written(ODV_SESSION *s)
 {
     if (!s) return 0;
     return s->lob_files_written;
 }
 
-ODV_API int __stdcall odv_cancel(ODV_SESSION *s)
+ODV_API int ODV_CALL odv_cancel(ODV_SESSION *s)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->cancelled = 1;
@@ -640,18 +632,18 @@ ODV_API int __stdcall odv_cancel(ODV_SESSION *s)
     Utilities
  ---------------------------------------------------------------------------*/
 
-ODV_API const char * __stdcall odv_get_version(void)
+ODV_API const char * ODV_CALL odv_get_version(void)
 {
     return ODV_VERSION_STRING;
 }
 
-ODV_API const char * __stdcall odv_get_last_error(ODV_SESSION *s)
+ODV_API const char * ODV_CALL odv_get_last_error(ODV_SESSION *s)
 {
     if (!s) return "Invalid session";
     return s->last_error;
 }
 
-ODV_API int __stdcall odv_get_progress_pct(ODV_SESSION *s)
+ODV_API int ODV_CALL odv_get_progress_pct(ODV_SESSION *s)
 {
     if (!s) return 0;
     return s->last_progress_pct;

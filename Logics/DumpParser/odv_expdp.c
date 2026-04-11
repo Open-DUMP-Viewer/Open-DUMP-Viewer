@@ -332,12 +332,12 @@ static int is_system_table(ODV_TABLE *t, const char *schema)
     };
 
     /* Skip SYS-owned tables */
-    if (schema[0] && _stricmp(schema, "SYS") == 0) return 1;
+    if (schema[0] && odv_stricmp(schema, "SYS") == 0) return 1;
 
     /* Skip DataPump job tables */
-    if (_strnicmp(t->name, "SYS_EXPORT_", 11) == 0) return 1;
-    if (_strnicmp(t->name, "SYS_IMPORT_", 11) == 0) return 1;
-    if (_strnicmp(t->name, "IMPDP_", 6) == 0) return 1;
+    if (odv_strnicmp(t->name, "SYS_EXPORT_", 11) == 0) return 1;
+    if (odv_strnicmp(t->name, "SYS_IMPORT_", 11) == 0) return 1;
+    if (odv_strnicmp(t->name, "IMPDP_", 6) == 0) return 1;
 
     /* Dictionary table check: 10 specific columns */
     if (t->col_count < 10) return 0;
@@ -1508,7 +1508,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                                     odv_strcpy(ft, tmp, ODV_OBJNAME_LEN);
                                 }
                             }
-                            if (_stricmp(s->table.name, ft) != 0)
+                            if (odv_stricmp(s->table.name, ft) != 0)
                                 match = 0;
                         }
                         if (match && s->filter_schema[0]) {
@@ -1527,7 +1527,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                                     odv_strcpy(fs, tmp, ODV_OBJNAME_LEN);
                                 }
                             }
-                            if (_stricmp(s->table.schema, fs) != 0)
+                            if (odv_stricmp(s->table.schema, fs) != 0)
                                 match = 0;
                         }
                         s->pass_flg = match ? 0 : 1;
