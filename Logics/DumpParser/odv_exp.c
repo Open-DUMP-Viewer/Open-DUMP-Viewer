@@ -419,7 +419,7 @@ static char *serialize_constraints_json(ODV_SESSION *s)
             /* JSON-escape helper inline */
             #define JSON_ESC_COMMENT(src, dst, dst_size) do { \
                 int _ei = 0; const char *_cp = (src); \
-                while (*_cp && _ei < (dst_size) - 2) { \
+                while (*_cp && _ei < (int)(dst_size) - 2) { \
                     if (*_cp == '"' || *_cp == '\\') (dst)[_ei++] = '\\'; \
                     (dst)[_ei++] = *_cp++; \
                 } (dst)[_ei] = '\0'; \
@@ -1459,21 +1459,28 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             int bad = 0;
             switch (ctype) {
             case COL_NUMBER: case COL_FLOAT:
-                if (col_len > 32) bad = 1; break;
+                if (col_len > 32) bad = 1;
+                break;
             case COL_DATE:
-                if (col_len > 7) bad = 1; break;
+                if (col_len > 7) bad = 1;
+                break;
             case COL_TIMESTAMP: case COL_TIMESTAMP_TZ: case COL_TIMESTAMP_LTZ:
-                if (col_len > 13) bad = 1; break;
+                if (col_len > 13) bad = 1;
+                break;
             case COL_INTERVAL_YM: case COL_INTERVAL_DS:
-                if (col_len > 11) bad = 1; break;
+                if (col_len > 11) bad = 1;
+                break;
             case COL_BFILE:
-                if (col_len > 1000) bad = 1; break;
+                if (col_len > 1000) bad = 1;
+                break;
             case COL_ROWID:
-                if (col_len > 100) bad = 1; break;
+                if (col_len > 100) bad = 1;
+                break;
             case COL_CHAR: case COL_NCHAR: case COL_VARCHAR: case COL_NVARCHAR:
-                if (col_len > ODV_VARCHAR_LEN * 3) bad = 1; break;
+                if (col_len > ODV_VARCHAR_LEN * 3) bad = 1;
+                break;
             default:
-                break; /* BLOB, CLOB, RAW, LONG, LONG_RAW: no upper limit */
+                break;
             }
             if (bad) {
                 /* Corrupt data — skip to next table */
@@ -1600,15 +1607,16 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
     int64_t address = 0;
     int rc = ODV_OK;
 
-    /* Step 3 (metadata) state */
+    /* Step 3 (metadata) state — some variables are set during parse but
+       only used for state-machine transitions, not read afterward. */
     int meta_col_count = 0;
     int meta_col_idx = 0;
-    int meta_col_type = 0;
+    int meta_col_type = 0;  /* set during parse, not read after */
     int is_char_type = 0;
     int meta_lob_idx = 0;
-    int lob_total = 0;
-    int lob_name_len = 0;
-    int lob_name_read = 0;
+    int lob_total = 0;      /* set during parse, not read after */
+    int lob_name_len = 0;   /* set during parse, not read after */
+    int lob_name_read = 0;  /* set during parse, not read after */
     unsigned char meta_buf[4];
     int null_count = 0;
     int pending_table = 0;  /* 1=table parsed but not yet notified */
@@ -2590,6 +2598,11 @@ done:
     }
 
     free(word);
+
+    /* Suppress GCC -Wunused-but-set-variable for state-machine variables
+       that are assigned during parse but only used for transitions */
+    (void)meta_col_type; (void)lob_total; (void)lob_name_len; (void)lob_name_read;
+
     if (s->cancelled) return ODV_ERROR_CANCELLED;
     return rc;
 }

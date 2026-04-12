@@ -6,7 +6,7 @@
 #   make install      # Install to /usr/local/lib (requires sudo)
 
 CC      ?= gcc
-CFLAGS  ?= -O2 -Wall -Wextra -std=c11 -fPIC
+CFLAGS  ?= -O2 -Wall -Wextra -std=c11 -fPIC -Wno-format-truncation
 DEFS    = -DUTF8 -D_FILE_OFFSET_BITS=64 -D_POSIX_C_SOURCE=200809L
 LDFLAGS = -shared
 

@@ -95,6 +95,7 @@ static void ddl_xml_callback(const char *tag, const char *value,
 {
     DDL_CONTEXT *dc = (DDL_CONTEXT *)ctx;
     ODV_SESSION *s = dc->session;
+    (void)depth;
 
     if (!tag || !tag[0]) return;
 
@@ -1638,7 +1639,6 @@ expdp_done:
             FILE *sfp = fopen(s->dump_path, "rb");
             if (sfp) {
                 unsigned char blk[8192];
-                int64_t blk_offset = 0;
                 int blk_len = 0;
 
                 while (!s->cancelled) {

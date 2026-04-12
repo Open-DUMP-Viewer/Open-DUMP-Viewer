@@ -56,27 +56,6 @@ void reset_record(ODV_RECORD *rec)
     rec->col_count = 0;
 }
 
-/* Grow record if needed (e.g., table has more than 256 columns) */
-static int grow_record(ODV_RECORD *rec, int needed)
-{
-    ODV_VALUE *new_vals;
-    int new_max;
-
-    if (needed <= rec->max_columns) return ODV_OK;
-
-    new_max = needed + 64; /* grow with some slack */
-    new_vals = (ODV_VALUE *)realloc(rec->values, new_max * sizeof(ODV_VALUE));
-    if (!new_vals) return ODV_ERROR_MALLOC;
-
-    /* Zero-init new entries */
-    memset(new_vals + rec->max_columns, 0,
-           (new_max - rec->max_columns) * sizeof(ODV_VALUE));
-
-    rec->values = new_vals;
-    rec->max_columns = new_max;
-    return ODV_OK;
-}
-
 /*---------------------------------------------------------------------------
     Value helpers
  ---------------------------------------------------------------------------*/

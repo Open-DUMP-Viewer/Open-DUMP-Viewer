@@ -15,6 +15,7 @@
 #include <windows.h>
 #endif
 
+#ifdef WINDOWS
 /*---------------------------------------------------------------------------
     Map internal charset constant to Windows code page
  ---------------------------------------------------------------------------*/
@@ -34,6 +35,7 @@ static unsigned int charset_to_codepage(int cs)
     default:                return 65001;  /* Default to UTF-8 */
     }
 }
+#endif /* WINDOWS */
 
 /*---------------------------------------------------------------------------
     convert_charset
@@ -144,6 +146,7 @@ int convert_charset(const char *src, int src_len, int src_cs,
 #else
     /* Non-Windows: simple copy (assume UTF-8) */
     int copy_len;
+    (void)src_cs; (void)dst_cs;
     if (!src || !dst) return ODV_ERROR_INVALID_ARG;
     copy_len = (src_len < dst_size - 1) ? src_len : dst_size - 1;
     memcpy(dst, src, copy_len);

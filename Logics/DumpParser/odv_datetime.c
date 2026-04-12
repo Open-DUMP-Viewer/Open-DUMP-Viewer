@@ -124,7 +124,7 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
         if (custom_fmt && custom_fmt[0]) {
             return format_date_custom(custom_fmt, yyyy, mm, dd, hh, mi, ss, out, out_size);
         }
-        /* Fall through to default if no custom format */
+        /* fall through */
     default:
         if (out_size < 20) return ODV_ERROR_BUFFER_OVER;
         snprintf(out, out_size, "%04d/%02d/%02d %02d:%02d:%02d", yyyy, mm, dd, hh, mi, ss);

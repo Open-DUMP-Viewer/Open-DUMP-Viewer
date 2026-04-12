@@ -84,6 +84,7 @@ static void ODV_CALL csv_row_callback(
 {
     CSV_CONTEXT *ctx = (CSV_CONTEXT *)user_data;
     int i;
+    (void)schema;
 
     if (!ctx || !ctx->fp) return;
 
