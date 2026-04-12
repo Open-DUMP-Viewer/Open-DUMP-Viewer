@@ -85,18 +85,19 @@ Public Class SqlExportLogic
                     WriteCreateTable(sw, schema, tableName, columnNames, effectiveTypes, dbmsType,
                                      columnNotNulls, columnDefaults)
                     sw.WriteLine()
+                End If
 
-                    ' 制約 DDL (PK/UNIQUE/FK)
-                    If Not String.IsNullOrEmpty(constraintsJson) AndAlso constraintsJson <> "[]" Then
-                        WriteConstraints(sw, schema, tableName, constraintsJson, dbmsType)
-                        sw.WriteLine()
-                    End If
+                ' CREATE INDEX / 制約 DDL (オプション)
+                If ExportOptions.SqlCreateIndex AndAlso
+                   Not String.IsNullOrEmpty(constraintsJson) AndAlso constraintsJson <> "[]" Then
+                    WriteConstraints(sw, schema, tableName, constraintsJson, dbmsType)
+                    sw.WriteLine()
+                End If
 
-                    ' GO (SQL Server のみ)
-                    If isSqlServer Then
-                        sw.WriteLine("GO")
-                        sw.WriteLine()
-                    End If
+                ' GO (SQL Server のみ)
+                If isSqlServer AndAlso (ExportOptions.SqlCreateTable OrElse ExportOptions.SqlCreateIndex) Then
+                    sw.WriteLine("GO")
+                    sw.WriteLine()
                 End If
 
                 ' INSERT INTO ... (...) VALUES ( プレフィックスをキャッシュ
