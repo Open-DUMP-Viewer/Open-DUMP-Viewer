@@ -60,6 +60,15 @@ typedef struct _odv_session ODV_SESSION;
 #define ODV_ERR_CANCELLED       -200
 
 /*---------------------------------------------------------------------------
+    SQL Export Flags (for odv_set_sql_flags)
+ ---------------------------------------------------------------------------*/
+#define ODV_SQL_CREATE_TABLE   0x01u  /* Output DROP TABLE + CREATE TABLE */
+#define ODV_SQL_CREATE_INDEX   0x02u  /* Output CREATE INDEX */
+#define ODV_SQL_WRITE_COMMENTS 0x04u  /* Output COMMENT ON */
+#define ODV_SQL_WRITE_INSERTS  0x08u  /* Output INSERT INTO statements */
+#define ODV_SQL_ALL            0x0Fu  /* All of the above */
+
+/*---------------------------------------------------------------------------
     Callback Types
  ---------------------------------------------------------------------------*/
 
@@ -140,12 +149,10 @@ ODV_API int ODV_CALL odv_set_date_format(ODV_SESSION *s, int fmt, const char *cu
    write_types:  1=output column type row after header, 0=skip (default) */
 ODV_API int ODV_CALL odv_set_csv_options(ODV_SESSION *s, int write_header, int write_types);
 
-/* Set SQL export options.
-   create_table:  1=output DROP TABLE + CREATE TABLE DDL, 0=skip
-   create_index:  1=output CREATE INDEX DDL, 0=skip
-   write_comments: 1=output COMMENT ON DDL, 0=skip */
-ODV_API int ODV_CALL odv_set_sql_options(ODV_SESSION *s, int create_table,
-                                          int create_index, int write_comments);
+/* Set SQL export flags (bitwise OR of ODV_SQL_* constants).
+   Default: ODV_SQL_ALL (all DDL + INSERT output enabled).
+   Pass ODV_SQL_CREATE_TABLE alone for DDL-only mode (no INSERT). */
+ODV_API int ODV_CALL odv_set_sql_flags(ODV_SESSION *s, uint32_t flags);
 
 /* Set application version string (displayed in export comments).
    ver: UTF-8 version string e.g. "1.1.0". Pass NULL to clear. */
@@ -183,8 +190,10 @@ ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter);
 /* Export a specific table to CSV file */
 ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path);
 
-/* Export a specific table to SQL INSERT statements
-   dbms_type: 0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server */
+/* Export table(s) to SQL file.
+   table_name: target table name, or NULL to export all tables.
+   dbms_type: 0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server.
+   Output content is controlled by odv_set_sql_flags(). */
 ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
 
 /* Extract LOB column data to individual files.

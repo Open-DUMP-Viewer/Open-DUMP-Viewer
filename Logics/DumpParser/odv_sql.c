@@ -14,6 +14,7 @@
  *****************************************************************************/
 
 #include "odv_types.h"
+#include "odv_api.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -31,6 +32,10 @@ typedef struct {
     int         create_table;         /* 1=output DROP TABLE + CREATE TABLE DDL */
     int         create_index;         /* 1=output CREATE INDEX DDL */
     int         write_comments;       /* 1=output COMMENT ON DDL */
+    int         write_inserts;        /* 1=output INSERT INTO statements */
+    int         all_tables;           /* 1=export all tables (no filter) */
+    int         indexes_written;      /* 1=CREATE INDEX already output for current table */
+    int         comments_written;     /* 1=COMMENT ON already output for current table */
     char        last_schema[129];     /* Schema name from last row (for post-parse index output) */
     char        last_table[129];      /* Table name from last row */
 } SQL_CONTEXT;
@@ -374,6 +379,21 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
 }
 
 /*---------------------------------------------------------------------------
+    has_column_comments
+
+    Check if any column has a comment.
+ ---------------------------------------------------------------------------*/
+static int has_column_comments(ODV_SESSION *s)
+{
+    int i;
+    if (!s) return 0;
+    for (i = 0; i < s->table.col_count; i++) {
+        if (s->table.columns[i].comment[0]) return 1;
+    }
+    return 0;
+}
+
+/*---------------------------------------------------------------------------
     write_create_table
 
     Outputs CREATE TABLE DDL for the target DBMS.
@@ -486,7 +506,8 @@ static void write_indexes(SQL_CONTEXT *ctx, const char *schema,
 
         /* Use index_expr if available (preserves function-based expressions),
            otherwise build from columns[] */
-        if (c->index_expr[0]) {
+        if (c->index_expr[0] && dbms == DBMS_ORACLE) {
+            /* Oracle: use raw expression as-is (preserves function-based indexes) */
             fputs(c->index_expr, fp);
         } else if (c->col_count > 0) {
             fputc('(', fp);
@@ -640,6 +661,26 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
         write_create_table(ctx, schema, table, col_count, col_names, dbms);
     }
 
+    /* Write INDEX/COMMENT eagerly if data is already available (EXPDP).
+       For EXP, constraints arrive after data records — handled by table_cb. */
+    ctx->indexes_written = 0;
+    ctx->comments_written = 0;
+    if (ctx->create_index && ctx->session->table.constraint_count > 0) {
+        write_indexes(ctx, schema, table, dbms);
+        ctx->indexes_written = 1;
+    }
+    if (ctx->write_comments && (ctx->session->table.comment[0] ||
+        has_column_comments(ctx->session))) {
+        write_comments(ctx, schema, table, dbms);
+        ctx->comments_written = 1;
+    }
+
+    /* DDL-only mode: skip building INSERT prefix */
+    if (!ctx->write_inserts) {
+        ctx->insert_prefix[0] = '\0';
+        return;
+    }
+
     /* Build cached prefix string (safe position tracking) */
     {
         int pos = 0;
@@ -707,7 +748,15 @@ static void ODV_CALL sql_row_callback(
         if (strcmp(table, ctx->target_table) != 0) return;
     }
 
-    /* Build INSERT prefix on first row */
+    /* Detect table change in all-table mode */
+    if (ctx->all_tables && ctx->header_written && ctx->last_table[0] &&
+        strcmp(table, ctx->last_table) != 0) {
+        fprintf(ctx->fp, "\n");
+        ctx->header_written = 0;
+        ctx->insert_prefix[0] = '\0';
+    }
+
+    /* Build INSERT prefix / DDL header on first row of each table */
     if (!ctx->header_written) {
         build_insert_prefix(ctx, schema, table, col_count, col_names, ctx->dbms_type);
     }
@@ -715,6 +764,9 @@ static void ODV_CALL sql_row_callback(
     /* Remember schema/table for post-parse index output */
     if (schema) odv_strcpy(ctx->last_schema, schema, 128);
     if (table) odv_strcpy(ctx->last_table, table, 128);
+
+    /* DDL-only mode: skip INSERT output */
+    if (!ctx->write_inserts) return;
 
     /* Write INSERT statement */
     fputs(ctx->insert_prefix, ctx->fp);
@@ -753,6 +805,59 @@ static void ODV_CALL sql_row_callback(
                 fputs("NULL", ctx->fp);
                 break;
             }
+        } else if (ctx->session && i < ctx->session->table.col_count &&
+                   (ctx->session->table.columns[i].type == COL_DATE ||
+                    ctx->session->table.columns[i].type == COL_TIMESTAMP ||
+                    ctx->session->table.columns[i].type == COL_TIMESTAMP_TZ ||
+                    ctx->session->table.columns[i].type == COL_TIMESTAMP_LTZ)) {
+            /* Date/Timestamp: DBMS-specific formatting */
+            switch (ctx->dbms_type) {
+            case DBMS_ORACLE: {
+                int is_ts = (ctx->session->table.columns[i].type != COL_DATE);
+                if (is_ts) {
+                    /* TIMESTAMP: use TO_TIMESTAMP with fractional seconds */
+                    fprintf(ctx->fp, "TO_TIMESTAMP(");
+                    sql_write_string(ctx->fp, col_values[i]);
+                    fprintf(ctx->fp, ", 'YYYY/MM/DD HH24:MI:SS.FF')");
+                } else {
+                    /* DATE: use TO_DATE */
+                    const char *ora_fmt;
+                    switch (ctx->session->date_format) {
+                    case DATE_FMT_COMPACT: ora_fmt = "YYYYMMDD"; break;
+                    case DATE_FMT_FULL:    ora_fmt = "YYYYMMDDHH24MISS"; break;
+                    default:               ora_fmt = "YYYY/MM/DD HH24:MI:SS"; break;
+                    }
+                    fprintf(ctx->fp, "TO_DATE(");
+                    sql_write_string(ctx->fp, col_values[i]);
+                    fprintf(ctx->fp, ", '%s')", ora_fmt);
+                }
+                break;
+            }
+            default:
+                sql_write_string(ctx->fp, col_values[i]);
+                break;
+            }
+        } else if (ctx->session && i < ctx->session->table.col_count &&
+                   (ctx->session->table.columns[i].type == COL_RAW ||
+                    ctx->session->table.columns[i].type == COL_LONG_RAW)) {
+            /* RAW: DBMS-specific hex format */
+            const char *val = col_values[i];
+            /* Skip "0x" prefix if present */
+            if (val[0] == '0' && (val[1] == 'x' || val[1] == 'X')) val += 2;
+            switch (ctx->dbms_type) {
+            case DBMS_ORACLE:
+                fprintf(ctx->fp, "HEXTORAW('%s')", val);
+                break;
+            case DBMS_POSTGRES:
+                fprintf(ctx->fp, "'\\x%s'::BYTEA", val);
+                break;
+            case DBMS_MYSQL:
+                fprintf(ctx->fp, "X'%s'", val);
+                break;
+            default: /* SQL Server */
+                fprintf(ctx->fp, "0x%s", val);
+                break;
+            }
         } else if (is_numeric_value(col_values[i])) {
             fputs(col_values[i], ctx->fp);
         } else {
@@ -770,6 +875,65 @@ static void ODV_CALL sql_row_callback(
 }
 
 /*---------------------------------------------------------------------------
+    sql_table_callback
+
+    Called once per table (including zero-row tables) during all-table export.
+    Ensures DDL is emitted for tables that had no data rows, and flushes
+    INDEX/COMMENT for the just-completed table.
+ ---------------------------------------------------------------------------*/
+static void ODV_CALL sql_table_callback(
+    const char *schema, const char *table,
+    int col_count, const char **col_names, const char **col_types,
+    const int *col_not_nulls, const char **col_defaults,
+    int constraint_count, const char *constraints_json,
+    int64_t row_count, int64_t data_offset, void *user_data)
+{
+    SQL_CONTEXT *ctx = (SQL_CONTEXT *)user_data;
+    if (!ctx || !ctx->fp) return;
+
+    (void)col_types; (void)col_not_nulls; (void)col_defaults;
+    (void)constraint_count; (void)constraints_json;
+    (void)row_count; (void)data_offset;
+
+    /* Filter by table name if specified */
+    if (ctx->target_table && ctx->target_table[0] != '\0') {
+        if (strcmp(table, ctx->target_table) != 0) return;
+    }
+
+    /* Table boundary separator */
+    if (ctx->header_written && ctx->last_table[0] &&
+        strcmp(table, ctx->last_table) != 0) {
+        fprintf(ctx->fp, "\n");
+        ctx->header_written = 0;
+        ctx->insert_prefix[0] = '\0';
+    }
+
+    /* Write DDL header for zero-row tables (row_callback never fires for them). */
+    if (!ctx->header_written) {
+        build_insert_prefix(ctx, schema, table, col_count, col_names, ctx->dbms_type);
+    }
+
+    /* For EXP format: INDEX/COMMENT DDL arrives after data records.
+       At table_cb time, s->table still holds THIS table's data, so
+       flush any INDEX/COMMENT that wasn't output during build_insert_prefix. */
+    if (ctx->header_written) {
+        if (ctx->create_index && !ctx->indexes_written &&
+            ctx->session->table.constraint_count > 0) {
+            write_indexes(ctx, schema, table, ctx->dbms_type);
+            ctx->indexes_written = 1;
+        }
+        if (ctx->write_comments && !ctx->comments_written &&
+            (ctx->session->table.comment[0] || has_column_comments(ctx->session))) {
+            write_comments(ctx, schema, table, ctx->dbms_type);
+            ctx->comments_written = 1;
+        }
+    }
+
+    if (schema) odv_strcpy(ctx->last_schema, schema, 128);
+    if (table) odv_strcpy(ctx->last_table, table, 128);
+}
+
+/*---------------------------------------------------------------------------
     write_sql_file
 
     Exports a table to SQL INSERT statements.
@@ -778,11 +942,18 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
                    const char *output_path, int dbms_type)
 {
     SQL_CONTEXT ctx;
-    ODV_ROW_CALLBACK saved_cb;
-    void *saved_ud;
+    ODV_ROW_CALLBACK saved_row_cb;
+    void *saved_row_ud;
+    ODV_TABLE_CALLBACK saved_table_cb;
+    void *saved_table_ud;
+    int saved_filter_active;
+    int64_t saved_seek_offset;
     int rc;
+    int all_tables;
 
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
+
+    all_tables = (!table_name || table_name[0] == '\0');
 
     ctx.fp = fopen(output_path, "wb");
     if (!ctx.fp) {
@@ -796,17 +967,33 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
     ctx.header_written = 0;
     ctx.insert_prefix[0] = '\0';
     ctx.session = s;
-    ctx.create_table = s->sql_create_table;
-    ctx.create_index = s->sql_create_index;
-    ctx.write_comments = s->sql_write_comments;
+    ctx.create_table   = (s->sql_flags & ODV_SQL_CREATE_TABLE) ? 1 : 0;
+    ctx.create_index   = (s->sql_flags & ODV_SQL_CREATE_INDEX) ? 1 : 0;
+    ctx.write_comments = (s->sql_flags & ODV_SQL_WRITE_COMMENTS) ? 1 : 0;
+    ctx.write_inserts  = (s->sql_flags & ODV_SQL_WRITE_INSERTS) ? 1 : 0;
+    ctx.all_tables = all_tables;
     ctx.last_schema[0] = '\0';
     ctx.last_table[0] = '\0';
 
-    /* Save and replace row callback */
-    saved_cb = s->row_cb;
-    saved_ud = s->row_ud;
+    /* Save and replace callbacks */
+    saved_row_cb = s->row_cb;
+    saved_row_ud = s->row_ud;
+    saved_table_cb = s->table_cb;
+    saved_table_ud = s->table_ud;
+
     s->row_cb = sql_row_callback;
     s->row_ud = &ctx;
+
+    /* Hook table_cb for zero-row table DDL and per-table INDEX/COMMENT flush */
+    s->table_cb = sql_table_callback;
+    s->table_ud = &ctx;
+
+    if (all_tables) {
+        saved_filter_active = s->filter_active;
+        saved_seek_offset = s->seek_offset;
+        s->filter_active = 0;
+        s->seek_offset = 0;
+    }
 
     /* Re-parse dump */
     s->cancelled = 0;
@@ -817,8 +1004,10 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         rc = detect_dump_kind(s);
         if (rc != ODV_OK) {
             fclose(ctx.fp);
-            s->row_cb = saved_cb;
-            s->row_ud = saved_ud;
+            s->row_cb = saved_row_cb;
+            s->row_ud = saved_row_ud;
+            s->table_cb = saved_table_cb;
+            s->table_ud = saved_table_ud;
             return rc;
         }
     }
@@ -840,20 +1029,17 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         break;
     }
 
-    /* Write CREATE INDEX and COMMENT ON after parse completes
-       (EXP has INDEX/COMMENT DDL after data records) */
-    if (ctx.header_written && ctx.last_table[0]) {
-        if (ctx.create_index)
-            write_indexes(&ctx, ctx.last_schema, ctx.last_table, ctx.dbms_type);
-        if (ctx.write_comments)
-            write_comments(&ctx, ctx.last_schema, ctx.last_table, ctx.dbms_type);
-    }
-
     fclose(ctx.fp);
 
-    /* Restore original callback */
-    s->row_cb = saved_cb;
-    s->row_ud = saved_ud;
+    /* Restore original state */
+    s->row_cb = saved_row_cb;
+    s->row_ud = saved_row_ud;
+    s->table_cb = saved_table_cb;
+    s->table_ud = saved_table_ud;
+    if (all_tables) {
+        s->filter_active = saved_filter_active;
+        s->seek_offset = saved_seek_offset;
+    }
 
     return rc;
 }

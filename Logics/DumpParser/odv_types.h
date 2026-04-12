@@ -454,9 +454,7 @@ struct _odv_session {
     int             csv_write_header;      /* 1=write column header row (default:1) */
     int             csv_write_types;       /* 1=write column type row (default:0) */
     char            csv_delimiter;         /* CSV field delimiter (default ',') */
-    int             sql_create_table;      /* 1=output DROP+CREATE TABLE DDL (default:1) */
-    int             sql_create_index;      /* 1=output CREATE INDEX DDL (default:1) */
-    int             sql_write_comments;    /* 1=output COMMENT ON DDL (default:1) */
+    uint32_t        sql_flags;             /* Bitwise OR of ODV_SQL_* flags (default: ODV_SQL_ALL) */
 
     /* LOB extraction options */
     int             lob_extract_mode;      /* 1=extracting LOB files */
@@ -491,11 +489,9 @@ struct _odv_session {
   #define odv_ftell(fp)              ftello((fp))
 #endif
 
-/* Safe string copy */
-#define odv_strcpy(dst, src, maxlen) do { \
-    strncpy((dst), (src), (maxlen)); \
-    (dst)[(maxlen)] = '\0'; \
-} while(0)
+/* Safe string copy (null-terminated, no truncation warnings) */
+#define odv_strcpy(dst, src, maxlen) \
+    snprintf((dst), (size_t)(maxlen) + 1, "%s", (src))
 
 /* Min/Max */
 #define ODV_MIN(a, b) ((a) < (b) ? (a) : (b))

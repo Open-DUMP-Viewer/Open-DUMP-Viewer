@@ -137,8 +137,15 @@ Public Class OraDB_NativeParser
     End Function
 
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
-    Private Shared Function odv_set_sql_options(session As IntPtr, createTable As Integer, createIndex As Integer, writeComments As Integer) As Integer
+    Private Shared Function odv_set_sql_flags(session As IntPtr, flags As UInteger) As Integer
     End Function
+
+    ' SQL export flag constants
+    Public Const ODV_SQL_CREATE_TABLE As UInteger = &H1UI
+    Public Const ODV_SQL_CREATE_INDEX As UInteger = &H2UI
+    Public Const ODV_SQL_WRITE_COMMENTS As UInteger = &H4UI
+    Public Const ODV_SQL_WRITE_INSERTS As UInteger = &H8UI
+    Public Const ODV_SQL_ALL As UInteger = &HFUI
 
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_set_app_version(session As IntPtr,
@@ -232,9 +239,11 @@ Public Class OraDB_NativeParser
     Private Shared Sub ApplyExportOptions(session As IntPtr)
         odv_set_date_format(session, ExportOptions.DateFormat, ExportOptions.CustomDateFormat)
         odv_set_csv_options(session, If(ExportOptions.CsvWriteHeader, 1, 0), If(ExportOptions.CsvWriteTypes, 1, 0))
-        odv_set_sql_options(session, If(ExportOptions.SqlCreateTable, 1, 0),
-                            If(ExportOptions.SqlCreateIndex, 1, 0),
-                            If(ExportOptions.SqlWriteComments, 1, 0))
+        Dim sqlFlags As UInteger = ODV_SQL_WRITE_INSERTS  ' Always include INSERT for GUI
+        If ExportOptions.SqlCreateTable Then sqlFlags = sqlFlags Or ODV_SQL_CREATE_TABLE
+        If ExportOptions.SqlCreateIndex Then sqlFlags = sqlFlags Or ODV_SQL_CREATE_INDEX
+        If ExportOptions.SqlWriteComments Then sqlFlags = sqlFlags Or ODV_SQL_WRITE_COMMENTS
+        odv_set_sql_flags(session, sqlFlags)
 
         ' CSV デリミタ設定
         Dim delimChar As Char = If(String.IsNullOrEmpty(ExportOptions.CsvDelimiter), ","c, ExportOptions.CsvDelimiter(0))
