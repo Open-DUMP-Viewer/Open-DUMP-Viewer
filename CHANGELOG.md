@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.3.0] - 2026-04-12
+
+### 新機能
+- **SQL エクスポート API をビットフラグ方式に刷新** ([#25](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/25))
+  - `odv_set_sql_flags()` による `ODV_SQL_CREATE_TABLE` / `ODV_SQL_CREATE_INDEX` / `ODV_SQL_WRITE_COMMENTS` / `ODV_SQL_WRITE_INSERTS` の個別制御
+  - DDL のみ出力モード（INSERT 文を省略可能）
+  - 全テーブル一括出力（`table_name=NULL` で全テーブルを 1 パスでエクスポート）
+  - 空テーブル（0 行）の DDL 出力に対応
+
+### 修正
+- **Oracle 向け SQL エクスポートで DATE / TIMESTAMP / RAW 型の値が正しくフォーマットされない問題を修正**
+  - DATE: `TO_DATE()` でユーザー指定の日付フォーマットに対応
+  - TIMESTAMP: `TO_TIMESTAMP()` でマイクロ秒を含むフォーマットに対応
+  - RAW: `HEXTORAW()` で正しいバイナリリテラルを出力
+- **MySQL 向け SQL エクスポートで CREATE INDEX の識別子クォートが正しくない問題を修正**
+  - Oracle 形式のダブルクォートからバッククォートに変換
+- **Linux (GCC) ビルド時の警告を全て修正** (25 件 → 0 件)
+
+### 破壊的変更
+- `odv_set_sql_options()` を `odv_set_sql_flags()` に置き換え（C API 利用者のみ影響）
+
 ## [3.2.0] - 2026-04-11
 
 ### 新機能
