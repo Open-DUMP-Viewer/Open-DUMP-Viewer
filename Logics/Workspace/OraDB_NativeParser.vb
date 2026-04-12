@@ -239,10 +239,11 @@ Public Class OraDB_NativeParser
     Private Shared Sub ApplyExportOptions(session As IntPtr)
         odv_set_date_format(session, ExportOptions.DateFormat, ExportOptions.CustomDateFormat)
         odv_set_csv_options(session, If(ExportOptions.CsvWriteHeader, 1, 0), If(ExportOptions.CsvWriteTypes, 1, 0))
-        Dim sqlFlags As UInteger = ODV_SQL_WRITE_INSERTS  ' Always include INSERT for GUI
+        Dim sqlFlags As UInteger = 0
         If ExportOptions.SqlCreateTable Then sqlFlags = sqlFlags Or ODV_SQL_CREATE_TABLE
         If ExportOptions.SqlCreateIndex Then sqlFlags = sqlFlags Or ODV_SQL_CREATE_INDEX
         If ExportOptions.SqlWriteComments Then sqlFlags = sqlFlags Or ODV_SQL_WRITE_COMMENTS
+        If ExportOptions.SqlWriteInserts Then sqlFlags = sqlFlags Or ODV_SQL_WRITE_INSERTS
         odv_set_sql_flags(session, sqlFlags)
 
         ' CSV デリミタ設定

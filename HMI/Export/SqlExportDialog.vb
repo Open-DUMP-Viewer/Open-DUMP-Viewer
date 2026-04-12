@@ -30,6 +30,7 @@ Public Class SqlExportDialog
         chkCreateTable.Checked = ExportOptions.SqlCreateTable
         chkCreateIndex.Checked = ExportOptions.SqlCreateIndex
         chkWriteComments.Checked = ExportOptions.SqlWriteComments
+        chkWriteInserts.Checked = ExportOptions.SqlWriteInserts
         chkInferInteger.Checked = ExportOptions.SqlInferInteger
     End Sub
 
@@ -45,6 +46,7 @@ Public Class SqlExportDialog
         ExportOptions.SqlCreateTable = chkCreateTable.Checked
         ExportOptions.SqlCreateIndex = chkCreateIndex.Checked
         ExportOptions.SqlWriteComments = chkWriteComments.Checked
+        ExportOptions.SqlWriteInserts = chkWriteInserts.Checked
         ExportOptions.SqlInferInteger = chkInferInteger.Checked
         DatabaseName = txtDatabaseName.Text.Trim()
         ExportOptions.Save()
@@ -57,6 +59,7 @@ Public Class SqlExportDialog
         chkCreateTable.Text = Loc.S("ExportOptions_SqlCreateTable")
         chkCreateIndex.Text = Loc.S("ExportOptions_SqlCreateIndex")
         chkWriteComments.Text = Loc.S("ExportOptions_SqlWriteComments")
+        chkWriteInserts.Text = Loc.S("ExportOptions_SqlWriteInserts")
         chkInferInteger.Text = Loc.S("ExportOptions_SqlInferInteger")
         lblDatabaseName.Text = Loc.S("SqlExport_DatabaseName")
         btnOK.Text = Loc.S("Button_OK")

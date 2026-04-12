@@ -22,6 +22,8 @@ Partial Class SqlExportDialog
         chkCreateTable = New CheckBox()
         chkCreateIndex = New CheckBox()
         chkWriteComments = New CheckBox()
+        sepLine = New Label()
+        chkWriteInserts = New CheckBox()
         chkInferInteger = New CheckBox()
         lblDatabaseName = New Label()
         txtDatabaseName = New TextBox()
@@ -74,19 +76,35 @@ Partial Class SqlExportDialog
         chkWriteComments.TabIndex = 4
         chkWriteComments.Text = "COMMENT ON を出力"
         '
+        ' sepLine
+        '
+        sepLine.BorderStyle = BorderStyle.Fixed3D
+        sepLine.Location = New Point(20, 138)
+        sepLine.Name = "sepLine"
+        sepLine.Size = New Size(330, 2)
+        '
+        ' chkWriteInserts
+        '
+        chkWriteInserts.AutoSize = True
+        chkWriteInserts.Location = New Point(20, 148)
+        chkWriteInserts.Name = "chkWriteInserts"
+        chkWriteInserts.Size = New Size(330, 19)
+        chkWriteInserts.TabIndex = 5
+        chkWriteInserts.Text = "INSERT INTO データを出力"
+        '
         ' chkInferInteger
         '
         chkInferInteger.AutoSize = True
-        chkInferInteger.Location = New Point(20, 135)
+        chkInferInteger.Location = New Point(20, 173)
         chkInferInteger.Name = "chkInferInteger"
         chkInferInteger.Size = New Size(330, 19)
-        chkInferInteger.TabIndex = 5
+        chkInferInteger.TabIndex = 6
         chkInferInteger.Text = "NUMBER を実データから整数型に推定"
         '
         ' lblDatabaseName
         '
         lblDatabaseName.AutoSize = True
-        lblDatabaseName.Location = New Point(20, 168)
+        lblDatabaseName.Location = New Point(20, 206)
         lblDatabaseName.Name = "lblDatabaseName"
         lblDatabaseName.Size = New Size(120, 15)
         lblDatabaseName.TabIndex = 6
@@ -94,27 +112,27 @@ Partial Class SqlExportDialog
         '
         ' txtDatabaseName
         '
-        txtDatabaseName.Location = New Point(150, 165)
+        txtDatabaseName.Location = New Point(150, 203)
         txtDatabaseName.Name = "txtDatabaseName"
         txtDatabaseName.Size = New Size(200, 23)
-        txtDatabaseName.TabIndex = 7
+        txtDatabaseName.TabIndex = 8
         txtDatabaseName.PlaceholderText = "(省略可)"
         '
         ' btnOK
         '
-        btnOK.Location = New Point(150, 205)
+        btnOK.Location = New Point(150, 243)
         btnOK.Name = "btnOK"
         btnOK.Size = New Size(90, 30)
-        btnOK.TabIndex = 8
+        btnOK.TabIndex = 9
         btnOK.Text = "OK"
         btnOK.DialogResult = DialogResult.OK
         '
         ' btnCancel
         '
-        btnCancel.Location = New Point(260, 205)
+        btnCancel.Location = New Point(260, 243)
         btnCancel.Name = "btnCancel"
         btnCancel.Size = New Size(90, 30)
-        btnCancel.TabIndex = 9
+        btnCancel.TabIndex = 10
         btnCancel.Text = "キャンセル"
         btnCancel.DialogResult = DialogResult.Cancel
         '
@@ -124,12 +142,14 @@ Partial Class SqlExportDialog
         CancelButton = btnCancel
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(380, 250)
+        ClientSize = New Size(380, 288)
         Controls.Add(lblDbms)
         Controls.Add(cboDbms)
         Controls.Add(chkCreateTable)
         Controls.Add(chkCreateIndex)
         Controls.Add(chkWriteComments)
+        Controls.Add(sepLine)
+        Controls.Add(chkWriteInserts)
         Controls.Add(chkInferInteger)
         Controls.Add(lblDatabaseName)
         Controls.Add(txtDatabaseName)
@@ -150,6 +170,8 @@ Partial Class SqlExportDialog
     Friend WithEvents chkCreateTable As CheckBox
     Friend WithEvents chkCreateIndex As CheckBox
     Friend WithEvents chkWriteComments As CheckBox
+    Friend WithEvents sepLine As Label
+    Friend WithEvents chkWriteInserts As CheckBox
     Friend WithEvents chkInferInteger As CheckBox
     Friend WithEvents lblDatabaseName As Label
     Friend WithEvents txtDatabaseName As TextBox

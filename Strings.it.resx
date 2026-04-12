@@ -393,6 +393,7 @@ Continuare?</value>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Includi DROP TABLE + CREATE TABLE</value></data>
   <data name="ExportOptions_SqlCreateIndex" xml:space="preserve"><value>Includi CREATE INDEX</value></data>
   <data name="ExportOptions_SqlWriteComments" xml:space="preserve"><value>Includi COMMENT ON</value></data>
+  <data name="ExportOptions_SqlWriteInserts" xml:space="preserve"><value>Includi dati INSERT INTO</value></data>
   <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Dedurre i tipi interi dai dati effettivi per le colonne NUMBER</value></data>
   <!-- SQL Export -->
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>Esportazione script SQL</value></data>

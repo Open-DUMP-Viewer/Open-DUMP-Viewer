@@ -399,6 +399,7 @@ https://www.odv.dev/
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Включить DROP TABLE + CREATE TABLE</value></data>
   <data name="ExportOptions_SqlCreateIndex" xml:space="preserve"><value>Включить CREATE INDEX</value></data>
   <data name="ExportOptions_SqlWriteComments" xml:space="preserve"><value>Включить COMMENT ON</value></data>
+  <data name="ExportOptions_SqlWriteInserts" xml:space="preserve"><value>Включить данные INSERT INTO</value></data>
   <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Определять целочисленные типы для NUMBER по данным</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->

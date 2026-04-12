@@ -100,6 +100,11 @@ Public Class SqlExportLogic
                     sw.WriteLine()
                 End If
 
+                ' INSERT INTO データ出力 (オプション)
+                If Not ExportOptions.SqlWriteInserts Then
+                    Return True
+                End If
+
                 ' INSERT INTO ... (...) VALUES ( プレフィックスをキャッシュ
                 Dim prefix = BuildInsertPrefix(schema, tableName, columnNames, dbmsType)
 

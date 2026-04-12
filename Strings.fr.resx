@@ -407,6 +407,7 @@ Continuer ?</value>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>Inclure DROP TABLE + CREATE TABLE</value></data>
   <data name="ExportOptions_SqlCreateIndex" xml:space="preserve"><value>Inclure CREATE INDEX</value></data>
   <data name="ExportOptions_SqlWriteComments" xml:space="preserve"><value>Inclure COMMENT ON</value></data>
+  <data name="ExportOptions_SqlWriteInserts" xml:space="preserve"><value>Inclure les données INSERT INTO</value></data>
   <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Déduire les types entiers à partir des données pour les colonnes NUMBER</value></data>
 
   <!-- SQL Export Dialog -->

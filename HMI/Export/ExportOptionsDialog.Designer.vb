@@ -32,6 +32,7 @@ Partial Class ExportOptionsDialog
         chkCreateTable = New CheckBox()
         chkCreateIndex = New CheckBox()
         chkWriteComments = New CheckBox()
+        chkWriteInserts = New CheckBox()
         chkInferInteger = New CheckBox()
         btnOK = New Button()
         btnCancel = New Button()
@@ -162,10 +163,11 @@ Partial Class ExportOptionsDialog
         grpSqlOptions.Controls.Add(chkCreateTable)
         grpSqlOptions.Controls.Add(chkCreateIndex)
         grpSqlOptions.Controls.Add(chkWriteComments)
+        grpSqlOptions.Controls.Add(chkWriteInserts)
         grpSqlOptions.Controls.Add(chkInferInteger)
         grpSqlOptions.Location = New Point(15, 285)
         grpSqlOptions.Name = "grpSqlOptions"
-        grpSqlOptions.Size = New Size(380, 130)
+        grpSqlOptions.Size = New Size(380, 155)
         grpSqlOptions.TabIndex = 2
         grpSqlOptions.TabStop = False
         grpSqlOptions.Text = "SQL スクリプトオプション"
@@ -197,13 +199,22 @@ Partial Class ExportOptionsDialog
         chkWriteComments.TabIndex = 2
         chkWriteComments.Text = "COMMENT ON を出力"
         '
+        ' chkWriteInserts
+        '
+        chkWriteInserts.AutoSize = True
+        chkWriteInserts.Location = New Point(15, 100)
+        chkWriteInserts.Name = "chkWriteInserts"
+        chkWriteInserts.Size = New Size(330, 19)
+        chkWriteInserts.TabIndex = 3
+        chkWriteInserts.Text = "INSERT INTO データを出力"
+        '
         ' chkInferInteger
         '
         chkInferInteger.AutoSize = True
-        chkInferInteger.Location = New Point(15, 100)
+        chkInferInteger.Location = New Point(15, 125)
         chkInferInteger.Name = "chkInferInteger"
         chkInferInteger.Size = New Size(330, 19)
-        chkInferInteger.TabIndex = 3
+        chkInferInteger.TabIndex = 4
         chkInferInteger.Text = "NUMBER を実データから整数型に推定"
         '
         ' grpOracleClient
@@ -212,7 +223,7 @@ Partial Class ExportOptionsDialog
         grpOracleClient.Controls.Add(btnBrowseImpdp)
         grpOracleClient.Controls.Add(btnAutoSetup)
         grpOracleClient.Controls.Add(lblImpdpInfo)
-        grpOracleClient.Location = New Point(15, 425)
+        grpOracleClient.Location = New Point(15, 450)
         grpOracleClient.Name = "grpOracleClient"
         grpOracleClient.Size = New Size(380, 130)
         grpOracleClient.TabIndex = 5
@@ -255,7 +266,7 @@ Partial Class ExportOptionsDialog
         '
         ' btnOK
         '
-        btnOK.Location = New Point(195, 570)
+        btnOK.Location = New Point(195, 595)
         btnOK.Name = "btnOK"
         btnOK.Size = New Size(90, 30)
         btnOK.TabIndex = 6
@@ -264,7 +275,7 @@ Partial Class ExportOptionsDialog
         '
         ' btnCancel
         '
-        btnCancel.Location = New Point(305, 570)
+        btnCancel.Location = New Point(305, 595)
         btnCancel.Name = "btnCancel"
         btnCancel.Size = New Size(90, 30)
         btnCancel.TabIndex = 7
@@ -277,7 +288,7 @@ Partial Class ExportOptionsDialog
         CancelButton = btnCancel
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(410, 615)
+        ClientSize = New Size(410, 640)
         Controls.Add(grpDateFormat)
         Controls.Add(grpCsvOptions)
         Controls.Add(grpSqlOptions)
@@ -316,6 +327,7 @@ Partial Class ExportOptionsDialog
     Friend WithEvents chkCreateTable As CheckBox
     Friend WithEvents chkCreateIndex As CheckBox
     Friend WithEvents chkWriteComments As CheckBox
+    Friend WithEvents chkWriteInserts As CheckBox
     Friend WithEvents chkInferInteger As CheckBox
     Friend WithEvents grpOracleClient As GroupBox
     Friend WithEvents txtImpdpPath As TextBox

@@ -367,6 +367,7 @@ Fortfahren?</value>
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>DROP TABLE + CREATE TABLE ausgeben</value></data>
   <data name="ExportOptions_SqlCreateIndex" xml:space="preserve"><value>CREATE INDEX ausgeben</value></data>
   <data name="ExportOptions_SqlWriteComments" xml:space="preserve"><value>COMMENT ON ausgeben</value></data>
+  <data name="ExportOptions_SqlWriteInserts" xml:space="preserve"><value>INSERT INTO Daten ausgeben</value></data>
   <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>Ganzzahltypen aus Ist-Daten für NUMBER-Spalten ableiten</value></data>
   <data name="SqlExport_FormTitle" xml:space="preserve"><value>SQL-Skript-Export</value></data>
   <data name="SqlExport_DatabaseLabel" xml:space="preserve"><value>Ziel-DB:</value></data>

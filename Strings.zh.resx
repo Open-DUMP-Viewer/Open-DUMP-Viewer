@@ -399,6 +399,7 @@ https://www.odv.dev/
   <data name="ExportOptions_SqlCreateTable" xml:space="preserve"><value>输出 DROP TABLE + CREATE TABLE</value></data>
   <data name="ExportOptions_SqlCreateIndex" xml:space="preserve"><value>输出 CREATE INDEX</value></data>
   <data name="ExportOptions_SqlWriteComments" xml:space="preserve"><value>输出 COMMENT ON</value></data>
+  <data name="ExportOptions_SqlWriteInserts" xml:space="preserve"><value>输出 INSERT INTO 数据</value></data>
   <data name="ExportOptions_SqlInferInteger" xml:space="preserve"><value>根据实际数据推断 NUMBER 列的整数类型</value></data>
 
   <!-- ========== SQL Export Dialog ========== -->

@@ -135,6 +135,18 @@ Namespace My
 
         <Global.System.Configuration.UserScopedSettingAttribute(),  _
          Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
+         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
+        Public Property ExportSqlWriteInserts() As Boolean
+            Get
+                Return CType(Me("ExportSqlWriteInserts"),Boolean)
+            End Get
+            Set
+                Me("ExportSqlWriteInserts") = value
+            End Set
+        End Property
+
+        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
          Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
         Public Property ExportSqlInferInteger() As Boolean
             Get
