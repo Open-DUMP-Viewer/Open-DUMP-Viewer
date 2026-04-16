@@ -1,0 +1,108 @@
+name: Publish Chocolatey Deprecation Package
+
+# 旧 Chocolatey パッケージ `oradb-dump-viewer` に deprecation notice を
+# 持つ新バージョン (3.3.2) を push して、ユーザーを新ID `open-dump-viewer`
+# へ誘導する。
+#
+# 実行後はこのワークフローファイルを削除する想定（1回限りのタスク）。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - name: Prepare deprecated package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path "deprecate/tools" -Force | Out-Null
+
+          # nuspec (deprecation notice)
+          @'
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>oradb-dump-viewer</id>
+              <version>3.3.2</version>
+              <title>[DEPRECATED] OraDB DUMP Viewer - renamed to open-dump-viewer</title>
+              <authors>Taketo Yanai</authors>
+              <owners>YANAi</owners>
+              <projectUrl>https://www.odv.dev/</projectUrl>
+              <projectSourceUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer</projectSourceUrl>
+              <bugTrackerUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues</bugTrackerUrl>
+              <licenseUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/EULA.md</licenseUrl>
+              <requireLicenseAcceptance>false</requireLicenseAcceptance>
+              <tags>oracle database dump dmp viewer expdp datapump deprecated</tags>
+              <summary>[DEPRECATED] This package has been renamed. Please install 'open-dump-viewer' instead.</summary>
+              <description><![CDATA[
+          ## ⚠️ This Package is Deprecated
+
+          The tool has been renamed from **OraDB DUMP Viewer** to **Open DUMP Viewer for Oracle database** (v4.0.0) for Oracle trademark compliance.
+
+          This Chocolatey package (`oradb-dump-viewer`) has been replaced by a new package ID:
+
+              choco install open-dump-viewer
+
+          ### Why?
+
+          Oracle Corporation's legal team flagged the "OraDB" name as violating their trademark policy. To comply, the tool name and related package identifiers have been updated.
+
+          ### Migration
+
+          1. Uninstall the old package: `choco uninstall oradb-dump-viewer`
+          2. Install the new one: `choco install open-dump-viewer`
+
+          Your existing license key remains valid (ODV-XXXX-XXXX-XXXX format unchanged). You will need to re-authenticate on first launch of the new version.
+
+          See the [CHANGELOG](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/CHANGELOG.md) for details.
+          ]]></description>
+            </metadata>
+            <files>
+              <file src="tools\**" target="tools" />
+            </files>
+          </package>
+          '@ | Out-File -FilePath "deprecate/oradb-dump-viewer.nuspec" -Encoding utf8
+
+          # chocolateyinstall.ps1: show deprecation message, do nothing
+          @'
+          $ErrorActionPreference = 'Stop'
+
+          Write-Warning "================================================================"
+          Write-Warning "  This package 'oradb-dump-viewer' is DEPRECATED."
+          Write-Warning ""
+          Write-Warning "  The tool has been renamed to 'Open DUMP Viewer for Oracle database'"
+          Write-Warning "  (v4.0.0) for Oracle trademark compliance."
+          Write-Warning ""
+          Write-Warning "  Please use the new package ID instead:"
+          Write-Warning ""
+          Write-Warning "      choco install open-dump-viewer"
+          Write-Warning ""
+          Write-Warning "  See: https://chocolatey.org/packages/open-dump-viewer"
+          Write-Warning "================================================================"
+
+          # Do NOT install anything. User must manually install the new package.
+          # This prevents silent confusion (e.g., two installations side by side).
+          '@ | Out-File -FilePath "deprecate/tools/chocolateyinstall.ps1" -Encoding utf8
+
+          # chocolateyuninstall.ps1: no-op (nothing was installed)
+          @'
+          $ErrorActionPreference = 'Stop'
+          # No-op: the deprecated package does not install any files.
+          '@ | Out-File -FilePath "deprecate/tools/chocolateyuninstall.ps1" -Encoding utf8
+
+      - name: Pack Chocolatey package
+        shell: pwsh
+        working-directory: deprecate
+        run: |
+          choco pack oradb-dump-viewer.nuspec
+
+      - name: Push to Chocolatey
+        shell: pwsh
+        working-directory: deprecate
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          choco apikey --key $env:CHOCOLATEY_API_KEY --source https://push.chocolatey.org/
+          choco push oradb-dump-viewer.3.3.2.nupkg --source https://push.chocolatey.org/
