@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_charset.c
     Character set conversion using Win32 MultiByteToWideChar / WideCharToMultiByte

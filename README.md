@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="app.ico" alt="OraDB DUMP Viewer" width="80">
+  <img src="app.ico" alt="Open DUMP Viewer for Oracle database" width="80">
 </p>
-<h1 align="center">OraDB DUMP Viewer</h1>
+<h1 align="center">Open DUMP Viewer for Oracle database</h1>
 <p align="center">
   View Oracle .dmp files <strong>without Oracle</strong> — a Windows desktop tool for EXP &amp; EXPDP dumps<br>
   Oracle 環境なしで .dmp ファイルを解析・閲覧できる Windows デスクトップツール
 </p>
 
 <p align="center">
-  <a href="https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases"><img src="https://img.shields.io/github/v/tag/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer?label=version&style=flat-square" alt="Release"></a>
-  <a href="https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases"><img src="https://img.shields.io/github/downloads/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/total?label=downloads&style=flat-square" alt="Downloads"></a>
+  <a href="https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases"><img src="https://img.shields.io/github/v/tag/Open-DUMP-Viewer/Open-DUMP-Viewer?label=version&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases"><img src="https://img.shields.io/github/downloads/Open-DUMP-Viewer/Open-DUMP-Viewer/total?label=downloads&style=flat-square" alt="Downloads"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20x64%20%7C%20ARM64-blue?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/runtime-.NET%2010.0-purple?style=flat-square" alt=".NET 10">
   <img src="https://img.shields.io/badge/languages-10-orange?style=flat-square" alt="10 Languages">
@@ -17,22 +17,22 @@
 </p>
 
 <p align="center">
-  <a href="https://www.odv.dev/">Website</a> · <a href="https://www.odv.dev/ja/blog">Blog</a> · <a href="https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest">Download</a> · <a href="https://www.odv.dev/ja/register">Get License</a>
+  <a href="https://www.odv.dev/">Website</a> · <a href="https://www.odv.dev/ja/blog">Blog</a> · <a href="https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest">Download</a> · <a href="https://www.odv.dev/ja/register">Get License</a>
 </p>
 
 ---
 
 <p align="center">
-  <img src="docs/screenshots/main-window.png" alt="OraDB DUMP Viewer — Main Window" width="800">
+  <img src="docs/screenshots/main-window.png" alt="Open DUMP Viewer for Oracle database — Main Window" width="800">
   <br>
   <em>スキーマツリーとテーブル一覧 / Schema tree and table list</em>
 </p>
 
-## Why OraDB DUMP Viewer?
+## Why Open DUMP Viewer for Oracle database?
 
-Oracle の .dmp ファイルを開くには、従来は Oracle Database や Client のインストールが必要でした。OraDB DUMP Viewer は **Oracle 環境を一切必要とせず**、.dmp ファイルの中身を GUI で閲覧・エクスポートできます。
+Oracle の .dmp ファイルを開くには、従来は Oracle Database や Client のインストールが必要でした。Open DUMP Viewer for Oracle database は **Oracle 環境を一切必要とせず**、.dmp ファイルの中身を GUI で閲覧・エクスポートできます。
 
-| | impdp (Oracle) | OraDB DUMP Viewer | strings コマンド |
+| | impdp (Oracle) | Open DUMP Viewer for Oracle database | strings コマンド |
 |---|:---:|:---:|:---:|
 | Oracle 環境 | 必要 | **不要** | 不要 |
 | テーブルデータ閲覧 | ✗ | **✓** | ✗ |
@@ -133,10 +133,10 @@ Oracle の .dmp ファイルを開くには、従来は Oracle Database や Clie
 
 **winget (推奨):**
 ```
-winget install OraDBDumpViewer.OraDBDumpViewer
+winget install OpenDumpViewer.OpenDumpViewer
 ```
 
-**手動ダウンロード:** [GitHub Releases](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest) から MSI インストーラーまたは ZIP ポータブル版をダウンロード
+**手動ダウンロード:** [GitHub Releases](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest) から MSI インストーラーまたは ZIP ポータブル版をダウンロード
 
 | 形式 | 説明 |
 |---|---|
@@ -241,22 +241,22 @@ build_dll.bat
 
 # 2. Build the VB.NET application
 cd ../..
-dotnet build "OraDB DUMP Viewer.vbproj"
+dotnet build "Open DUMP Viewer.vbproj"
 ```
 
 ### Testing
 
 テスト用ダンプファイル (.dmp) は別リポジトリで管理しています:
 
-👉 **[OraDB-DUMP-Viewer/odv-testdump](https://github.com/OraDB-DUMP-Viewer/odv-testdump)** — Docker + Oracle Database Free で全データ型・全エクスポート形式のダンプを自動生成
+👉 **[Open-DUMP-Viewer/odv-testdump](https://github.com/Open-DUMP-Viewer/odv-testdump)** — Docker + Oracle Database Free で全データ型・全エクスポート形式のダンプを自動生成
 
 ```bash
 # テストダンプの生成と実行
-git clone https://github.com/OraDB-DUMP-Viewer/odv-testdump.git
+git clone https://github.com/Open-DUMP-Viewer/odv-testdump.git
 cd odv-testdump
 ./run.sh                          # Docker で .dmp ファイルを生成
-cp output/*.dmp ../OraDB-DUMP-Viewer/test_dumps/11g/
-cd ../OraDB-DUMP-Viewer/test_dumps
+cp output/*.dmp ../Open-DUMP-Viewer/test_dumps/11g/
+cd ../Open-DUMP-Viewer/test_dumps
 ./test_parser.exe .               # テスト実行
 ```
 
@@ -299,6 +299,6 @@ cd ../OraDB-DUMP-Viewer/test_dumps
 ---
 
 <p align="center">
-  <strong>OraDB DUMP Viewer</strong> — by <a href="https://www.ta-yan.ai/">YANAI Taketo</a><br>
+  <strong>Open DUMP Viewer for Oracle database</strong> — by <a href="https://www.ta-yan.ai/">YANAI Taketo</a><br>
   <a href="https://www.odv.dev/">https://www.odv.dev/</a>
 </p>

@@ -1,6 +1,6 @@
 @echo off
-REM OraDB DUMP Viewer - DLL Build Script
-REM Builds OraDB_DumpParser.dll using MSVC
+REM Open DUMP Viewer for Oracle database - DLL Build Script
+REM Builds Open_DumpParser.dll using MSVC
 
 cd /d "%~dp0"
 
@@ -30,8 +30,8 @@ set OUTDIR=..\..\bin\Debug\net10.0-windows7.0
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
 
-echo Building OraDB_DumpParser.dll ...
-cl %CFLAGS% %DEFS% /I "." /Fe"%OUTDIR%\OraDB_DumpParser.dll" %SRCS% /link /DLL
+echo Building Open_DumpParser.dll ...
+cl %CFLAGS% %DEFS% /I "." /Fe"%OUTDIR%\Open_DumpParser.dll" %SRCS% /link /DLL
 
 if %ERRORLEVEL% NEQ 0 (
     echo BUILD FAILED
@@ -39,17 +39,17 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo BUILD SUCCEEDED
-echo Output: %OUTDIR%\OraDB_DumpParser.dll
+echo Output: %OUTDIR%\Open_DumpParser.dll
 
 REM Copy to Release directory as well
 set RELDIR=..\..\bin\Release\net10.0-windows7.0
 if not exist "%RELDIR%" mkdir "%RELDIR%"
-copy /y "%OUTDIR%\OraDB_DumpParser.dll" "%RELDIR%\OraDB_DumpParser.dll" >nul
+copy /y "%OUTDIR%\Open_DumpParser.dll" "%RELDIR%\Open_DumpParser.dll" >nul
 
 REM Copy to test_dumps for DumpParserTest project
 set TESTDIR=..\..\test_dumps
 if exist "%TESTDIR%" (
-    copy /y "%OUTDIR%\OraDB_DumpParser.dll" "%TESTDIR%\OraDB_DumpParser.dll" >nul
+    copy /y "%OUTDIR%\Open_DumpParser.dll" "%TESTDIR%\Open_DumpParser.dll" >nul
 )
 
 REM Cleanup intermediate files

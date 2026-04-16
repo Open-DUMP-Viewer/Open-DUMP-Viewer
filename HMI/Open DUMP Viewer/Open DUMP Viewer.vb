@@ -1,13 +1,13 @@
 Imports System.IO
 Imports System.Text
 
-Public Class OraDB_DUMP_Viewer
+Public Class Open_DUMP_Viewer
     Implements ILocalizable
 
     Private Const MRU_MAX As Integer = 5
 
 #Region "フォームロード・初期化"
-    Private Sub OraDB_DUMP_Viewer_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+    Private Sub Open_DUMP_Viewer_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         LocaleManager.InitializeLanguage()
         ApplyLocalization()
 
@@ -18,7 +18,7 @@ Public Class OraDB_DUMP_Viewer
         If Not CheckAndActivateLicense() Then
             ' ライセンス認証をスキップ → 試用版モードで起動
             COMMON.IsTrial = True
-            Me.Text = "OraDB DUMP Viewer " & Loc.S("Trial_TitleSuffix")
+            Me.Text = "Open DUMP Viewer for Oracle database " & Loc.S("Trial_TitleSuffix")
         End If
 
         ' ライセンス使用状況をバックグラウンドで送信（1日1回、UIをブロックしない）
@@ -47,7 +47,7 @@ Public Class OraDB_DUMP_Viewer
         Next
     End Sub
 
-    Private Sub OraDB_DUMP_Viewer_DragEnter(sender As Object, e As DragEventArgs) Handles MyBase.DragEnter
+    Private Sub Open_DUMP_Viewer_DragEnter(sender As Object, e As DragEventArgs) Handles MyBase.DragEnter
         If e.Data.GetDataPresent(DataFormats.FileDrop) Then
             e.Effect = DragDropEffects.Copy
         Else
@@ -55,7 +55,7 @@ Public Class OraDB_DUMP_Viewer
         End If
     End Sub
 
-    Private Sub OraDB_DUMP_Viewer_DragDrop(sender As Object, e As DragEventArgs) Handles MyBase.DragDrop
+    Private Sub Open_DUMP_Viewer_DragDrop(sender As Object, e As DragEventArgs) Handles MyBase.DragDrop
         Dim files = TryCast(e.Data.GetData(DataFormats.FileDrop), String())
         If files Is Nothing OrElse files.Length = 0 Then Return
 
@@ -69,7 +69,7 @@ Public Class OraDB_DUMP_Viewer
     End Sub
 
     ''' <summary>MDI 子ウィンドウの切替時にメニュー有効化を更新</summary>
-    Private Sub OraDB_DUMP_Viewer_MdiChildActivate(sender As Object, e As EventArgs) Handles MyBase.MdiChildActivate
+    Private Sub Open_DUMP_Viewer_MdiChildActivate(sender As Object, e As EventArgs) Handles MyBase.MdiChildActivate
         UpdateWorkspaceMenuState()
     End Sub
 
@@ -217,7 +217,7 @@ Public Class OraDB_DUMP_Viewer
     ''' <returns>認証成功なら True、アプリ終了すべき場合は False</returns>
     Private Function CheckAndActivateLicense() As Boolean
         Try
-            Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OraDBDUMPViewer")
+            Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenDUMPViewer")
             Dim statusPath = Path.Combine(appData, "license.status")
 
             ' 既にライセンスが有効ならすぐに通過
@@ -549,7 +549,7 @@ Public Class OraDB_DUMP_Viewer
 
         ' 試用版モードで認証成功した場合、試用版を解除
         If COMMON.IsTrial Then
-            Dim appData = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OraDBDUMPViewer")
+            Dim appData = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenDUMPViewer")
             Dim statusPath = IO.Path.Combine(appData, "license.status")
             If IO.File.Exists(statusPath) Then
                 Dim licenseKey As String = String.Empty
@@ -558,7 +558,7 @@ Public Class OraDB_DUMP_Viewer
                 Dim errMsg As String = String.Empty
                 If LICENSE.VerifyLicenseFile(statusPath, licenseKey, expiryDate, holder, errMsg) Then
                     COMMON.IsTrial = False
-                    Me.Text = "OraDB DUMP Viewer"
+                    Me.Text = "Open DUMP Viewer for Oracle database"
                     COMMON.ReSet_StatusLavel()
                 End If
             End If
@@ -825,7 +825,7 @@ Public Class OraDB_DUMP_Viewer
                                     ctx.ColumnNotNulls, ctx.ColumnDefaults, dbName, ctx.ConstraintsJson)
                         ElseIf ExportOptions.SqlInferInteger Then
                             ' InferInteger ON: データを読み込んで VB.NET パスで出力
-                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
                                 Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                             Dim rows As New List(Of String())
                             If tableData IsNot Nothing AndAlso
@@ -953,7 +953,7 @@ Public Class OraDB_DUMP_Viewer
                             rows = preview.FilteredData
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
                                 Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
@@ -1020,7 +1020,7 @@ Public Class OraDB_DUMP_Viewer
                             rows = preview.FilteredData
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
                                 Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
@@ -1092,7 +1092,7 @@ Public Class OraDB_DUMP_Viewer
                             rows = preview.FilteredData
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
                                 Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
@@ -1162,7 +1162,7 @@ Public Class OraDB_DUMP_Viewer
                             rows = preview.FilteredData
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
                                 Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso

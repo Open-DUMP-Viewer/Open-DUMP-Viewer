@@ -3,11 +3,11 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows7.0</TargetFramework>
-    <RootNamespace>OraDB_DUMP_Viewer</RootNamespace>
+    <RootNamespace>Open_DUMP_Viewer</RootNamespace>
     <StartupObject>Sub Main</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
-    <Version>3.3.0</Version>
+    <Version>4.0.0</Version>
     <Authors>YANAI Taketo</Authors>
     <Company>YANAI Taketo</Company>
     <ApplicationIcon>app.ico</ApplicationIcon>
@@ -20,13 +20,13 @@
   <!-- ネイティブDLLをビルド出力にコピー -->
   <!-- C++ DLLは build_dll.bat / _build.cmd で別途ビルドする -->
   <ItemGroup>
-    <None Include="Logics\DumpParser\OraDB_DumpParser.dll" Condition="Exists('Logics\DumpParser\OraDB_DumpParser.dll')">
+    <None Include="Logics\DumpParser\Open_DumpParser.dll" Condition="Exists('Logics\DumpParser\Open_DumpParser.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>OraDB_DumpParser.dll</Link>
+      <Link>Open_DumpParser.dll</Link>
     </None>
-    <None Include="Logics\DumpParser\OraDB_DumpParser.pdb" Condition="Exists('Logics\DumpParser\OraDB_DumpParser.pdb')">
+    <None Include="Logics\DumpParser\Open_DumpParser.pdb" Condition="Exists('Logics\DumpParser\Open_DumpParser.pdb')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>OraDB_DumpParser.pdb</Link>
+      <Link>Open_DumpParser.pdb</Link>
     </None>
   </ItemGroup>
 
@@ -39,9 +39,9 @@
 
   <!-- ヘルプファイルをビルド出力にコピー -->
   <ItemGroup>
-    <None Include="Help\OraDBDumpViewer.chm" Condition="Exists('Help\OraDBDumpViewer.chm')">
+    <None Include="Help\OpenDumpViewer.chm" Condition="Exists('Help\OpenDumpViewer.chm')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>OraDBDumpViewer.chm</Link>
+      <Link>OpenDumpViewer.chm</Link>
     </None>
     <Content Include="Help\*.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

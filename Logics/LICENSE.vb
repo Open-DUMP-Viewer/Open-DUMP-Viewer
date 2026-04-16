@@ -138,7 +138,7 @@ Public Class LICENSE
     Public Shared Function VerifyOnline(licenseKey As String) As Boolean
         Try
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
                 client.Timeout = TimeSpan.FromSeconds(5)
 
                 Dim task = client.GetAsync(CheckStatusEndpoint & Uri.EscapeDataString(licenseKey))
@@ -178,7 +178,7 @@ Public Class LICENSE
     ''' </summary>
     Public Shared Function GetLicenseHolder() As String
         Try
-            Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OraDBDUMPViewer")
+            Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenDUMPViewer")
             Dim statusPath = Path.Combine(appData, "license.status")
             If Not File.Exists(statusPath) Then Return ""
             Dim licenseKey As String = ""

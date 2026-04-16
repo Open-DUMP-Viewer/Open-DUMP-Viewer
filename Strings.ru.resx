@@ -161,8 +161,8 @@
   <data name="Title_BulkExport" xml:space="preserve"><value>Массовый экспорт</value></data>
 
   <!-- ========== Status Bar (COMMON.vb) ========== -->
-  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - Без лицензии</value></data>
-  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - Без лицензии</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - {0}</value></data>
   <data name="Status_SelectDumpFile" xml:space="preserve"><value>Выберите путь к файлу дампа...</value></data>
   <data name="Status_GettingTableList" xml:space="preserve"><value>Получение списка таблиц...</value></data>
   <data name="Status_SearchingTables" xml:space="preserve"><value>Поиск таблиц... ({0}%) | Прошло: {1}{2}</value></data>
@@ -249,7 +249,7 @@ https://www.odv.dev/
 
   <!-- ========== Analysis Errors (AnalyzeLogic) ========== -->
   <data name="Analyze_DllNotFound" xml:space="preserve"><value>DLL анализа не найдена: {0}
-Убедитесь, что OraDB_DumpParser.dll находится в той же папке, что и исполняемый файл.</value></data>
+Убедитесь, что Open_DumpParser.dll находится в той же папке, что и исполняемый файл.</value></data>
   <data name="Analyze_ParseError" xml:space="preserve"><value>Ошибка при анализе файла дампа: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Ошибка при получении списка таблиц: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Ошибка при анализе таблицы: {0}</value></data>
@@ -306,7 +306,7 @@ https://www.odv.dev/
   <data name="About_Downloading" xml:space="preserve"><value>Загрузка...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Запуск установщика...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Ошибка загрузки: {0}</value></data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Обновление OraDB DUMP Viewer...</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Обновление Open DUMP Viewer for Oracle database...</value></data>
 
   <!-- ========== Error Report Dialog ========== -->
   <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Отчёт об ошибке</value></data>
@@ -467,7 +467,7 @@ https://www.odv.dev/
 Открыть диалог активации лицензии?</value></data>
 
   <!-- ========== Help Viewer (HelpViewerForm) ========== -->
-  <data name="Help_FormTitle" xml:space="preserve"><value>Справка - OraDB DUMP Viewer</value></data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>Справка - Open DUMP Viewer for Oracle database</value></data>
   <data name="Help_Back" xml:space="preserve"><value>Назад</value></data>
   <data name="Help_Forward" xml:space="preserve"><value>Вперёд</value></data>
   <data name="Help_Home" xml:space="preserve"><value>Содержание</value></data>

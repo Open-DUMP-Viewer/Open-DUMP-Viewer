@@ -27,9 +27,9 @@ Public Class CsvExportLogic
                              End Sub
         End If
 
-        Dim rc = OraDB_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath,
+        Dim rc = Open_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath,
                                                ctx.Schema, ctx.DataOffset, progressAction)
-        If rc <> OraDB_NativeParser.ODV_OK Then
+        If rc <> Open_NativeParser.ODV_OK Then
             Throw New Exception(Loc.SF("CsvExport_ErrorRc", rc))
         End If
         Return True

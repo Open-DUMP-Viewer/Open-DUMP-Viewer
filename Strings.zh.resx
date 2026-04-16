@@ -161,8 +161,8 @@
   <data name="Title_BulkExport" xml:space="preserve"><value>批量导出</value></data>
 
   <!-- ========== Status Bar ========== -->
-  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - 未授权</value></data>
-  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - 未授权</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - {0}</value></data>
   <data name="Status_SelectDumpFile" xml:space="preserve"><value>请选择转储文件路径...</value></data>
   <data name="Status_GettingTableList" xml:space="preserve"><value>正在获取表列表...</value></data>
   <data name="Status_SearchingTables" xml:space="preserve"><value>正在搜索表... ({0}%) | 已用时间: {1}{2}</value></data>
@@ -249,7 +249,7 @@ https://www.odv.dev/
 
   <!-- ========== Analysis Errors ========== -->
   <data name="Analyze_DllNotFound" xml:space="preserve"><value>未找到分析 DLL: {0}
-请确保 OraDB_DumpParser.dll 与可执行文件位于同一文件夹中。</value></data>
+请确保 Open_DumpParser.dll 与可执行文件位于同一文件夹中。</value></data>
   <data name="Analyze_ParseError" xml:space="preserve"><value>转储文件分析时发生错误: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>获取表列表时发生错误: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>表分析时发生错误: {0}</value></data>
@@ -306,7 +306,7 @@ https://www.odv.dev/
   <data name="About_Downloading" xml:space="preserve"><value>正在下载...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>正在启动安装程序...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>下载失败: {0}</value></data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo 正在更新 OraDB DUMP Viewer...</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo 正在更新 Open DUMP Viewer for Oracle database...</value></data>
 
   <!-- ========== Error Report Dialog ========== -->
   <data name="ErrorReport_FormTitle" xml:space="preserve"><value>错误报告</value></data>
@@ -466,7 +466,7 @@ https://www.odv.dev/
 是否要打开许可证激活对话框?</value></data>
 
   <!-- ========== Help Viewer ========== -->
-  <data name="Help_FormTitle" xml:space="preserve"><value>帮助 - OraDB DUMP Viewer</value></data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>帮助 - Open DUMP Viewer for Oracle database</value></data>
   <data name="Help_Back" xml:space="preserve"><value>后退</value></data>
   <data name="Help_Forward" xml:space="preserve"><value>前进</value></data>
   <data name="Help_Home" xml:space="preserve"><value>目录</value></data>

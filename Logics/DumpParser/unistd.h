@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     unistd.h
     POSIX compatibility stub for Windows (MSVC)

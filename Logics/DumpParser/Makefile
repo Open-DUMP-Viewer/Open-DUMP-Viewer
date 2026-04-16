@@ -1,4 +1,4 @@
-# OraDB DUMP Viewer - C Library Build (Linux / macOS)
+# Open DUMP Viewer for Oracle database - C Library Build (Linux / macOS)
 #
 # Usage:
 #   make              # Build shared library

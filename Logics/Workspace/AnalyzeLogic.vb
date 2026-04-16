@@ -4,7 +4,7 @@ Imports System.Collections.Generic
 
 ''' <summary>
 ''' Oracle DUMPファイル解析ロジック
-''' OraDB_DumpParser.dll (C言語ネイティブDLL) を呼び出して解析する
+''' Open_DumpParser.dll (C言語ネイティブDLL) を呼び出して解析する
 ''' </summary>
 Public Class AnalyzeLogic
 
@@ -30,7 +30,7 @@ Public Class AnalyzeLogic
                 End Sub
 
             ' DLLを使ってダンプファイルを解析
-            Dim result = OraDB_NativeParser.ParseDump(filePath, progressAction)
+            Dim result = Open_NativeParser.ParseDump(filePath, progressAction)
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime
 
@@ -78,7 +78,7 @@ Public Class AnalyzeLogic
                                       Optional ByRef columnTypesMap As Dictionary(Of String, String()) = Nothing,
                                       Optional ByRef columnNotNullsMap As Dictionary(Of String, Boolean()) = Nothing,
                                       Optional ByRef columnDefaultsMap As Dictionary(Of String, String()) = Nothing,
-                                      Optional ByRef constraintsJsonMap As Dictionary(Of String, String) = Nothing) As List(Of OraDB_NativeParser.TableEntry)
+                                      Optional ByRef constraintsJsonMap As Dictionary(Of String, String) = Nothing) As List(Of Open_NativeParser.TableEntry)
         Try
             ValidateFilePath(filePath)
 
@@ -86,7 +86,7 @@ Public Class AnalyzeLogic
             COMMON.Set_StatusLavel(Loc.S("Status_GettingTableList"))
 
             Dim startTime As DateTime = DateTime.Now
-            Dim tables = OraDB_NativeParser.ListTables(filePath, columnNamesMap, columnTypesMap, columnNotNullsMap, columnDefaultsMap, constraintsJsonMap)
+            Dim tables = Open_NativeParser.ListTables(filePath, columnNamesMap, columnTypesMap, columnNotNullsMap, columnDefaultsMap, constraintsJsonMap)
             Dim elapsed As TimeSpan = DateTime.Now - startTime
 
             COMMON.ResetProgressBar()
@@ -99,13 +99,13 @@ Public Class AnalyzeLogic
                            Loc.S("Title_DllError"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
-            Return New List(Of OraDB_NativeParser.TableEntry)()
+            Return New List(Of Open_NativeParser.TableEntry)()
 
         Catch ex As Exception
             MessageBox.Show(Loc.SF("Analyze_TableListError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
             COMMON.ResetProgressBar()
             COMMON.ReSet_StatusLavel()
-            Return New List(Of OraDB_NativeParser.TableEntry)()
+            Return New List(Of Open_NativeParser.TableEntry)()
         End Try
     End Function
 
@@ -130,7 +130,7 @@ Public Class AnalyzeLogic
                 End Sub
 
             ' テーブルフィルタ付きで解析（dataOffset>0ならDDL位置に高速シーク）
-            Dim result = OraDB_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset)
+            Dim result = Open_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset)
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime
             COMMON.ResetProgressBar()
@@ -174,7 +174,7 @@ Public Class AnalyzeLogic
             Dim startTime As DateTime = DateTime.Now
 
             ' 進捗コールバック: BeginInvoke でUIスレッドにマーシャル
-            Dim mainForm = Application.OpenForms.OfType(Of OraDB_DUMP_Viewer)().FirstOrDefault()
+            Dim mainForm = Application.OpenForms.OfType(Of Open_DUMP_Viewer)().FirstOrDefault()
             Dim progressAction As Action(Of Long, String, Integer) = Nothing
             If mainForm IsNot Nothing Then
                 progressAction = Sub(rowsProcessed As Long, currentTable As String, pct As Integer)
@@ -186,7 +186,7 @@ Public Class AnalyzeLogic
 
             ' バックグラウンドスレッドで解析実行
             Dim result = Await Task.Run(Function()
-                                            Return OraDB_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount, partitionName)
+                                            Return Open_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount, partitionName)
                                         End Function)
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime

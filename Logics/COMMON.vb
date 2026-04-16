@@ -36,7 +36,7 @@
         ' 既存のリセットタイマーをキャンセル
         StopStatusResetTimer()
         'ステータスラベルのテキストを更新する
-        OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = text
+        Open_DUMP_Viewer.ToolStripStatusLabel.Text = text
         Application.DoEvents() ' UIの更新を強制
     End Sub
 
@@ -76,16 +76,16 @@
     ''' </summary>
     Public Shared Sub ReSet_StatusLavel()
         If IsTrial Then
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.S("Status_Trial")
+            Open_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.S("Status_Trial")
             Application.DoEvents()
             Return
         End If
         'ライセンス認証状態に応じてステータスラベルを更新
         Dim holder As String = LICENSE.GetLicenseHolder()
         If String.IsNullOrEmpty(holder) Then
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.S("Status_Unlicensed")
+            Open_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.S("Status_Unlicensed")
         Else
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.SF("Status_Licensed", holder)
+            Open_DUMP_Viewer.ToolStripStatusLabel.Text = Loc.SF("Status_Licensed", holder)
         End If
         Application.DoEvents() ' UIの更新を強制
     End Sub
@@ -125,7 +125,7 @@
 
             COMMON.Set_StatusLavel(statusMessage)
 
-            OraDB_DUMP_Viewer.ToolStripProgressBar.Value = current
+            Open_DUMP_Viewer.ToolStripProgressBar.Value = current
 
         Catch ex As Exception
             ' エラーは無視（プログレス表示の失敗でアプリを停止させない）
@@ -171,7 +171,7 @@
 
             ' プログレスバーを更新
             If pct >= 0 AndAlso pct <= 100 Then
-                OraDB_DUMP_Viewer.ToolStripProgressBar.Value = pct
+                Open_DUMP_Viewer.ToolStripProgressBar.Value = pct
             End If
 
         Catch ex As Exception
@@ -205,7 +205,7 @@
 
             ' プログレスバーを更新
             If pct >= 0 AndAlso pct <= 100 Then
-                OraDB_DUMP_Viewer.ToolStripProgressBar.Value = pct
+                Open_DUMP_Viewer.ToolStripProgressBar.Value = pct
             End If
 
         Catch ex As Exception
@@ -224,24 +224,24 @@
     ''' プログレスバーをリセットする
     ''' </summary>
     Public Shared Sub ResetProgressBar()
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Blocks
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Value = 0
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Visible = False
+        Open_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Blocks
+        Open_DUMP_Viewer.ToolStripProgressBar.Value = 0
+        Open_DUMP_Viewer.ToolStripProgressBar.Visible = False
     End Sub
 
     ''' <summary>
     ''' プログレスバーをマーキースタイルに設定する（総行数不明時用）
     ''' </summary>
     Public Shared Sub SetProgressBarMarquee()
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Marquee
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Visible = True
+        Open_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Marquee
+        Open_DUMP_Viewer.ToolStripProgressBar.Visible = True
     End Sub
 
     Private Shared Sub SetProgressBarMax(total As Integer)
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Blocks
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Maximum = total
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Value = 0
-        OraDB_DUMP_Viewer.ToolStripProgressBar.Visible = True
+        Open_DUMP_Viewer.ToolStripProgressBar.Style = ProgressBarStyle.Blocks
+        Open_DUMP_Viewer.ToolStripProgressBar.Maximum = total
+        Open_DUMP_Viewer.ToolStripProgressBar.Value = 0
+        Open_DUMP_Viewer.ToolStripProgressBar.Visible = True
     End Sub
 #End Region
 

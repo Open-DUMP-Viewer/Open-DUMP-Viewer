@@ -221,10 +221,10 @@ Public Class BulkExportLogic
     ''' <summary>
     ''' テーブルデータを DLL 経由で取得 (スレッドセーフ: UIアクセスなし)
     ''' AnalyzeLogic.AnalyzeTable() はCOMMONのUI操作を含むため、
-    ''' BackgroundWorkerスレッドからは直接 OraDB_NativeParser.ParseDump() を使用する
+    ''' BackgroundWorkerスレッドからは直接 Open_NativeParser.ParseDump() を使用する
     ''' </summary>
     Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext) As List(Of String())
-        Dim result = OraDB_NativeParser.ParseDump(ctx.DumpFilePath,
+        Dim result = Open_NativeParser.ParseDump(ctx.DumpFilePath,
             Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
 
         If result IsNot Nothing AndAlso

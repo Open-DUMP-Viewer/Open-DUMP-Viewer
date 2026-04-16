@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
-$packageName = 'oradb-dump-viewer'
+$packageName = 'open-dump-viewer'
 
 # Find uninstall entry in registry
-$uninstallKey = Get-UninstallRegistryKey -SoftwareName 'OraDB DUMP Viewer*'
+$uninstallKey = Get-UninstallRegistryKey -SoftwareName 'Open DUMP Viewer for Oracle database*'
 
 if ($uninstallKey) {
   $uninstallString = $uninstallKey.UninstallString

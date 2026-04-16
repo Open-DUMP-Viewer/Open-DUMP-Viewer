@@ -1,10 +1,10 @@
 # エンドユーザー使用許諾契約書 (EULA)
 
-## OraDB DUMP Viewer End-User License Agreement
+## Open DUMP Viewer for Oracle database End-User License Agreement
 
 最終更新日: 2025年2月27日
 
-本エンドユーザー使用許諾契約書（以下「本契約」）は、OraDB DUMP Viewer（以下「本ソフトウェア」）の
+本エンドユーザー使用許諾契約書（以下「本契約」）は、Open DUMP Viewer for Oracle database（以下「本ソフトウェア」）の
 使用に関する条件を定めるものです。本ソフトウェアをインストール、コピー、または使用することにより、
 本契約のすべての条項に同意したものとみなされます。
 
@@ -16,7 +16,7 @@
 
 | 用語 | 定義 |
 |---|---|
-| **「本ソフトウェア」** | OraDB DUMP Viewer アプリケーションおよび付属するすべてのファイル |
+| **「本ソフトウェア」** | Open DUMP Viewer for Oracle database アプリケーションおよび付属するすべてのファイル |
 | **「ライセンサー」** | 柳井建人（YANAI Taketo） |
 | **「ユーザー」** | 本ソフトウェアのライセンスを取得し使用する個人または法人 |
 | **「ライセンスキー」** | ライセンサーが発行する認証ファイル (.lic.json) |

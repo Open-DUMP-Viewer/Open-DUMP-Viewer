@@ -1,9 +1,37 @@
 # Changelog
 
+## [4.0.0] - 2026-04-16
+
+### 破壊的変更 — 商標準拠のためのリネーム
+- **ツール名を「OraDB DUMP Viewer」から「Open DUMP Viewer for Oracle database」に変更**
+  - Oracle Corporation のトレードマークポリシーへの準拠のため
+  - 製品名・ブランド表記を全面刷新、既存のドメイン (`odv.dev`) とライセンスキー形式 (`ODV-XXXX-XXXX-XXXX`) は維持
+- **Winget パッケージID**: `OraDBDumpViewer.OraDBDumpViewer` → `OpenDumpViewer.OpenDumpViewer`
+  - 旧パッケージは deprecated 化。ユーザーは `winget uninstall OraDBDumpViewer.OraDBDumpViewer` 後に `winget install OpenDumpViewer.OpenDumpViewer` を実行
+- **Chocolatey パッケージID**: `oradb-dump-viewer` → `open-dump-viewer`（同様に旧パッケージは deprecated 化）
+- **インストーラー AppId (Inno Setup GUID) 刷新**
+  - 新規インストール時、既存の旧バージョン (v3.x 以前) を自動的にサイレントアンインストールしてから新規インストール
+  - **再ライセンス認証が必要**: 既存ライセンスキーを再度入力してください（ライセンスキー自体は有効）
+- **ファイル関連付け ProgID**: `OraDBDumpViewer.dmp` → `OpenDumpViewer.dmp`
+- **AppData 設定フォルダ**: `%APPDATA%\OraDBDUMPViewer` → `%APPDATA%\OpenDUMPViewer`（旧フォルダはアンインストール時に既定で削除）
+- **インストール先ディレクトリ**: `C:\Program Files\OraDB DUMP Viewer` → `C:\Program Files\Open DUMP Viewer`
+- **DLL 名**: `OraDB_DumpParser.dll` → `Open_DumpParser.dll`
+- **VB.NET RootNamespace / メインフォームクラス**: `OraDB_DUMP_Viewer` → `Open_DUMP_Viewer`
+- **ソリューション/プロジェクトファイル名**: `OraDB DUMP Viewer.{slnx,vbproj}` → `Open DUMP Viewer.{slnx,vbproj}`
+- **GitHub 組織/リポジトリ**: `OraDB-DUMP-Viewer/OraDB-DUMP-Viewer` → `Open-DUMP-Viewer/Open-DUMP-Viewer`
+- **メールアドレス**: `oradb_dump_viewer@sent.at` → `open_dump_viewer@sent.at`
+- **配布バイナリ命名**: `OraDBDumpViewer_v*_installer_*.exe` → `OpenDumpViewer_v*_installer_*.exe`
+
+### 保持される項目（変更なし）
+- ドメイン `odv.dev` / `api.odv.dev` / `report.odv.dev` / `status.odv.dev`
+- ライセンスキー形式 `ODV-XXXX-XXXX-XXXX`
+- C API 関数名プレフィックス (`odv_*`, `ODV_*`)
+- 既存の支払い・サブスクリプション（Stripe側では過去の請求書の商品名は凍結される）
+
 ## [3.3.0] - 2026-04-12
 
 ### 新機能
-- **SQL エクスポート API をビットフラグ方式に刷新** ([#25](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/25))
+- **SQL エクスポート API をビットフラグ方式に刷新** ([#25](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/25))
   - `odv_set_sql_flags()` による `ODV_SQL_CREATE_TABLE` / `ODV_SQL_CREATE_INDEX` / `ODV_SQL_WRITE_COMMENTS` / `ODV_SQL_WRITE_INSERTS` の個別制御
   - DDL のみ出力モード（INSERT 文を省略可能）
   - 全テーブル一括出力（`table_name=NULL` で全テーブルを 1 パスでエクスポート）
@@ -24,22 +52,22 @@
 ## [3.2.0] - 2026-04-11
 
 ### 新機能
-- **SQL エクスポートの DDL 選択出力** ([#25](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/25))
+- **SQL エクスポートの DDL 選択出力** ([#25](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/25))
   - CREATE TABLE / CREATE INDEX / COMMENT ON を個別に ON/OFF 可能に
   - SQL エクスポートダイアログとエクスポートオプションダイアログの両方に対応
   - デフォルトは全て ON（完全な SQL スクリプトを出力）
-- **C パーサーライブラリのクロスプラットフォーム対応** ([#27](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/27))
+- **C パーサーライブラリのクロスプラットフォーム対応** ([#27](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/27))
   - Linux (.so) / macOS (.dylib) でのビルドをサポート
   - Makefile を追加（`make` で共有ライブラリをビルド可能）
   - Windows 固有 API (`__stdcall`, `_stricmp` 等) をポータブルマクロに抽象化
 
 ### ドキュメント
-- README に [odv-testdump](https://github.com/OraDB-DUMP-Viewer/odv-testdump) リポジトリへのリンクを追加 ([#26](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/26))
+- README に [odv-testdump](https://github.com/Open-DUMP-Viewer/odv-testdump) リポジトリへのリンクを追加 ([#26](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/26))
 
 ## [3.1.2] - 2026-04-09
 
 ### 修正
-- **EXP 形式の BLOB / CLOB を含むテーブルが 0 行と表示される問題を修正** ([#24](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues/24))
+- **EXP 形式の BLOB / CLOB を含むテーブルが 0 行と表示される問題を修正** ([#24](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/24))
   - 従来は LOB 列を含むテーブルのレコードを強制スキップしていたため、行数が 0、データが空で表示されていた
   - LOB 列のロケータ + チャンクストリーム形式 (単一チャンク・マルチチャンク) を完全にサポート
   - 同一行内に NULL / 非NULL の BLOB が混在するケースにも対応
@@ -399,7 +427,7 @@
 ### ダンプファイル解析
 - Oracle EXP (レガシー) 形式の解析に対応
 - Oracle EXPDP (DataPump) 形式の解析に対応
-- C ネイティブ DLL (`OraDB_DumpParser.dll`) による高速解析
+- C ネイティブ DLL (`Open_DumpParser.dll`) による高速解析
 - 2フェーズ解析: フェーズ1でテーブル一覧を高速取得、フェーズ2で選択テーブルのみオンデマンド解析
 - テーブル位置キャッシュ (DDLオフセット) による高速シーク
 - フィルタテーブル処理完了後の早期終了最適化

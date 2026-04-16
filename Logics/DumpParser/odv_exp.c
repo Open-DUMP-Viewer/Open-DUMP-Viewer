@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_exp.c
     Legacy EXP (conventional export) format dump file parsing

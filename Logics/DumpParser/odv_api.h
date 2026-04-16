@@ -1,8 +1,8 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_api.h
-    Public DLL API for the OraDB DUMP Parser
+    Public DLL API for the Open DUMP Parser
 
     Copyright (C) 2026 YANAI Taketo
  *****************************************************************************/

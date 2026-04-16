@@ -11,8 +11,8 @@ Imports System.Text.Json
 Partial Public Class AboutDialog
     Implements ILocalizable
 
-    Private Const GitHubApiUrl As String = "https://api.github.com/repos/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
-    Private Const ReleasesPageUrl As String = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
+    Private Const GitHubApiUrl As String = "https://api.github.com/repos/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
+    Private Const ReleasesPageUrl As String = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
 
     ''' <summary>最新リリースのインストーラーダウンロードURL（更新ボタン押下時に使用）</summary>
     Private _installerDownloadUrl As String = Nothing
@@ -40,7 +40,7 @@ Partial Public Class AboutDialog
     Private Async Sub CheckLatestVersionAsync(currentVersion As String)
         Try
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
                 client.Timeout = TimeSpan.FromSeconds(5)
 
                 Dim response = Await client.GetAsync(GitHubApiUrl)
@@ -145,13 +145,13 @@ Partial Public Class AboutDialog
 
         Try
             ' 一時フォルダにインストーラーをダウンロード
-            Dim tempDir = Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_Update")
+            Dim tempDir = Path.Combine(Path.GetTempPath(), "OpenDumpViewer_Update")
             Directory.CreateDirectory(tempDir)
             Dim installerFileName = Path.GetFileName(New Uri(_installerDownloadUrl).LocalPath)
             Dim installerPath = Path.Combine(tempDir, installerFileName)
 
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
                 client.Timeout = TimeSpan.FromMinutes(5)
 
                 Using response = Await client.GetAsync(_installerDownloadUrl, HttpCompletionOption.ResponseHeadersRead)
@@ -212,7 +212,7 @@ Partial Public Class AboutDialog
             Throw New FileNotFoundException("Installer not found", fullPath)
         End If
 
-        Dim batPath = Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_Update", "update.bat")
+        Dim batPath = Path.Combine(Path.GetTempPath(), "OpenDumpViewer_Update", "update.bat")
         Dim escapedPath = fullPath.Replace("^", "^^").Replace("&", "^&").Replace("|", "^|").
                                    Replace("<", "^<").Replace(">", "^>").Replace("%", "%%")
         Dim batContent =

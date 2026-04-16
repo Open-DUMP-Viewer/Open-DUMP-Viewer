@@ -13,10 +13,10 @@ Public Class ExportOptionsDialog
     Private Sub ExportOptionsDialog_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         ' ExportOptions から現在の設定をコントロールに反映
         Select Case ExportOptions.DateFormat
-            Case OraDB_NativeParser.DATE_FMT_SLASH : rdoSlash.Checked = True
-            Case OraDB_NativeParser.DATE_FMT_COMPACT : rdoCompact.Checked = True
-            Case OraDB_NativeParser.DATE_FMT_FULL : rdoFull.Checked = True
-            Case OraDB_NativeParser.DATE_FMT_CUSTOM : rdoCustom.Checked = True
+            Case Open_NativeParser.DATE_FMT_SLASH : rdoSlash.Checked = True
+            Case Open_NativeParser.DATE_FMT_COMPACT : rdoCompact.Checked = True
+            Case Open_NativeParser.DATE_FMT_FULL : rdoFull.Checked = True
+            Case Open_NativeParser.DATE_FMT_CUSTOM : rdoCustom.Checked = True
             Case Else : rdoSlash.Checked = True
         End Select
 
@@ -69,7 +69,7 @@ Public Class ExportOptionsDialog
         ' Oracle Instant Client + Tools を自動ダウンロード・展開
         Dim installDir = IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OraDB_DUMP_Viewer", "oracle_client")
+            "Open_DUMP_Viewer", "oracle_client")
 
         Dim result = MessageBox.Show(
             Loc.S("ExportOptions_AutoSetupConfirm"),
@@ -110,7 +110,7 @@ Public Class ExportOptionsDialog
 
         Using client As New Net.Http.HttpClient()
             client.Timeout = TimeSpan.FromMinutes(10)
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
 
             Dim json = client.GetStringAsync("https://oracle-dl.odv.dev/").Result
             Dim doc = System.Text.Json.JsonDocument.Parse(json)
@@ -162,13 +162,13 @@ Public Class ExportOptionsDialog
     Private Sub btnOK_Click(sender As Object, e As EventArgs) Handles btnOK.Click
         ' コントロールの値を ExportOptions に書き戻す
         If rdoSlash.Checked Then
-            ExportOptions.DateFormat = OraDB_NativeParser.DATE_FMT_SLASH
+            ExportOptions.DateFormat = Open_NativeParser.DATE_FMT_SLASH
         ElseIf rdoCompact.Checked Then
-            ExportOptions.DateFormat = OraDB_NativeParser.DATE_FMT_COMPACT
+            ExportOptions.DateFormat = Open_NativeParser.DATE_FMT_COMPACT
         ElseIf rdoFull.Checked Then
-            ExportOptions.DateFormat = OraDB_NativeParser.DATE_FMT_FULL
+            ExportOptions.DateFormat = Open_NativeParser.DATE_FMT_FULL
         ElseIf rdoCustom.Checked Then
-            ExportOptions.DateFormat = OraDB_NativeParser.DATE_FMT_CUSTOM
+            ExportOptions.DateFormat = Open_NativeParser.DATE_FMT_CUSTOM
         End If
 
         ExportOptions.CustomDateFormat = txtCustomFormat.Text

@@ -13,7 +13,7 @@ Public Class Workspace
     <Browsable(False)>
     Public Property WorkspacePath As String
     ''' <summary>テーブル一覧メタデータ (スキーマ名→テーブルエントリリスト)</summary>
-    Private _tableList As New Dictionary(Of String, List(Of OraDB_NativeParser.TableEntry))
+    Private _tableList As New Dictionary(Of String, List(Of Open_NativeParser.TableEntry))
     ''' <summary>テーブルごとのカラム名 (キー: "schema.table")</summary>
     Private _columnNamesMap As New Dictionary(Of String, String())
     ''' <summary>テーブルごとのカラム型 (キー: "schema.table")</summary>
@@ -99,9 +99,9 @@ Public Class Workspace
         _tableList.Clear()
         For Each entry In tables
             Dim schema = entry.Schema
-            Dim list As List(Of OraDB_NativeParser.TableEntry) = Nothing
+            Dim list As List(Of Open_NativeParser.TableEntry) = Nothing
             If Not _tableList.TryGetValue(schema, list) Then
-                list = New List(Of OraDB_NativeParser.TableEntry)
+                list = New List(Of Open_NativeParser.TableEntry)
                 _tableList(schema) = list
             End If
             list.Add(entry)
@@ -189,7 +189,7 @@ Public Class Workspace
 
         Try
             Dim selectedItem = lstTableList.SelectedItems(0)
-            Dim entry = TryCast(selectedItem.Tag, OraDB_NativeParser.TableEntry)
+            Dim entry = TryCast(selectedItem.Tag, Open_NativeParser.TableEntry)
 
             If String.IsNullOrEmpty(_currentSchema) OrElse entry Is Nothing Then
                 MessageBox.Show(Loc.S("Workspace_SchemaNotSelected"), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -255,7 +255,7 @@ Public Class Workspace
         End If
 
         Dim selectedItem = lstTableList.SelectedItems(0)
-        Dim entry = TryCast(selectedItem.Tag, OraDB_NativeParser.TableEntry)
+        Dim entry = TryCast(selectedItem.Tag, Open_NativeParser.TableEntry)
 
         If String.IsNullOrEmpty(_currentSchema) OrElse entry Is Nothing Then
             MessageBox.Show(Loc.S("Workspace_SchemaNotSelected"), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -298,7 +298,7 @@ Public Class Workspace
         _redoStack.Clear()
 
         For Each item As ListViewItem In lstTableList.SelectedItems
-            Dim te = TryCast(item.Tag, OraDB_NativeParser.TableEntry)
+            Dim te = TryCast(item.Tag, Open_NativeParser.TableEntry)
             If te IsNot Nothing Then
                 _excludedTables.Add(te.Key)
             End If
@@ -453,7 +453,7 @@ Public Class Workspace
         If lstTableList.SelectedItems.Count = 0 Then Return Nothing
         If String.IsNullOrEmpty(_currentSchema) Then Return Nothing
 
-        Dim entry = TryCast(lstTableList.SelectedItems(0).Tag, OraDB_NativeParser.TableEntry)
+        Dim entry = TryCast(lstTableList.SelectedItems(0).Tag, Open_NativeParser.TableEntry)
         If entry Is Nothing Then Return Nothing
 
         Return BuildExportContext(entry)
@@ -469,7 +469,7 @@ Public Class Workspace
         If String.IsNullOrEmpty(_currentSchema) Then Return result
 
         For Each item As ListViewItem In lstTableList.SelectedItems
-            Dim entry = TryCast(item.Tag, OraDB_NativeParser.TableEntry)
+            Dim entry = TryCast(item.Tag, Open_NativeParser.TableEntry)
             If entry Is Nothing Then Continue For
             result.Add(BuildExportContext(entry))
         Next
@@ -480,7 +480,7 @@ Public Class Workspace
     ''' <summary>
     ''' TableEntry からエクスポートコンテキストを構築するヘルパー
     ''' </summary>
-    Private Function BuildExportContext(entry As OraDB_NativeParser.TableEntry) As ExportHelper.TableExportContext
+    Private Function BuildExportContext(entry As Open_NativeParser.TableEntry) As ExportHelper.TableExportContext
         Dim tableName = entry.TableName
         Dim tableKey = $"{_currentSchema}.{tableName}"
 
@@ -669,8 +669,8 @@ Public Class Workspace
 
                 ' パーティションテーブルをグループ化表示するため、
                 ' まず通常テーブルとパーティショングループに分類する
-                Dim normalTables As New List(Of OraDB_NativeParser.TableEntry)
-                Dim partGroups As New Dictionary(Of String, List(Of OraDB_NativeParser.TableEntry))
+                Dim normalTables As New List(Of Open_NativeParser.TableEntry)
+                Dim partGroups As New Dictionary(Of String, List(Of Open_NativeParser.TableEntry))
                 Dim partGroupOrder As New List(Of String)  ' 出現順を保持
 
                 For Each entry In tables
@@ -685,11 +685,11 @@ Public Class Workspace
                         Continue For
                     End If
 
-                    If entry.EntryType = OraDB_NativeParser.TABLE_TYPE_PARTITION_TABLE OrElse
-                       entry.EntryType = OraDB_NativeParser.TABLE_TYPE_PARTITION OrElse
-                       entry.EntryType = OraDB_NativeParser.TABLE_TYPE_SUBPARTITION Then
+                    If entry.EntryType = Open_NativeParser.TABLE_TYPE_PARTITION_TABLE OrElse
+                       entry.EntryType = Open_NativeParser.TABLE_TYPE_PARTITION OrElse
+                       entry.EntryType = Open_NativeParser.TABLE_TYPE_SUBPARTITION Then
                         If Not partGroups.ContainsKey(tableName) Then
-                            partGroups(tableName) = New List(Of OraDB_NativeParser.TableEntry)
+                            partGroups(tableName) = New List(Of Open_NativeParser.TableEntry)
                             partGroupOrder.Add(tableName)
                         End If
                         partGroups(tableName).Add(entry)
@@ -715,7 +715,7 @@ Public Class Workspace
                     Dim totalRows As Long = group.Sum(Function(e) e.RowCount)
 
                     ' 親テーブル行 (PARTITION_TABLE エントリがあればそれを使用、なければ最初のエントリ)
-                    Dim parentEntry = group.FirstOrDefault(Function(e) e.EntryType = OraDB_NativeParser.TABLE_TYPE_PARTITION_TABLE)
+                    Dim parentEntry = group.FirstOrDefault(Function(e) e.EntryType = Open_NativeParser.TABLE_TYPE_PARTITION_TABLE)
                     If parentEntry Is Nothing Then parentEntry = group(0)
 
                     Dim parentItem As New ListViewItem(groupName)
@@ -728,7 +728,7 @@ Public Class Workspace
                     ' 子パーティション行（インデント表示）
                     For Each entry In group
                         Dim partName = If(entry.PartitionName.Length > 0, entry.PartitionName, $"#{group.IndexOf(entry) + 1}")
-                        Dim typeStr = If(entry.EntryType = OraDB_NativeParser.TABLE_TYPE_SUBPARTITION, "SUBPARTITION", "PARTITION")
+                        Dim typeStr = If(entry.EntryType = Open_NativeParser.TABLE_TYPE_SUBPARTITION, "SUBPARTITION", "PARTITION")
 
                         Dim childItem As New ListViewItem($"  {Chrw(&H251C)} {partName}")
                         childItem.SubItems.Add(schemaName)

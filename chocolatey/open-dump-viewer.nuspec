@@ -1,22 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
-    <id>oradb-dump-viewer</id>
-    <version>3.1.1</version>
-    <title>OraDB DUMP Viewer</title>
+    <id>open-dump-viewer</id>
+    <version>4.0.0</version>
+    <title>Open DUMP Viewer for Oracle database</title>
     <authors>Taketo Yanai</authors>
     <owners>YANAi</owners>
     <projectUrl>https://www.odv.dev/</projectUrl>
-    <projectSourceUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer</projectSourceUrl>
-    <bugTrackerUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues</bugTrackerUrl>
+    <projectSourceUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues</bugTrackerUrl>
     <docsUrl>https://www.odv.dev/en/blog</docsUrl>
-    <releaseNotes>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/tag/v3.1.1</releaseNotes>
-    <iconUrl>https://raw.githubusercontent.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/main/app.ico</iconUrl>
-    <licenseUrl>https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/blob/main/EULA.md</licenseUrl>
+    <releaseNotes>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/tag/v4.0.0</releaseNotes>
+    <iconUrl>https://raw.githubusercontent.com/Open-DUMP-Viewer/Open-DUMP-Viewer/main/app.ico</iconUrl>
+    <licenseUrl>https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/EULA.md</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <tags>oracle database dump dmp viewer expdp datapump export csv sql migration dba</tags>
     <summary>View Oracle .dmp files (EXP &amp; EXPDP) without Oracle — free for personal use</summary>
-    <description><![CDATA[## OraDB DUMP Viewer
+    <description><![CDATA[## Open DUMP Viewer for Oracle database
 
 View and export Oracle database dump files (.dmp) **without Oracle Database or Client**.
 

@@ -1,6 +1,0 @@
-<Solution>
-  <Project Path="Logics/DumpParser/OraDB_DumpParser.vcxproj" Id="c7d3e5f1-a2b4-4c6d-8e9f-0a1b2c3d4e5f">
-    <Platform Solution="*|Any CPU" Project="x64" />
-  </Project>
-  <Project Path="OraDB DUMP Viewer.vbproj" />
-</Solution>

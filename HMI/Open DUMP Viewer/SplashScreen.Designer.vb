@@ -44,7 +44,7 @@ Partial Class SplashScreen
         lblAppName.Name = "lblAppName"
         lblAppName.Size = New Size(400, 40)
         lblAppName.TabIndex = 1
-        lblAppName.Text = "OraDB DUMP Viewer"
+        lblAppName.Text = "Open DUMP Viewer for Oracle database"
         lblAppName.TextAlign = ContentAlignment.MiddleCenter
         '
         ' lblVersion

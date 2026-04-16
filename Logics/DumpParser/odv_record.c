@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_record.c
     Record buffer management and row delivery

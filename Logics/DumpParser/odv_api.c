@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_api.c
     DLL exported functions - session management and operation dispatch
@@ -13,7 +13,7 @@
 /*---------------------------------------------------------------------------
     Version
  ---------------------------------------------------------------------------*/
-#define ODV_VERSION_STRING "3.3.0"
+#define ODV_VERSION_STRING "4.0.0"
 
 /*---------------------------------------------------------------------------
     Internal helpers

@@ -45,7 +45,7 @@ jobs:
       # 3. C ネイティブ DLL ビルド
       #    vcvarsall.bat で MSVC 環境を設定後、cl.exe でビルド
       # ─────────────────────────────────────
-      - name: Build native DLL (OraDB_DumpParser.dll)
+      - name: Build native DLL (Open_DumpParser.dll)
         shell: cmd
         working-directory: Logics/DumpParser
         run: |
@@ -54,11 +54,11 @@ jobs:
           set DEFS=/DWINDOWS /DWIN32 /DUTF8 /DODV_DLL_MODE /D_CRT_SECURE_NO_WARNINGS /DNDEBUG
           set CFLAGS=/O2 /W3 /LD /MT /nologo /utf-8 /std:c11
           set SRCS=odv_api.c odv_detect.c odv_expdp.c odv_exp.c odv_record.c odv_number.c odv_datetime.c odv_charset.c odv_xml.c odv_csv.c odv_sql.c
-          cl %CFLAGS% %DEFS% /I "." /Fe"OraDB_DumpParser.dll" %SRCS% /link /DLL
+          cl %CFLAGS% %DEFS% /I "." /Fe"Open_DumpParser.dll" %SRCS% /link /DLL
           if %ERRORLEVEL% NEQ 0 exit /b 1
           del /q *.obj *.exp *.lib 2>nul
           echo DLL built successfully (${{ matrix.arch }})
-          dir OraDB_DumpParser.dll
+          dir Open_DumpParser.dll
 
       # ─────────────────────────────────────
       # 5. バージョン番号を .vbproj から取得
@@ -67,7 +67,7 @@ jobs:
         id: get_version
         shell: pwsh
         run: |
-          [xml]$xml = Get-Content "OraDB DUMP Viewer.vbproj"
+          [xml]$xml = Get-Content "Open DUMP Viewer.vbproj"
           $version = $xml.Project.PropertyGroup `
             | Where-Object { $_.Version } `
             | Select-Object -ExpandProperty Version -First 1
@@ -80,7 +80,7 @@ jobs:
       # 6. NuGet パッケージの復元
       # ─────────────────────────────────────
       - name: Restore dependencies
-        run: dotnet restore "OraDB DUMP Viewer.vbproj"
+        run: dotnet restore "Open DUMP Viewer.vbproj"
 
       # ─────────────────────────────────────
       # 7. アプリビルド (Self-contained)
@@ -89,7 +89,7 @@ jobs:
       # ─────────────────────────────────────
       - name: Build application (self-contained)
         run: |
-          dotnet publish "OraDB DUMP Viewer.vbproj" `
+          dotnet publish "Open DUMP Viewer.vbproj" `
             --configuration Release `
             --runtime ${{ matrix.rid }} `
             --self-contained true `
@@ -109,11 +109,11 @@ jobs:
       - name: Verify native DLL in output
         shell: pwsh
         run: |
-          if (-not (Test-Path "./publish/app/OraDB_DumpParser.dll")) {
-            Write-Error "OraDB_DumpParser.dll がビルド出力に含まれていません"
+          if (-not (Test-Path "./publish/app/Open_DumpParser.dll")) {
+            Write-Error "Open_DumpParser.dll がビルド出力に含まれていません"
             exit 1
           }
-          Write-Host "OraDB_DumpParser.dll found in build output (${{ matrix.arch }})"
+          Write-Host "Open_DumpParser.dll found in build output (${{ matrix.arch }})"
 
       # ─────────────────────────────────────
       # 9. ポータブル版を ZIP に圧縮
@@ -124,7 +124,7 @@ jobs:
           $version = "${{ steps.get_version.outputs.VERSION }}"
           Compress-Archive `
             -Path "./publish/portable/*" `
-            -DestinationPath "./publish/OraDBDumpViewer_v${version}_portable_${{ matrix.arch }}.zip"
+            -DestinationPath "./publish/OpenDumpViewer_v${version}_portable_${{ matrix.arch }}.zip"
 
       # ─────────────────────────────────────
       # 10. Inno Setup のインストール
@@ -201,8 +201,8 @@ jobs:
         with:
           name: build-${{ matrix.arch }}
           path: |
-            ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_portable_${{ matrix.arch }}.zip
-            ./publish/OraDBDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer_${{ matrix.arch }}.exe
+            ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}_portable_${{ matrix.arch }}.zip
+            ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer_${{ matrix.arch }}.exe
 
       - name: Save version info
         shell: pwsh
@@ -322,10 +322,10 @@ jobs:
           gh release create $tag `
             --title "Release $tag" `
             --notes-file $notesFile `
-            "./artifacts/OraDBDumpViewer_v${version}_portable_x64.zip" `
-            "./artifacts/OraDBDumpViewer_v${version}_installer_x64.exe" `
-            "./artifacts/OraDBDumpViewer_v${version}_portable_arm64.zip" `
-            "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.exe"
+            "./artifacts/OpenDumpViewer_v${version}_portable_x64.zip" `
+            "./artifacts/OpenDumpViewer_v${version}_installer_x64.exe" `
+            "./artifacts/OpenDumpViewer_v${version}_portable_arm64.zip" `
+            "./artifacts/OpenDumpViewer_v${version}_installer_arm64.exe"
 
           Remove-Item $notesFile
 
@@ -338,30 +338,30 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.get_version.outputs.VERSION }}"
-          $baseUrl = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/download/v${version}"
+          $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/v${version}"
 
           # 各アーキテクチャの EXE ハッシュを取得
-          $exeX64 = "./artifacts/OraDBDumpViewer_v${version}_installer_x64.exe"
-          $exeArm64 = "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.exe"
+          $exeX64 = "./artifacts/OpenDumpViewer_v${version}_installer_x64.exe"
+          $exeArm64 = "./artifacts/OpenDumpViewer_v${version}_installer_arm64.exe"
           $hashX64 = (Get-FileHash $exeX64 -Algorithm SHA256).Hash
           $hashArm64 = (Get-FileHash $exeArm64 -Algorithm SHA256).Hash
 
           # マニフェストディレクトリ作成
-          $dir = "manifests/o/OraDBDumpViewer/OraDBDumpViewer/$version"
+          $dir = "manifests/o/OpenDumpViewer/OpenDumpViewer/$version"
           New-Item -ItemType Directory -Path $dir -Force
 
           # バージョンマニフェスト
           @"
-          PackageIdentifier: OraDBDumpViewer.OraDBDumpViewer
+          PackageIdentifier: OpenDumpViewer.OpenDumpViewer
           PackageVersion: $version
           DefaultLocale: ja-JP
           ManifestType: version
           ManifestVersion: 1.6.0
-          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OraDBDumpViewer.OraDBDumpViewer.yaml" -NoNewline
+          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OpenDumpViewer.OpenDumpViewer.yaml" -NoNewline
 
           # インストーラーマニフェスト (x64 + ARM64)
           @"
-          PackageIdentifier: OraDBDumpViewer.OraDBDumpViewer
+          PackageIdentifier: OpenDumpViewer.OpenDumpViewer
           PackageVersion: $version
           Platform:
           - Windows.Desktop
@@ -374,23 +374,23 @@ jobs:
           - silentWithProgress
           Installers:
           - Architecture: x64
-            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_x64.exe
+            InstallerUrl: ${baseUrl}/OpenDumpViewer_v${version}_installer_x64.exe
             InstallerSha256: $hashX64
           - Architecture: arm64
-            InstallerUrl: ${baseUrl}/OraDBDumpViewer_v${version}_installer_arm64.exe
+            InstallerUrl: ${baseUrl}/OpenDumpViewer_v${version}_installer_arm64.exe
             InstallerSha256: $hashArm64
           ManifestType: installer
           ManifestVersion: 1.6.0
-          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OraDBDumpViewer.OraDBDumpViewer.installer.yaml" -NoNewline
+          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OpenDumpViewer.OpenDumpViewer.installer.yaml" -NoNewline
 
           # ロケールマニフェスト
           @"
-          PackageIdentifier: OraDBDumpViewer.OraDBDumpViewer
+          PackageIdentifier: OpenDumpViewer.OpenDumpViewer
           PackageVersion: $version
           PackageLocale: ja-JP
           Publisher: YANAI Taketo
           PublisherUrl: https://www.odv.dev/
-          PackageName: OraDB DUMP Viewer
+          PackageName: Open DUMP Viewer for Oracle database
           PackageUrl: https://www.odv.dev/
           License: Proprietary
           ShortDescription: Oracle EXP/EXPDP DUMPファイルビューア
@@ -401,7 +401,7 @@ jobs:
           - database
           ManifestType: defaultLocale
           ManifestVersion: 1.6.0
-          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OraDBDumpViewer.OraDBDumpViewer.locale.ja-JP.yaml" -NoNewline
+          "@ -replace '(?m)^          ', '' | Set-Content "$dir/OpenDumpViewer.OpenDumpViewer.locale.ja-JP.yaml" -NoNewline
 
           # wingetcreate で winget-pkgs へ PR 送信
           Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
@@ -418,18 +418,18 @@ jobs:
           CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
         run: |
           $version = "${{ steps.get_version.outputs.VERSION }}"
-          $baseUrl = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/download/v${version}"
+          $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/v${version}"
 
           # インストーラーのチェックサムを取得
-          $exeX64   = "./artifacts/OraDBDumpViewer_v${version}_installer_x64.exe"
-          $exeArm64 = "./artifacts/OraDBDumpViewer_v${version}_installer_arm64.exe"
+          $exeX64   = "./artifacts/OpenDumpViewer_v${version}_installer_x64.exe"
+          $exeArm64 = "./artifacts/OpenDumpViewer_v${version}_installer_arm64.exe"
           $hashX64   = (Get-FileHash $exeX64 -Algorithm SHA256).Hash.ToLower()
           $hashArm64 = (Get-FileHash $exeArm64 -Algorithm SHA256).Hash.ToLower()
 
           # nuspec のバージョンを更新
-          $nuspec = Get-Content "chocolatey/oradb-dump-viewer.nuspec" -Raw
+          $nuspec = Get-Content "chocolatey/open-dump-viewer.nuspec" -Raw
           $nuspec = $nuspec -replace '<version>[^<]+</version>', "<version>${version}</version>"
-          Set-Content "chocolatey/oradb-dump-viewer.nuspec" $nuspec -NoNewline
+          Set-Content "chocolatey/open-dump-viewer.nuspec" $nuspec -NoNewline
 
           # chocolateyinstall.ps1 のバージョンとチェックサムを更新
           $install = Get-Content "chocolatey/tools/chocolateyinstall.ps1" -Raw
@@ -445,11 +445,11 @@ jobs:
           Set-Content "chocolatey/tools/VERIFICATION.txt" $verify -NoNewline
 
           # パッケージをビルド
-          choco pack "chocolatey/oradb-dump-viewer.nuspec" --output-directory "./artifacts"
+          choco pack "chocolatey/open-dump-viewer.nuspec" --output-directory "./artifacts"
 
           # Chocolatey Community Repository にプッシュ
           if ($env:CHOCOLATEY_API_KEY) {
-            choco push "./artifacts/oradb-dump-viewer.${version}.nupkg" --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
+            choco push "./artifacts/open-dump-viewer.${version}.nupkg" --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
             Write-Host "Chocolatey package v${version} published successfully"
           } else {
             Write-Warning "CHOCOLATEY_API_KEY not set — skipping push"

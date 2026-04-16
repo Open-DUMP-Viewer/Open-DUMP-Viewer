@@ -1,6 +1,6 @@
 @echo off
 REM ========================================================
-REM  OraDB DUMP Viewer - CHM Help Builder
+REM  Open DUMP Viewer for Oracle database - CHM Help Builder
 REM
 REM  Prerequisites:
 REM    HTML Help Workshop (hhc.exe) must be installed.
@@ -24,12 +24,12 @@ if "%HHC_PATH%"=="" (
     exit /b 1
 )
 
-echo Building OraDBDumpViewer.chm ...
-"%HHC_PATH%" OraDBDumpViewer.hhp
+echo Building OpenDumpViewer.chm ...
+"%HHC_PATH%" OpenDumpViewer.hhp
 
 REM hhc.exe returns 1 on success (non-zero exit code)
-if exist OraDBDumpViewer.chm (
-    echo BUILD SUCCEEDED: OraDBDumpViewer.chm
+if exist OpenDumpViewer.chm (
+    echo BUILD SUCCEEDED: OpenDumpViewer.chm
     exit /b 0
 ) else (
     echo BUILD FAILED

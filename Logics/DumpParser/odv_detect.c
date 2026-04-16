@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_detect.c
     Dump file format detection (EXP / EXPDP / compressed EXPDP)

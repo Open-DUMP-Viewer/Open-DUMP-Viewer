@@ -345,7 +345,7 @@ Public Module ExportHelper
     ''' </summary>
     ''' <returns>テーブル情報。テーブル未選択時は Nothing</returns>
     Public Function GetActiveTableContext() As TableExportContext
-        Dim mainForm = TryCast(Application.OpenForms(0), OraDB_DUMP_Viewer)
+        Dim mainForm = TryCast(Application.OpenForms(0), Open_DUMP_Viewer)
         If mainForm Is Nothing Then Return Nothing
 
         ' まず Workspace をチェック
@@ -372,7 +372,7 @@ Public Module ExportHelper
     ''' メインフォームのアクティブなワークスペースから可視テーブル一覧を取得 (一括エクスポート用)
     ''' </summary>
     Public Function GetActiveVisibleTableContexts() As List(Of TableExportContext)
-        Dim mainForm = TryCast(Application.OpenForms(0), OraDB_DUMP_Viewer)
+        Dim mainForm = TryCast(Application.OpenForms(0), Open_DUMP_Viewer)
         If mainForm Is Nothing Then Return Nothing
 
         Dim workspace = TryCast(mainForm.ActiveMdiChild, Workspace)
@@ -392,7 +392,7 @@ Public Module ExportHelper
     ''' メインフォームのアクティブなワークスペースを取得
     ''' </summary>
     Public Function GetActiveWorkspace() As Workspace
-        Dim mainForm = TryCast(Application.OpenForms(0), OraDB_DUMP_Viewer)
+        Dim mainForm = TryCast(Application.OpenForms(0), Open_DUMP_Viewer)
         If mainForm Is Nothing Then Return Nothing
         Return TryCast(mainForm.ActiveMdiChild, Workspace)
     End Function

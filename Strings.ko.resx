@@ -161,8 +161,8 @@
   <data name="Title_BulkExport" xml:space="preserve"><value>일괄 내보내기</value></data>
 
   <!-- ========== 상태 표시줄 ========== -->
-  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - 미등록</value></data>
-  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - 미등록</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - {0}</value></data>
   <data name="Status_SelectDumpFile" xml:space="preserve"><value>덤프 파일 경로를 선택하세요...</value></data>
   <data name="Status_GettingTableList" xml:space="preserve"><value>테이블 목록 가져오는 중...</value></data>
   <data name="Status_SearchingTables" xml:space="preserve"><value>테이블 검색 중... ({0}%) | 경과 시간: {1}{2}</value></data>
@@ -249,7 +249,7 @@ https://www.odv.dev/
 
   <!-- ========== 분석 ========== -->
   <data name="Analyze_DllNotFound" xml:space="preserve"><value>분석 DLL을 찾을 수 없습니다: {0}
-OraDB_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세요.</value></data>
+Open_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세요.</value></data>
   <data name="Analyze_ParseError" xml:space="preserve"><value>덤프 파일 분석 중 오류 발생: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>테이블 목록 가져오기 중 오류 발생: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>테이블 분석 중 오류 발생: {0}</value></data>
@@ -306,7 +306,7 @@ OraDB_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세
   <data name="About_Downloading" xml:space="preserve"><value>다운로드 중...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>설치 프로그램 실행 중...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>다운로드 실패: {0}</value></data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo OraDB DUMP Viewer 업데이트 중...</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Open DUMP Viewer for Oracle database 업데이트 중...</value></data>
 
   <!-- ========== 오류 보고 ========== -->
   <data name="ErrorReport_FormTitle" xml:space="preserve"><value>오류 보고</value></data>
@@ -467,7 +467,7 @@ OraDB_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세
 라이선스 인증 대화 상자를 여시겠습니까?</value></data>
 
   <!-- ========== 도움말 ========== -->
-  <data name="Help_FormTitle" xml:space="preserve"><value>도움말 - OraDB DUMP Viewer</value></data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>도움말 - Open DUMP Viewer for Oracle database</value></data>
   <data name="Help_Back" xml:space="preserve"><value>뒤로</value></data>
   <data name="Help_Forward" xml:space="preserve"><value>앞으로</value></data>
   <data name="Help_Home" xml:space="preserve"><value>목차</value></data>

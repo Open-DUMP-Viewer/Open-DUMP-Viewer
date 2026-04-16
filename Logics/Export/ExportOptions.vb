@@ -6,7 +6,7 @@
 Public Module ExportOptions
 
     ''' <summary>日付フォーマット (0=SLASH, 1=COMPACT, 2=FULL, 3=CUSTOM)</summary>
-    Public Property DateFormat As Integer = OraDB_NativeParser.DATE_FMT_SLASH
+    Public Property DateFormat As Integer = Open_NativeParser.DATE_FMT_SLASH
 
     ''' <summary>カスタム日付フォーマット文字列 (トークン: YYYY, MM, DD, HH24, MI, SS)</summary>
     Public Property CustomDateFormat As String = "YYYY-MM-DD HH24:MI:SS"

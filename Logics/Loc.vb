@@ -9,7 +9,7 @@ Imports System.Threading
 ''' Loc.SF("key", args) でフォーマット文字列のパラメータ展開を行う。
 ''' </summary>
 Friend Class Loc
-    Private Shared ReadOnly _rm As New ResourceManager("OraDB_DUMP_Viewer.Strings", Assembly.GetExecutingAssembly())
+    Private Shared ReadOnly _rm As New ResourceManager("Open_DUMP_Viewer.Strings", Assembly.GetExecutingAssembly())
 
     ''' <summary>キーに対応するローカライズ文字列を取得</summary>
     Public Shared Function S(key As String) As String

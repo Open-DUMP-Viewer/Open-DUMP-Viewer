@@ -9,8 +9,8 @@ Imports System.Text.Json
 ''' </summary>
 Public Class UpdateChecker
 
-    Private Const GitHubApiUrl As String = "https://api.github.com/repos/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
-    Private Const ReleasesPageUrl As String = "https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases/latest"
+    Private Const GitHubApiUrl As String = "https://api.github.com/repos/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
+    Private Const ReleasesPageUrl As String = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
 
     ''' <summary>
     ''' バックグラウンドでアップデートチェックを実行し、新バージョンがあれば通知する。
@@ -54,7 +54,7 @@ Public Class UpdateChecker
 
     Private Shared Async Function GetLatestVersionAsync() As Task(Of String)
         Using client As New HttpClient()
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
             client.Timeout = TimeSpan.FromSeconds(5)
 
             Dim response = Await client.GetAsync(GitHubApiUrl)

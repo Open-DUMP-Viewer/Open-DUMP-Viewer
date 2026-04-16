@@ -1,8 +1,8 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_types.h
-    Internal type definitions for the OraDB DUMP Parser DLL
+    Internal type definitions for the Open DUMP Parser DLL
 
     Copyright (C) 2026 YANAI Taketo
  *****************************************************************************/

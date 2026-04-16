@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_xml.c
     Lightweight XML parser for EXPDP DDL metadata extraction

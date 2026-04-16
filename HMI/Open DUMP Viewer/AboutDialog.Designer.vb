@@ -69,7 +69,7 @@ Partial Class AboutDialog
         lblProductName.Name = "lblProductName"
         lblProductName.Size = New Size(412, 36)
         lblProductName.TabIndex = 0
-        lblProductName.Text = "OraDB DUMP Viewer"
+        lblProductName.Text = "Open DUMP Viewer for Oracle database"
         lblProductName.TextAlign = ContentAlignment.MiddleLeft
         '
         ' lblVersion

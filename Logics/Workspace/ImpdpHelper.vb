@@ -35,7 +35,7 @@ Public Class ImpdpHelper
 
         If Not IsAvailable() Then Return result
 
-        Dim tempDir = Path.Combine(Path.GetTempPath(), $"OraDB_DUMP_Viewer_impdp_{Guid.NewGuid():N}")
+        Dim tempDir = Path.Combine(Path.GetTempPath(), $"Open_DUMP_Viewer_impdp_{Guid.NewGuid():N}")
         Dim sqlFile = Path.Combine(tempDir, "expdp_ddl.sql")
 
         Try

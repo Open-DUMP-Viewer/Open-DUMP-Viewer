@@ -139,7 +139,7 @@ Public Class LobExtractDialog
         Using progress As New ExportProgressDialog()
             Dim result = progress.RunExport(
                 Sub(worker, args)
-                    Dim filesWritten = OraDB_NativeParser.ExtractLob(
+                    Dim filesWritten = Open_NativeParser.ExtractLob(
                         _dumpFilePath, _schema, _tableName,
                         lobColName, outputDir,
                         filenameCol, ext, _dataOffset,

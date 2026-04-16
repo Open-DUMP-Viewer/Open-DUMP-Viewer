@@ -1,5 +1,5 @@
 /*****************************************************************************
-    OraDB DUMP Viewer
+    Open DUMP Viewer for Oracle database
 
     odv_datetime.c
     Oracle DATE / TIMESTAMP / BINARY_FLOAT / BINARY_DOUBLE decoding

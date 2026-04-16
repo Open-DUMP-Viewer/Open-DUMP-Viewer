@@ -15,7 +15,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <ProjectGuid>{C7D3E5F1-A2B4-4C6D-8E9F-0A1B2C3D4E5F}</ProjectGuid>
-    <RootNamespace>OraDB_DumpParser</RootNamespace>
+    <RootNamespace>Open_DumpParser</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
 
@@ -44,12 +44,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)bin\Debug\net10.0-windows7.0\</OutDir>
     <IntDir>$(SolutionDir)obj\Debug\DumpParser\</IntDir>
-    <TargetName>OraDB_DumpParser</TargetName>
+    <TargetName>Open_DumpParser</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)bin\Release\net10.0-windows7.0\</OutDir>
     <IntDir>$(SolutionDir)obj\Release\DumpParser\</IntDir>
-    <TargetName>OraDB_DumpParser</TargetName>
+    <TargetName>Open_DumpParser</TargetName>
   </PropertyGroup>
 
   <!-- Debug Compile Options -->

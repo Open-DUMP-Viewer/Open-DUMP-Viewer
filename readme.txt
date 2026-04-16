@@ -1,5 +1,5 @@
 ===========================================================================
-  OraDB DUMP Viewer  v3.1.0
+  Open DUMP Viewer for Oracle database  v4.0.0
   Oracle DUMP ファイルビューア
 ===========================================================================
 
@@ -21,7 +21,7 @@
 ■ 作者・連絡先
 
   作者:     YANAI Taketo (柳井建人)
-  メール:   oradb_dump_viewer@sent.at
+  メール:   open_dump_viewer@sent.at
   Web:      https://www.odv.dev/
 
 ■ ソフトウェア種別
@@ -39,27 +39,27 @@
 ■ インストール方法
 
   【インストーラー版】
-  OraDBDumpViewer_vX.X.X_installer_x64.exe (または arm64) を実行し、
+  OpenDumpViewer_vX.X.X_installer_x64.exe (または arm64) を実行し、
   画面の指示に従ってインストールしてください。
-  既定のインストール先: C:\Program Files\OraDB DUMP Viewer
+  既定のインストール先: C:\Program Files\Open DUMP Viewer for Oracle database
 
   【ポータブル版 (ZIP)】
   ZIP ファイルを任意のフォルダに展開してください。
-  展開先の「OraDB DUMP Viewer.exe」をそのまま実行できます。
+  展開先の「Open DUMP Viewer.exe」をそのまま実行できます。
 
   【winget】
-  winget install OraDBDumpViewer.OraDBDumpViewer
+  winget install OpenDumpViewer.OpenDumpViewer
 
 ■ アンインストール方法
 
   【インストーラー版】
   Windows の「設定」→「アプリ」→「インストールされているアプリ」から
-  「OraDB DUMP Viewer」を選択し、アンインストールしてください。
+  「Open DUMP Viewer for Oracle database」を選択し、アンインストールしてください。
 
   【ポータブル版】
   展開したフォルダごと削除してください。
   ユーザー設定を削除する場合は、以下のフォルダも削除してください:
-  %APPDATA%\OraDBDUMPViewer
+  %APPDATA%\OpenDUMPViewer
 
 ■ ライセンスについて
 

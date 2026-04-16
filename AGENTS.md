@@ -1,8 +1,8 @@
-# AGENTS.md - OraDB DUMP Viewer
+# AGENTS.md - Open DUMP Viewer for Oracle database
 
 ## Project Overview
 
-OraDB DUMP Viewer は、Oracle データベースの EXPORT 形式（.dmp ファイル）を **Oracle 環境なしで** 解析・閲覧できる Windows デスクトップアプリケーションです。
+Open DUMP Viewer for Oracle database は、Oracle データベースの EXPORT 形式（.dmp ファイル）を **Oracle 環境なしで** 解析・閲覧できる Windows デスクトップアプリケーションです。
 
 **主な特徴:**
 - EXP (レガシー) / EXPDP (DataPump) 両形式の .dmp ファイル解析
@@ -21,9 +21,9 @@ VB.NET UI (WinForms)
   ↓
 AnalyzeLogic.vb (解析制御)
   ↓
-OraDB_NativeParser.vb (P/Invoke + コールバック)
+Open_NativeParser.vb (P/Invoke + コールバック)
   ↓
-OraDB_DumpParser.dll (C ネイティブ, x64)
+Open_DumpParser.dll (C ネイティブ, x64)
 ```
 
 ### 2フェーズ解析
@@ -50,11 +50,11 @@ ODV_ROW_CALLBACK(schema, table, col_count, col_names[], col_values[], user_data)
 ## Project Structure
 
 ```
-OraDB DUMP Viewer/
+Open DUMP Viewer for Oracle database/
 ├─ HMI/                                    # UI層
-│  ├─ OraDB DUMP Viewer/
-│  │  ├─ OraDB_DUMP_Viewer.vb              # メインフォーム（ライセンス認証）
-│  │  └─ OraDB_DUMP_Viewer.Designer.vb
+│  ├─ Open DUMP Viewer for Oracle database/
+│  │  ├─ Open_DUMP_Viewer.vb              # メインフォーム（ライセンス認証）
+│  │  └─ Open_DUMP_Viewer.Designer.vb
 │  ├─ Workspace/
 │  │  ├─ Workspace.vb                      # スキーマ・テーブル一覧表示
 │  │  └─ Workspace.Designer.vb
@@ -68,11 +68,11 @@ OraDB DUMP Viewer/
 ├─ Logics/                                 # ロジック層
 │  ├─ COMMON.vb                            # 共通ユーティリティ
 │  ├─ LICENSE.vb                           # ライセンス検証（RSA-2048）
-│  ├─ OraDB DUMP Viewer/
+│  ├─ Open DUMP Viewer for Oracle database/
 │  │  └─ MenuStripLogics.vb               # メニュー処理
 │  ├─ Workspace/
 │  │  ├─ AnalyzeLogic.vb                   # DLL呼出し制御（進捗表示）
-│  │  └─ OraDB_NativeParser.vb             # P/Invoke + コールバック + GCHandle
+│  │  └─ Open_NativeParser.vb             # P/Invoke + コールバック + GCHandle
 │  ├─ TablePreview/
 │  │  ├─ TablePreviewLogic.vb              # テーブル表示制御
 │  │  └─ SearchCondition.vb                # 検索条件の定義・評価
@@ -103,7 +103,7 @@ OraDB DUMP Viewer/
 ├─ CLA.md                                  # コントリビューターライセンス同意書
 ├─ EULA.md                                 # エンドユーザー使用許諾契約書
 ├─ SECURITY.md                             # セキュリティポリシー
-└─ OraDB DUMP Viewer.vbproj                # VB.NET プロジェクト
+└─ Open DUMP Viewer.vbproj                # VB.NET プロジェクト
 ```
 
 ## Build
@@ -122,7 +122,7 @@ _build.cmd
 ### VB.NET アプリケーション
 
 ```bash
-dotnet build "OraDB DUMP Viewer.vbproj"
+dotnet build "Open DUMP Viewer.vbproj"
 ```
 
 - .NET 10.0 (net10.0-windows7.0)
@@ -139,7 +139,7 @@ dotnet build "OraDB DUMP Viewer.vbproj"
 - GitHub Actions: Node.js 24 対応版アクションを使用
 
 バージョンアップ時の更新対象:
-- `OraDB DUMP Viewer.vbproj` の `TargetFramework`
+- `Open DUMP Viewer.vbproj` の `TargetFramework`
 - CI/CD ワークフロー (`dotnet-version`, `node-version`, アクションバージョン)
 - `README.md` の動作環境記載
 
@@ -149,7 +149,7 @@ dotnet build "OraDB DUMP Viewer.vbproj"
 
 | ファイル | 項目 | 例 |
 |---|---|---|
-| `OraDB DUMP Viewer.vbproj` | `<Version>` | `2.3.0` |
+| `Open DUMP Viewer.vbproj` | `<Version>` | `2.3.0` |
 | `Logics/DumpParser/odv_api.c` | `ODV_VERSION_STRING` | `"2.3.0"` |
 | `CHANGELOG.md` | 新バージョンセクション追加 | `## [2.3.0] - 2026-03-18` |
 
@@ -185,7 +185,7 @@ git push origin main:beta
 ```
 → GitHub Actions (`build-and-release-beta.yml`) が自動実行
 → タグ `v{version}-beta` で Pre-release を作成
-→ Winget ID: `OraDBDumpViewer.OraDBDumpViewer.BETA`
+→ Winget ID: `OpenDumpViewer.OpenDumpViewer.BETA`
 
 **正式版公開:**
 ```bash
@@ -193,16 +193,16 @@ git push origin main:release
 ```
 → GitHub Actions (`build-and-release.yml`) が自動実行
 → タグ `v{version}` で Release を作成
-→ Winget ID: `OraDBDumpViewer.OraDBDumpViewer`
+→ Winget ID: `OpenDumpViewer.OpenDumpViewer`
 
 ### ベータ版と安定版の並存
 
 | 項目 | 安定版 | Beta版 |
 |---|---|---|
-| インストール先 | `Program Files\OraDB DUMP Viewer` | `Program Files\OraDB DUMP Viewer Beta` |
-| ショートカット名 | `OraDB DUMP Viewer` | `OraDB DUMP Viewer (Beta)` |
-| Inno Setup AppId | `cd3b541d-5df6-4737-9bcc-16a4329a8a54` | `a6f03b60-f9ab-4182-a1fc-aa9801428121` |
-| Winget ID | `OraDBDumpViewer.OraDBDumpViewer` | `OraDBDumpViewer.OraDBDumpViewer.BETA` |
+| インストール先 | `Program Files\Open DUMP Viewer` | `Program Files\Open DUMP Viewer Beta` |
+| ショートカット名 | `Open DUMP Viewer for Oracle database` | `Open DUMP Viewer for Oracle database (Beta)` |
+| Inno Setup AppId | `25f04e6a-ad47-47aa-9a66-74f64c772bac` | `2e7f53d3-f0d6-4000-8d40-253b4ae66c63` |
+| Winget ID | `OpenDumpViewer.OpenDumpViewer` | `OpenDumpViewer.OpenDumpViewer.BETA` |
 
 同一 PC に両方インストール可能。
 
@@ -214,7 +214,7 @@ git push origin main:release
 |---|---|
 | 方式 | RSA-2048 公開鍵暗号による署名検証 |
 | ファイル形式 | JSON (`*.lic.json`) |
-| 保存場所 | `%APPDATA%\OraDBDUMPViewer\license.status` |
+| 保存場所 | `%APPDATA%\OpenDUMPViewer\license.status` |
 | 検証時期 | アプリ起動時（認証完了まで使用不可） |
 
 ### ライセンスの種類
@@ -228,7 +228,7 @@ git push origin main:release
 
 ライセンス取得: [https://www.odv.dev/](https://www.odv.dev/)
 
-**実装場所**: `Logics/LICENSE.vb`, `HMI/OraDB DUMP Viewer/OraDB_DUMP_Viewer.vb`
+**実装場所**: `Logics/LICENSE.vb`, `HMI/Open DUMP Viewer/Open_DUMP_Viewer.vb`
 
 ## Advanced Search Feature
 
@@ -286,4 +286,4 @@ git push origin main:release
 
 - ライセンス: [https://www.odv.dev/](https://www.odv.dev/)
 - セキュリティ報告: inquiry@ta-yan.ai
-- バグレポート・機能リクエスト: [GitHub Issues](https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/issues)
+- バグレポート・機能リクエスト: [GitHub Issues](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues)

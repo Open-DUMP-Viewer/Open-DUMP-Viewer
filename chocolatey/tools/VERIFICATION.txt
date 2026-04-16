@@ -1,12 +1,12 @@
 VERIFICATION
 
-Package: oradb-dump-viewer
+Package: open-dump-viewer
 Publisher: Taketo Yanai
 
 To verify the integrity of the downloaded installer:
 
 1. Download the installer from the official GitHub releases page:
-   https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/releases
+   https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases
 
 2. Compute the SHA-256 checksum:
    - PowerShell: Get-FileHash <file> -Algorithm SHA256
@@ -16,5 +16,5 @@ To verify the integrity of the downloaded installer:
    - x64:   92280e089ba8aab25791192c3ecdd42a5de3d22d8a9907f87c25116f6f502091
    - ARM64: 353c8763b3846a15c2cfbfeba18a706f5a1a6a18e75faa8bd4266434cfdb1508
 
-License: https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer/blob/main/EULA.md
-Source:  https://github.com/OraDB-DUMP-Viewer/OraDB-DUMP-Viewer
+License: https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/EULA.md
+Source:  https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer

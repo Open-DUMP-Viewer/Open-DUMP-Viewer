@@ -161,8 +161,8 @@
   <data name="Title_BulkExport" xml:space="preserve"><value>Export en masse</value></data>
 
   <!-- Status Bar -->
-  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - Non licencié</value></data>
-  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - Non licencié</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - {0}</value></data>
   <data name="Status_SelectDumpFile" xml:space="preserve"><value>Sélectionnez un chemin de fichier Dump...</value></data>
   <data name="Status_GettingTableList" xml:space="preserve"><value>Récupération de la liste des tables...</value></data>
   <data name="Status_SearchingTables" xml:space="preserve"><value>Recherche des tables... ({0}%) | Écoulé : {1}{2}</value></data>
@@ -254,7 +254,7 @@ Souhaitez-vous sélectionner un nouveau fichier de licence ?</value>
   <!-- Analysis Errors -->
   <data name="Analyze_DllNotFound" xml:space="preserve">
     <value>DLL d'analyse introuvable : {0}
-Assurez-vous que OraDB_DumpParser.dll se trouve dans le même dossier que l'exécutable.</value>
+Assurez-vous que Open_DumpParser.dll se trouve dans le même dossier que l'exécutable.</value>
   </data>
   <data name="Analyze_ParseError" xml:space="preserve"><value>Erreur lors de l'analyse du fichier Dump : {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Erreur lors de la récupération de la liste des tables : {0}</value></data>
@@ -314,7 +314,7 @@ Continuer ?</value>
   <data name="About_Downloading" xml:space="preserve"><value>Téléchargement...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Lancement de l'installateur...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Échec du téléchargement : {0}</value></data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Mise à jour de OraDB DUMP Viewer...</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Mise à jour de Open DUMP Viewer for Oracle database...</value></data>
 
   <!-- Error Report Dialog -->
   <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Rapport d'erreur</value></data>
@@ -481,7 +481,7 @@ Souhaitez-vous ouvrir la boîte de dialogue d'activation de licence ?</value>
   </data>
 
   <!-- Help Viewer -->
-  <data name="Help_FormTitle" xml:space="preserve"><value>Aide - OraDB DUMP Viewer</value></data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>Aide - Open DUMP Viewer for Oracle database</value></data>
   <data name="Help_Back" xml:space="preserve"><value>Retour</value></data>
   <data name="Help_Forward" xml:space="preserve"><value>Suivant</value></data>
   <data name="Help_Home" xml:space="preserve"><value>Sommaire</value></data>

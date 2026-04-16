@@ -2,14 +2,14 @@ Imports System.Runtime.InteropServices
 Imports System.Text
 
 ''' <summary>
-''' OraDB_DumpParser.dll P/Invoke ラッパー
+''' Open_DumpParser.dll P/Invoke ラッパー
 ''' C言語ネイティブDLLとの連携を担当
 ''' </summary>
-Public Class OraDB_NativeParser
+Public Class Open_NativeParser
 
 #Region "定数"
     ' DLL名
-    Private Const DLL_NAME As String = "OraDB_DumpParser.dll"
+    Private Const DLL_NAME As String = "Open_DumpParser.dll"
 
     ' Return codes
     Public Const ODV_OK As Integer = 0

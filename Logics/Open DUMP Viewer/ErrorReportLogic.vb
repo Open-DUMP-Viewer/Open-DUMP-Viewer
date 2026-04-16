@@ -58,7 +58,7 @@ Public Class ErrorReportLogic
 
         ' ネイティブ DLL バージョン
         Try
-            info.DllVersion = OraDB_NativeParser.GetVersion()
+            info.DllVersion = Open_NativeParser.GetVersion()
         Catch
             info.DllVersion = "N/A"
         End Try
@@ -115,7 +115,7 @@ Public Class ErrorReportLogic
             Try
                 Dim fi As New IO.FileInfo(dumpFilePath)
                 Dim sizeMB = fi.Length / (1024.0 * 1024.0)
-                Dim dumpType = OraDB_NativeParser.CheckDumpKind(dumpFilePath)
+                Dim dumpType = Open_NativeParser.CheckDumpKind(dumpFilePath)
                 Dim typeName = DumpTypeName(dumpType)
                 info.DumpFileInfo = $"{typeName} / {sizeMB:F1} MB"
                 info.DumpFilePath = dumpFilePath
@@ -147,10 +147,10 @@ Public Class ErrorReportLogic
     ''' </summary>
     Private Shared Function DumpTypeName(dumpType As Integer) As String
         Select Case dumpType
-            Case OraDB_NativeParser.DUMP_EXPDP : Return "EXPDP"
-            Case OraDB_NativeParser.DUMP_EXPDP_COMPRESS : Return Loc.S("ErrorReport_DumpType_ExpdpCompress")
-            Case OraDB_NativeParser.DUMP_EXP : Return "EXP"
-            Case OraDB_NativeParser.DUMP_EXP_DIRECT : Return "EXP (Direct)"
+            Case Open_NativeParser.DUMP_EXPDP : Return "EXPDP"
+            Case Open_NativeParser.DUMP_EXPDP_COMPRESS : Return Loc.S("ErrorReport_DumpType_ExpdpCompress")
+            Case Open_NativeParser.DUMP_EXP : Return "EXP"
+            Case Open_NativeParser.DUMP_EXP_DIRECT : Return "EXP (Direct)"
             Case Else : Return Loc.S("ErrorReport_DumpType_Unknown")
         End Select
     End Function
@@ -167,7 +167,7 @@ Public Class ErrorReportLogic
     ) As Task(Of ReportResult)
 
         Using client As New HttpClient()
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
             client.Timeout = TimeSpan.FromSeconds(If(attachDump, 120, 15))
 
             Dim payload As New Dictionary(Of String, String) From {

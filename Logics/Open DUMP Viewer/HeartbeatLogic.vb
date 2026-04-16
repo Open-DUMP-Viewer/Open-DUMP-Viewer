@@ -23,7 +23,7 @@ Public Class HeartbeatLogic
         Try
             Dim appData = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "OraDBDUMPViewer")
+                "OpenDUMPViewer")
 
             ' 1日1回制限: 最終送信日を確認
             Dim lastFile = Path.Combine(appData, HeartbeatFileName)
@@ -71,7 +71,7 @@ Public Class HeartbeatLogic
             Dim appVersion = $"{ver.Major}.{ver.Minor}.{ver.Build}"
 
             Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("OraDB-DUMP-Viewer")
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
                 client.Timeout = TimeSpan.FromSeconds(10)
 
                 Dim payload As New Dictionary(Of String, Object) From {

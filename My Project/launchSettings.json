@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "OraDB DUMP Viewer": {
+    "Open DUMP Viewer for Oracle database": {
       "commandName": "Project",
       "nativeDebugging": true
     }

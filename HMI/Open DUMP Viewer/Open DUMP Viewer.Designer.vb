@@ -1,5 +1,5 @@
 <Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
-Partial Class OraDB_DUMP_Viewer
+Partial Class Open_DUMP_Viewer
     Inherits System.Windows.Forms.Form
 
     'フォームがコンポーネントの一覧をクリーンアップするために dispose をオーバーライドします。
@@ -22,7 +22,7 @@ Partial Class OraDB_DUMP_Viewer
     'コード エディターを使って変更しないでください。
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
-        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(OraDB_DUMP_Viewer))
+        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(Open_DUMP_Viewer))
         MenuStrip = New MenuStrip()
         ファイルFToolStripMenuItem = New ToolStripMenuItem()
         開くToolStripMenuItem = New ToolStripMenuItem()
@@ -504,7 +504,7 @@ Partial Class OraDB_DUMP_Viewer
         ' 
         ToolStripStatusLabel.Name = "ToolStripStatusLabel"
         ToolStripStatusLabel.Size = New Size(116, 17)
-        ToolStripStatusLabel.Text = "OraDB DUMP Viewer"
+        ToolStripStatusLabel.Text = "Open DUMP Viewer for Oracle database"
         ' 
         ' ToolExport
         ' 
@@ -598,7 +598,7 @@ Partial Class OraDB_DUMP_Viewer
         btnExportOdbc.Size = New Size(28, 28)
         btnExportOdbc.Text = "ODBC"
         '
-        ' OraDB_DUMP_Viewer
+        ' Open_DUMP_Viewer
         '
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
@@ -610,8 +610,8 @@ Partial Class OraDB_DUMP_Viewer
         IsMdiContainer = True
         MainMenuStrip = MenuStrip
         Margin = New Padding(2, 2, 2, 2)
-        Name = "OraDB_DUMP_Viewer"
-        Text = "OraDB DUMP Viewer"
+        Name = "Open_DUMP_Viewer"
+        Text = "Open DUMP Viewer for Oracle database"
         MenuStrip.ResumeLayout(False)
         MenuStrip.PerformLayout()
         StatusStrip.ResumeLayout(False)

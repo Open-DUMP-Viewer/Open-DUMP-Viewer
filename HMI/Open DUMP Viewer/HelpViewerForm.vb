@@ -56,7 +56,7 @@ Partial Public Class HelpViewerForm
     Private Async Sub InitWebViewAsync()
         Try
             Dim env = Await CoreWebView2Environment.CreateAsync(
-                Nothing, Path.Combine(Path.GetTempPath(), "OraDBDumpViewer_WebView2"), Nothing)
+                Nothing, Path.Combine(Path.GetTempPath(), "OpenDumpViewer_WebView2"), Nothing)
             Await webView.EnsureCoreWebView2Async(env)
 
             ' 外部リンクをブラウザで開く

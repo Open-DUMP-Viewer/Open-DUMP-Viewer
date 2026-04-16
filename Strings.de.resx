@@ -151,8 +151,8 @@
   <data name="Title_AuthSuccess" xml:space="preserve"><value>Authentifizierung erfolgreich</value></data>
   <data name="Title_LobExtract" xml:space="preserve"><value>LOB-Dateiextraktion</value></data>
   <data name="Title_BulkExport" xml:space="preserve"><value>Massenexport</value></data>
-  <data name="Status_Unlicensed" xml:space="preserve"><value>OraDB DUMP Viewer - Nicht lizenziert</value></data>
-  <data name="Status_Licensed" xml:space="preserve"><value>OraDB DUMP Viewer - {0}</value></data>
+  <data name="Status_Unlicensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - Nicht lizenziert</value></data>
+  <data name="Status_Licensed" xml:space="preserve"><value>Open DUMP Viewer for Oracle database - {0}</value></data>
   <data name="Status_SelectDumpFile" xml:space="preserve"><value>Dump-Dateipfad auswählen...</value></data>
   <data name="Status_GettingTableList" xml:space="preserve"><value>Tabellenliste wird abgerufen...</value></data>
   <data name="Status_SearchingTables" xml:space="preserve"><value>Tabellen werden durchsucht... ({0}%) | Verstrichene Zeit: {1}{2}</value></data>
@@ -234,7 +234,7 @@ Möchten Sie eine neue Lizenzdatei auswählen?</value>
   <data name="Dialog_CsvFolderBrowse" xml:space="preserve"><value>Ausgabeordner für CSV-Dateien auswählen</value></data>
   <data name="Analyze_DllNotFound" xml:space="preserve">
     <value>Analyse-DLL nicht gefunden: {0}
-Stellen Sie sicher, dass OraDB_DumpParser.dll im selben Ordner wie die ausführbare Datei liegt.</value>
+Stellen Sie sicher, dass Open_DumpParser.dll im selben Ordner wie die ausführbare Datei liegt.</value>
   </data>
   <data name="Analyze_ParseError" xml:space="preserve"><value>Fehler bei der Dump-Dateianalyse: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Fehler beim Abrufen der Tabellenliste: {0}</value></data>
@@ -288,7 +288,7 @@ Fortfahren?</value>
   <data name="About_Downloading" xml:space="preserve"><value>Herunterladen...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Installationsprogramm wird gestartet...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Download fehlgeschlagen: {0}</value></data>
-  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo OraDB DUMP Viewer wird aktualisiert...</value></data>
+  <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Open DUMP Viewer for Oracle database wird aktualisiert...</value></data>
   <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Fehlerbericht</value></data>
   <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>Betreff:</value></data>
   <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>Beschreibung:</value></data>
@@ -429,7 +429,7 @@ Extrahierte Dateien: {0}</value>
     <value>Diese Lizenz wurde vom Server widerrufen. Bitte erwerben Sie eine neue Lizenz.
 Möchten Sie den Lizenzaktivierungsdialog öffnen?</value>
   </data>
-  <data name="Help_FormTitle" xml:space="preserve"><value>Hilfe - OraDB DUMP Viewer</value></data>
+  <data name="Help_FormTitle" xml:space="preserve"><value>Hilfe - Open DUMP Viewer for Oracle database</value></data>
   <data name="Help_Back" xml:space="preserve"><value>Zurück</value></data>
   <data name="Help_Forward" xml:space="preserve"><value>Vorwärts</value></data>
   <data name="Help_Home" xml:space="preserve"><value>Inhalt</value></data>

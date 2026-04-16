@@ -40,12 +40,12 @@ Public Class MenuStripLogics
 
     Public Shared Sub ステータスバーSToolStripMenuItem()
         'ステータスバーの表示・非表示を切り替える
-        If OraDB_DUMP_Viewer.ToolStripStatusLabel.Visible = True Then
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Visible = False
-            OraDB_DUMP_Viewer.ステータスバーSToolStripMenuItem.Checked = False
+        If Open_DUMP_Viewer.ToolStripStatusLabel.Visible = True Then
+            Open_DUMP_Viewer.ToolStripStatusLabel.Visible = False
+            Open_DUMP_Viewer.ステータスバーSToolStripMenuItem.Checked = False
         Else
-            OraDB_DUMP_Viewer.ToolStripStatusLabel.Visible = True
-            OraDB_DUMP_Viewer.ステータスバーSToolStripMenuItem.Checked = True
+            Open_DUMP_Viewer.ToolStripStatusLabel.Visible = True
+            Open_DUMP_Viewer.ステータスバーSToolStripMenuItem.Checked = True
         End If
     End Sub
 
@@ -75,7 +75,7 @@ Public Class MenuStripLogics
                         Return
                     End If
                     ' 認証成功時はAppDataにそのまま保存
-                    Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OraDBDUMPViewer")
+                    Dim appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "OpenDUMPViewer")
                     If Not Directory.Exists(appData) Then Directory.CreateDirectory(appData)
                     Dim statusPath = Path.Combine(appData, "license.status")
                     File.Copy(licPath, statusPath, True)

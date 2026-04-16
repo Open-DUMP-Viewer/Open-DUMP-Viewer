@@ -1,13 +1,13 @@
 [OPTIONS]
 Compatibility=1.1 or later
-Compiled file=OraDBDumpViewer.chm
-Contents file=OraDBDumpViewer.hhc
+Compiled file=OpenDumpViewer.chm
+Contents file=OpenDumpViewer.hhc
 Default topic=toc.html
 Display compile progress=No
 Full-text search=Yes
-Index file=OraDBDumpViewer.hhk
+Index file=OpenDumpViewer.hhk
 Language=0x411 Japanese
-Title=OraDB DUMP Viewer ヘルプ
+Title=Open DUMP Viewer for Oracle database ヘルプ
 
 [FILES]
 style.css

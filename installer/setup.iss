@@ -1,5 +1,5 @@
 ; ============================================================
-; OraDB DUMP Viewer - Inno Setup Script
+; Open DUMP Viewer for Oracle database - Inno Setup Script
 ; ============================================================
 ; CI から渡される定義:
 ;   MyAppVersion     - "2.0.0"
@@ -11,16 +11,18 @@
 
 #define MyAppPublisher "YANAI Taketo"
 #define MyAppURL       "https://www.odv.dev/"
-#define MyAppExeName   "OraDB DUMP Viewer.exe"
+#define MyAppExeName   "Open DUMP Viewer.exe"
 
 #ifdef BETA
-  #define MyAppName    "OraDB DUMP Viewer (Beta)"
-  #define MyAppId      "{{a6f03b60-f9ab-4182-a1fc-aa9801428121}"
-  #define MyAppDirName "OraDB DUMP Viewer Beta"
+  #define MyAppName      "Open DUMP Viewer for Oracle database (Beta)"
+  #define MyAppId        "{{2e7f53d3-f0d6-4000-8d40-253b4ae66c63}"
+  #define MyAppDirName   "Open DUMP Viewer Beta"
+  #define MyOldAppId     "{a6f03b60-f9ab-4182-a1fc-aa9801428121}_is1"
 #else
-  #define MyAppName    "OraDB DUMP Viewer"
-  #define MyAppId      "{{cd3b541d-5df6-4737-9bcc-16a4329a8a54}"
-  #define MyAppDirName "OraDB DUMP Viewer"
+  #define MyAppName      "Open DUMP Viewer for Oracle database"
+  #define MyAppId        "{{25f04e6a-ad47-47aa-9a66-74f64c772bac}"
+  #define MyAppDirName   "Open DUMP Viewer"
+  #define MyOldAppId     "{cd3b541d-5df6-4737-9bcc-16a4329a8a54}_is1"
 #endif
 
 ; ============================================================
@@ -38,7 +40,7 @@ DefaultDirName={autopf}\{#MyAppDirName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\publish
-OutputBaseFilename=OraDBDumpViewer_{#MyAppFileVersion}_installer_{#MyAppArch}
+OutputBaseFilename=OpenDumpViewer_{#MyAppFileVersion}_installer_{#MyAppArch}
 SetupIconFile=..\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardImageFile=WizardImage.bmp
@@ -147,10 +149,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 ; [Registry] - ファイル関連付け (.dmp)
 ; ============================================================
 [Registry]
-Root: HKA; Subkey: "Software\Classes\.dmp";                                 ValueType: string; ValueName: ""; ValueData: "OraDBDumpViewer.dmp"; Flags: uninsdeletevalue; Tasks: fileassoc
-Root: HKA; Subkey: "Software\Classes\OraDBDumpViewer.dmp";                  ValueType: string; ValueName: ""; ValueData: "Oracle DUMP File"; Flags: uninsdeletekey; Tasks: fileassoc
-Root: HKA; Subkey: "Software\Classes\OraDBDumpViewer.dmp\DefaultIcon";      ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
-Root: HKA; Subkey: "Software\Classes\OraDBDumpViewer.dmp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\.dmp";                                 ValueType: string; ValueName: ""; ValueData: "OpenDumpViewer.dmp"; Flags: uninsdeletevalue; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\OpenDumpViewer.dmp";                  ValueType: string; ValueName: ""; ValueData: "Oracle DUMP File"; Flags: uninsdeletekey; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\OpenDumpViewer.dmp\DefaultIcon";      ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppExeName},0"; Tasks: fileassoc
+Root: HKA; Subkey: "Software\Classes\OpenDumpViewer.dmp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: fileassoc
 
 ; ============================================================
 ; [Run] - インストール後の実行
@@ -169,8 +171,31 @@ Type: filesandordirs; Name: "{app}"
 ; ============================================================
 [Code]
 /// <summary>
+/// インストール開始前: 旧バージョン (OraDB DUMP Viewer) を検出しサイレントアンインストール
+/// v4.0.0 の商標準拠リネームに伴う処理。旧設定フォルダ %APPDATA%\OraDBDUMPViewer は
+/// 旧アンインストーラーのデフォルト動作で削除される想定（再ライセンス認証が必要）。
+/// </summary>
+function InitializeSetup(): Boolean;
+var
+  UninstallKey: String;
+  UninstallExe: String;
+  ResultCode: Integer;
+begin
+  UninstallKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyOldAppId}';
+  if RegQueryStringValue(HKLM, UninstallKey, 'UninstallString', UninstallExe) or
+     RegQueryStringValue(HKCU, UninstallKey, 'UninstallString', UninstallExe) then
+  begin
+    { UninstallString は引用符付きなので直接 Exec に渡す }
+    UninstallExe := RemoveQuotes(UninstallExe);
+    Exec(UninstallExe, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '',
+         SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  Result := True;
+end;
+
+/// <summary>
 /// アンインストール時: ユーザー設定の削除を確認
-/// %APPDATA%\OraDBDUMPViewer を削除するか尋ねる
+/// %APPDATA%\OpenDUMPViewer を削除するか尋ねる
 /// </summary>
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
@@ -179,9 +204,9 @@ begin
   if CurUninstallStep = usPostUninstall then
   begin
     { Oracle Client キャッシュを無条件削除 }
-    DelTree(ExpandConstant('{localappdata}\OraDB_DUMP_Viewer\oracle_client'), True, True, True);
+    DelTree(ExpandConstant('{localappdata}\Open_DUMP_Viewer\oracle_client'), True, True, True);
 
-    SettingsDir := ExpandConstant('{userappdata}\OraDBDUMPViewer');
+    SettingsDir := ExpandConstant('{userappdata}\OpenDUMPViewer');
     if DirExists(SettingsDir) then
     begin
       if MsgBox(CustomMessage('DeleteSettings'), mbConfirmation, MB_YESNO) = IDYES then
