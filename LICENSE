@@ -7,6 +7,20 @@ This software and its source code are the proprietary property of
 YANAI Taketo. The source code is made available for reference purposes
 only ("Source-Available") and is NOT open-source software.
 
+NOTICE - Why this source is published:
+This source code is published for (1) transparency and auditability,
+and (2) long-term knowledge succession in the event the licensor can
+no longer maintain the project. It is NOT intended as a foundation for
+third parties to build their own software. Reading and learning is
+permitted; building derivative works during the licensor's active
+maintenance period is not.
+
+DEAD MAN'S SWITCH:
+If the licensor (or successor) ceases new releases for 24 or more
+months AND remains unresponsive to reasonable inquiries for 6 or more
+months, the source code in this repository automatically converts to
+Apache License 2.0. See EULA Section 6 for full conditions.
+
 PERMITTED:
   - Viewing and studying the source code for personal learning
   - Contributing via Pull Requests (requires CLA signature)
