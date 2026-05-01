@@ -639,17 +639,16 @@ jobs:
 
       - name: Configure msstore CLI
         shell: pwsh
-        env:
-          MSSTORE_TENANT_ID:     ${{ secrets.AZURE_AD_TENANT_ID }}
-          MSSTORE_CLIENT_ID:     ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
-          MSSTORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
-          MSSTORE_SELLER_ID:     ${{ secrets.STORE_SELLER_ID }}
         run: |
+          # Note: secrets are substituted at YAML parse time. Using ${{ }} directly
+          # rather than $env:VAR indirection because the latter was failing with
+          # "Cannot parse argument" — msstore CLI was apparently receiving an empty
+          # value, possibly due to PowerShell env-var expansion timing differences.
           msstore reconfigure `
-            --tenantId   $env:MSSTORE_TENANT_ID `
-            --sellerId   $env:MSSTORE_SELLER_ID `
-            --clientId   $env:MSSTORE_CLIENT_ID `
-            --clientSecret $env:MSSTORE_CLIENT_SECRET
+            --tenantId     "${{ secrets.AZURE_AD_TENANT_ID }}" `
+            --sellerId     "${{ secrets.STORE_SELLER_ID }}" `
+            --clientId     "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
 
       - name: Publish to Microsoft Store
         shell: pwsh
