@@ -639,11 +639,11 @@ jobs:
 
       - name: Configure msstore CLI
         shell: pwsh
+        # Secrets are substituted at YAML parse time (direct expression syntax),
+        # rather than via $env:VAR indirection inside the run block. The env-var
+        # approach was failing with "Cannot parse argument" because the values
+        # were not expanding correctly inside PowerShell.
         run: |
-          # Note: secrets are substituted at YAML parse time. Using ${{ }} directly
-          # rather than $env:VAR indirection because the latter was failing with
-          # "Cannot parse argument" — msstore CLI was apparently receiving an empty
-          # value, possibly due to PowerShell env-var expansion timing differences.
           msstore reconfigure `
             --tenantId     "${{ secrets.AZURE_AD_TENANT_ID }}" `
             --sellerId     "${{ secrets.STORE_SELLER_ID }}" `
