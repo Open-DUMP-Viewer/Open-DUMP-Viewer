@@ -315,7 +315,11 @@ jobs:
   # ═══════════════════════════════════════════
   release:
     name: Release
-    needs: build
+    needs: [build, bundle-msix]
+    # bundle-msix は vars.MSIX_IDENTITY_NAME 未設定時に skip される。
+    # その場合でも release は実行する必要があるため if: always() を使用し、
+    # build が成功していることだけを必須条件にする
+    if: ${{ always() && needs.build.result == 'success' }}
     runs-on: windows-latest
 
     permissions:
