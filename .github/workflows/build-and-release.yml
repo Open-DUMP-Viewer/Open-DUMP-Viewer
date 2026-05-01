@@ -314,7 +314,7 @@ jobs:
   # リリースジョブ (ビルド完了後に統合)
   # ═══════════════════════════════════════════
   release:
-    name: Release
+    name: Release / GitHub Release
     needs: [build, bundle-msix]
     # bundle-msix は vars.MSIX_IDENTITY_NAME 未設定時に skip される。
     # その場合でも release は実行する必要があるため if: always() を使用し、
@@ -324,6 +324,10 @@ jobs:
 
     permissions:
       contents: write  # GitHub Release の作成に必要
+
+    outputs:
+      VERSION: ${{ steps.get_version.outputs.VERSION }}
+      TAG: ${{ steps.get_version.outputs.TAG }}
 
     steps:
       # ─────────────────────────────────────
@@ -440,15 +444,34 @@ jobs:
 
           Remove-Item $notesFile
 
-      # ─────────────────────────────────────
-      # 6. Winget パッケージマニフェストの自動PR
-      #    microsoft/winget-pkgs へ PR を送信
-      #    x64 + ARM64 両アーキテクチャのインストーラーを登録
-      # ─────────────────────────────────────
+  # ═══════════════════════════════════════════
+  # Winget 公開ジョブ (並列)
+  # ═══════════════════════════════════════════
+  publish-winget:
+    name: Release / Winget
+    needs: release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-x64
+          path: ./artifacts
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-arm64
+          path: ./artifacts
+
       - name: Publish to Winget
         shell: pwsh
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $version = "${{ needs.release.outputs.VERSION }}"
           $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/v${version}"
 
           # 各アーキテクチャの EXE ハッシュを取得
@@ -518,17 +541,36 @@ jobs:
           Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
           .\wingetcreate.exe submit --token "${{ secrets.WINGET_TOKEN }}" $dir
 
-      # ─────────────────────────────────────
-      # 7. Chocolatey パッケージのビルド & プッシュ
-      #    chocolatey/ 配下の nuspec を使って
-      #    バージョン・チェックサムを自動更新して公開
-      # ─────────────────────────────────────
+  # ═══════════════════════════════════════════
+  # Chocolatey 公開ジョブ (並列)
+  # ═══════════════════════════════════════════
+  publish-chocolatey:
+    name: Release / Chocolatey
+    needs: release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-x64
+          path: ./artifacts
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-arm64
+          path: ./artifacts
+
       - name: Publish to Chocolatey
         shell: pwsh
         env:
           CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $version = "${{ needs.release.outputs.VERSION }}"
           $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/v${version}"
 
           # インストーラーのチェックサムを取得
@@ -567,14 +609,16 @@ jobs:
           }
 
   # ═══════════════════════════════════════════
-  # Microsoft Store 提出ジョブ
+  # Microsoft Store 公開ジョブ (並列)
   # vars.STORE_PRODUCT_ID 未設定時はスキップ
+  # 初回登録時は手動で Partner Center にて Store listing 設定後、本ジョブが自動で
+  # パッケージを更新提出する
   # ═══════════════════════════════════════════
-  submit-store:
-    name: Submit to Microsoft Store
-    needs: [bundle-msix, release]
+  publish-store:
+    name: Release / Microsoft Store
+    needs: [release, bundle-msix]
     runs-on: windows-latest
-    if: vars.STORE_PRODUCT_ID != ''
+    if: ${{ vars.STORE_PRODUCT_ID != '' && needs.bundle-msix.result == 'success' }}
 
     steps:
       - name: Download .msixbundle

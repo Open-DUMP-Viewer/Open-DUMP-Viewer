@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.1.1] - 2026-05-01
+
+### 修正
+- CI ワークフロー再設計: 各配布チャネル（GitHub Release / Winget / Chocolatey / Microsoft Store）を独立した並列ジョブに分離。1 つの配布失敗が他チャネルを巻き込まなくなり、UI 上でどのチャネルが成功・失敗したか一目で分かるようになりました
+- v4.1.0 リリース時に発生した以下の問題を解消:
+  - `bundle-msix` ジョブと `release` ジョブのアーティファクトレースコンディション
+  - Chocolatey の 403 Forbidden で Microsoft Store 提出まで巻き込まれる問題
+
 ## [4.1.0] - 2026-05-01
 
 ### 新機能

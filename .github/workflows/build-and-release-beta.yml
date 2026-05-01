@@ -221,15 +221,20 @@ jobs:
             ./publish/file_version.txt
 
   # ═══════════════════════════════════════════
-  # リリースジョブ (Beta Pre-release)
+  # GitHub Pre-release 作成ジョブ
   # ═══════════════════════════════════════════
   release:
-    name: Beta Release
+    name: Beta / GitHub Pre-release
     needs: build
     runs-on: windows-latest
 
     permissions:
       contents: write
+
+    outputs:
+      VERSION: ${{ steps.get_version.outputs.VERSION }}
+      TAG: ${{ steps.get_version.outputs.TAG }}
+      FILE_VERSION: ${{ steps.get_version.outputs.FILE_VERSION }}
 
     steps:
       # ─────────────────────────────────────
@@ -336,15 +341,36 @@ jobs:
 
           Remove-Item $notesFile
 
-      # ─────────────────────────────────────
-      # 6. Winget パッケージマニフェストの自動PR
-      #    Beta 用パッケージ ID: OpenDumpViewer.OpenDumpViewer.BETA
-      # ─────────────────────────────────────
+  # ═══════════════════════════════════════════
+  # Winget Beta 公開ジョブ (並列)
+  # Beta 用パッケージ ID: OpenDumpViewer.OpenDumpViewer.BETA
+  # ═══════════════════════════════════════════
+  publish-winget:
+    name: Beta / Winget
+    needs: release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: beta-build-x64
+          path: ./artifacts
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: beta-build-arm64
+          path: ./artifacts
+
       - name: Publish to Winget (Beta)
         shell: pwsh
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          $fileVer = "${{ steps.get_version.outputs.FILE_VERSION }}"
+          $version = "${{ needs.release.outputs.VERSION }}"
+          $fileVer = "${{ needs.release.outputs.FILE_VERSION }}"
           $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/${fileVer}"
 
           $exeX64 = "./artifacts/OpenDumpViewer_${fileVer}_installer_x64.exe"
@@ -413,17 +439,38 @@ jobs:
           Invoke-WebRequest -Uri "https://aka.ms/wingetcreate/latest" -OutFile wingetcreate.exe
           .\wingetcreate.exe submit --token "${{ secrets.WINGET_TOKEN }}" $dir
 
-      # ─────────────────────────────────────
-      # 7. Chocolatey パッケージのビルド & プッシュ (Beta)
-      #    プレリリース版として公開
-      # ─────────────────────────────────────
+  # ═══════════════════════════════════════════
+  # Chocolatey Beta 公開ジョブ (並列)
+  # プレリリース版として公開
+  # ═══════════════════════════════════════════
+  publish-chocolatey:
+    name: Beta / Chocolatey
+    needs: release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: beta-build-x64
+          path: ./artifacts
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: beta-build-arm64
+          path: ./artifacts
+
       - name: Publish to Chocolatey (Beta)
         shell: pwsh
         env:
           CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
         run: |
-          $version = "${{ steps.get_version.outputs.VERSION }}"
-          $fileVer = "${{ steps.get_version.outputs.FILE_VERSION }}"
+          $version = "${{ needs.release.outputs.VERSION }}"
+          $fileVer = "${{ needs.release.outputs.FILE_VERSION }}"
           $chocoVersion = "${version}-beta"
           $baseUrl = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/download/${fileVer}"
 
