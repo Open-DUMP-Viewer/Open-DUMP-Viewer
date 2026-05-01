@@ -446,10 +446,13 @@ jobs:
 
   # ═══════════════════════════════════════════
   # Winget 公開ジョブ (並列)
+  # needs を publish-* 全ジョブで揃えて UI 上の grouping を統一
+  # bundle-msix は Winget では使わないが、視覚整合のため待つ
   # ═══════════════════════════════════════════
   publish-winget:
     name: Release / Winget
-    needs: release
+    needs: [release, bundle-msix]
+    if: ${{ always() && needs.release.result == 'success' }}
     runs-on: windows-latest
 
     steps:
@@ -543,10 +546,12 @@ jobs:
 
   # ═══════════════════════════════════════════
   # Chocolatey 公開ジョブ (並列)
+  # needs を publish-* 全ジョブで揃えて UI 上の grouping を統一
   # ═══════════════════════════════════════════
   publish-chocolatey:
     name: Release / Chocolatey
-    needs: release
+    needs: [release, bundle-msix]
+    if: ${{ always() && needs.release.result == 'success' }}
     runs-on: windows-latest
 
     steps:
