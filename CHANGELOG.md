@@ -1,13 +1,5 @@
 # Changelog
 
-## [4.1.1] - 2026-05-01
-
-### 修正
-- CI ワークフロー再設計: 各配布チャネル（GitHub Release / Winget / Chocolatey / Microsoft Store）を独立した並列ジョブに分離。1 つの配布失敗が他チャネルを巻き込まなくなり、UI 上でどのチャネルが成功・失敗したか一目で分かるようになりました
-- v4.1.0 リリース時に発生した以下の問題を解消:
-  - `bundle-msix` ジョブと `release` ジョブのアーティファクトレースコンディション
-  - Chocolatey の 403 Forbidden で Microsoft Store 提出まで巻き込まれる問題
-
 ## [4.1.0] - 2026-05-01
 
 ### 新機能
@@ -20,7 +12,7 @@
 - **GitHub Sponsors リンク**: バージョン情報ダイアログに GitHub Sponsors への寄付リンクを追加（10 言語対応）
 
 ### 開発・CI
-- GitHub Actions に MSIX ビルド / バンドル / Microsoft Store 自動提出ジョブを追加
+- GitHub Actions ワークフローを再構築: 各配布チャネル（GitHub Release / Winget / Chocolatey / Microsoft Store）を独立した並列ジョブに分離。1 つの配布失敗が他チャネルを巻き込まなくなり、UI 上でどのチャネルが成功・失敗したか一目で分かるようになりました
 - `workflow_dispatch` トリガーを追加（任意ブランチからの手動実行に対応）
 - MSIX 用 Visual Assets を `app.ico` から自動生成するスクリプトを追加（`installer/msix/scripts/generate-assets.ps1`）
 - MSIX マニフェストテンプレート + ビルドスクリプトを追加（`installer/msix/`）
