@@ -13,6 +13,7 @@ Partial Public Class AboutDialog
 
     Private Const GitHubApiUrl As String = "https://api.github.com/repos/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
     Private Const ReleasesPageUrl As String = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
+    Private Const SponsorPageUrl As String = "https://github.com/sponsors/Open-DUMP-Viewer"
 
     ''' <summary>最新リリースのインストーラーダウンロードURL（更新ボタン押下時に使用）</summary>
     Private _installerDownloadUrl As String = Nothing
@@ -29,8 +30,18 @@ Partial Public Class AboutDialog
         lblVersion.Text = $"{Loc.S("About_VersionLabel")} v{currentVersion}"
         lblCopyright.Text = $"Copyright (C) {DateTime.Now.Year} YANAI Taketo"
 
-        ' 最新バージョンを非同期で確認
-        CheckLatestVersionAsync(currentVersion)
+        ' MSIX (Microsoft Store) 配布版では Store が更新を担当するため、
+        ' 最新バージョン確認 UI を非表示にする
+        If PackageContext.IsPackaged Then
+            lblLatestCaption.Visible = False
+            lblLatestVersion.Visible = False
+            btnUpdate.Visible = False
+            prgDownload.Visible = False
+            lnkReleasePage.Visible = False
+        Else
+            ' 最新バージョンを非同期で確認
+            CheckLatestVersionAsync(currentVersion)
+        End If
     End Sub
 
     ''' <summary>
@@ -242,12 +253,21 @@ Partial Public Class AboutDialog
         End Try
     End Sub
 
+    Private Sub lnkSponsor_LinkClicked(sender As Object, e As EventArgs) Handles lnkSponsor.LinkClicked
+        Try
+            Process.Start(New ProcessStartInfo(SponsorPageUrl) With {.UseShellExecute = True})
+        Catch
+            ' ブラウザ起動失敗は無視
+        End Try
+    End Sub
+
 #Region "ローカライズ"
     Public Sub ApplyLocalization() Implements ILocalizable.ApplyLocalization
         Me.Text = Loc.S("About_FormTitle")
         lblLatestCaption.Text = Loc.S("About_LatestVersionLabel")
         lblLatestVersion.Text = Loc.S("About_Checking")
         btnUpdate.Text = Loc.S("Button_Update")
+        lnkSponsor.Text = "❤ " & Loc.S("About_SponsorOnGitHub")
         btnClose.Text = Loc.S("Button_Close")
     End Sub
 #End Region

@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.1.0] - 2026-05-01
+
+### 新機能
+- **Microsoft Store 配布対応**: MSIX パッケージング対応により Microsoft Store からのインストール・自動更新が可能になりました
+  - 配布チャネル: Microsoft Store / Inno Setup インストーラー / Portable ZIP / winget / Chocolatey の **5 チャネル並列配布**
+  - x64 / ARM64 両アーキテクチャを `.msixbundle` で 1 パッケージ提供
+  - MSIX 環境での実行時はアプリ内アップデートチェックを自動的に無効化（Store が更新を担当）
+  - `.dmp` ファイル関連付けは Store 版でも対応
+  - ライセンス保存先 (`%APPDATA%\OpenDUMPViewer`) は他配布チャネルと共有のため、ライセンスはチャネルをまたいで有効
+- **GitHub Sponsors リンク**: バージョン情報ダイアログに GitHub Sponsors への寄付リンクを追加（10 言語対応）
+
+### 開発・CI
+- GitHub Actions に MSIX ビルド / バンドル / Microsoft Store 自動提出ジョブを追加
+- `workflow_dispatch` トリガーを追加（任意ブランチからの手動実行に対応）
+- MSIX 用 Visual Assets を `app.ico` から自動生成するスクリプトを追加（`installer/msix/scripts/generate-assets.ps1`）
+- MSIX マニフェストテンプレート + ビルドスクリプトを追加（`installer/msix/`）
+
 ## [4.0.0] - 2026-04-16
 
 ### 破壊的変更 — 商標準拠のためのリネーム

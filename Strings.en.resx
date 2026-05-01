@@ -298,6 +298,7 @@ Ensure Open_DumpParser.dll is in the same folder as the executable.</value></dat
   <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (A new version is available)</value></data>
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Using latest version)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Open release page</value></data>
+  <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Sponsor on GitHub</value></data>
   <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>Download and run the latest version installer.
 The application will exit automatically.
 

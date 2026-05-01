@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Open DUMP Viewer for Oracle database — MSIX manifest template
+  ===============================================================
+  CI 時に以下のプレースホルダーが置換されます:
+    {{IDENTITY_NAME}}            : Package Identity Name (例: YANAITaketo.OpenDUMPViewer)
+    {{IDENTITY_PUBLISHER}}       : Publisher CN (例: CN=22377CE5-...)
+    {{IDENTITY_VERSION}}         : 4.0.0.0 形式 (vbproj の Version + ".0")
+    {{PUBLISHER_DISPLAY_NAME}}   : 表示用発行者名 (例: YANAITaketo)
+    {{PROCESSOR_ARCHITECTURE}}   : x64 / arm64
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap2 uap3 uap10 rescap desktop">
+
+  <Identity
+    Name="{{IDENTITY_NAME}}"
+    Publisher="{{IDENTITY_PUBLISHER}}"
+    Version="{{IDENTITY_VERSION}}"
+    ProcessorArchitecture="{{PROCESSOR_ARCHITECTURE}}" />
+
+  <Properties>
+    <DisplayName>Open DUMP Viewer for Oracle database</DisplayName>
+    <PublisherDisplayName>{{PUBLISHER_DISPLAY_NAME}}</PublisherDisplayName>
+    <Logo>Images\StoreLogo.png</Logo>
+    <Description>Oracle EXP/EXPDP DUMP file viewer. Browse and export schema, table data, indexes, and more from Oracle database export dump files.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="ja-JP" />
+    <Resource Language="en-US" />
+    <Resource Language="zh-Hans" />
+    <Resource Language="ko-KR" />
+    <Resource Language="de-DE" />
+    <Resource Language="fr-FR" />
+    <Resource Language="es-ES" />
+    <Resource Language="it-IT" />
+    <Resource Language="ru-RU" />
+    <Resource Language="pt-BR" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="OpenDumpViewer"
+      Executable="Open DUMP Viewer.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="Open DUMP Viewer for Oracle database"
+        Description="Oracle EXP/EXPDP DUMP file viewer"
+        BackgroundColor="transparent"
+        Square150x150Logo="Images\Square150x150Logo.png"
+        Square44x44Logo="Images\Square44x44Logo.png">
+        <uap:DefaultTile
+          ShortName="Open DUMP Viewer"
+          Wide310x150Logo="Images\Wide310x150Logo.png"
+          Square71x71Logo="Images\Square71x71Logo.png"
+          Square310x310Logo="Images\Square310x310Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+            <uap:ShowOn Tile="wide310x150Logo" />
+            <uap:ShowOn Tile="square310x310Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+        <uap:SplashScreen Image="Images\SplashScreen.png" BackgroundColor="#780000" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <!-- .dmp ファイル関連付け -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="dmp">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.dmp</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>Oracle DUMP File</uap:DisplayName>
+            <uap:Logo>Images\Square44x44Logo.png</uap:Logo>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- ネイティブ DLL ロード・任意ファイル読み書きのため runFullTrust が必須 -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>

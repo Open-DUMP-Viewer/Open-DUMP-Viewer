@@ -298,6 +298,7 @@ https://www.odv.dev/
   <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (有新版本可用)</value></data>
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (已是最新版本)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>打开发布页面</value></data>
+  <data name="About_SponsorOnGitHub" xml:space="preserve"><value>在 GitHub 上赞助</value></data>
   <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>将下载并运行最新版本的安装程序。
 应用程序将自动退出。
 

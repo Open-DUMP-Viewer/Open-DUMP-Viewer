@@ -434,3 +434,6 @@ test_dumps/*.exp
 test_dumps/*.lib
 test_dumps/11g/
 test_dumps/23ai/
+
+# MSIX generated assets (CI generates these from app.ico)
+/installer/msix/Images/

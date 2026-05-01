@@ -298,6 +298,7 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (新しいバージョンがあります)</value></data>
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (最新版を利用中)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>リリースページを開く</value></data>
+  <data name="About_SponsorOnGitHub" xml:space="preserve"><value>GitHub Sponsors で開発を支援する</value></data>
   <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>最新バージョンのインストーラーをダウンロードして実行します。
 アプリケーションは自動的に終了します。
 

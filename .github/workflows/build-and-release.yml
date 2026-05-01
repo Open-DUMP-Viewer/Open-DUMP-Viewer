@@ -1,12 +1,22 @@
 name: Build and Release
 
 # ───────────────────────────────────────────
-# トリガー: release ブランチへの push 時に実行
+# トリガー:
+#   - release ブランチへの push 時に通常実行
+#   - workflow_dispatch で任意ブランチから手動実行 (テスト用)
+#     ※ 手動実行時も Store 提出ジョブは vars.STORE_PRODUCT_ID が
+#        セットされていれば動くため、テスト時は注意
 # ───────────────────────────────────────────
 on:
   push:
     branches:
       - release
+  workflow_dispatch:
+    inputs:
+      skip_store_submit:
+        description: 'Skip Microsoft Store submission (testing only)'
+        type: boolean
+        default: true
 
 jobs:
   # ═══════════════════════════════════════════
@@ -194,7 +204,36 @@ jobs:
             installer\setup.iss
 
       # ─────────────────────────────────────
-      # 13. ビルドアーティファクトをアップロード
+      # 14. MSIX 用 Visual Assets を生成
+      #     vars.MSIX_IDENTITY_NAME が未設定の場合はスキップ
+      # ─────────────────────────────────────
+      - name: Generate MSIX visual assets
+        if: vars.MSIX_IDENTITY_NAME != ''
+        shell: pwsh
+        run: |
+          pwsh -File installer/msix/scripts/generate-assets.ps1 `
+            -IconPath "$env:GITHUB_WORKSPACE\app.ico" `
+            -OutputDir "$env:GITHUB_WORKSPACE\installer\msix\Images"
+
+      # ─────────────────────────────────────
+      # 15. MSIX パッケージをビルド (アーキテクチャ別)
+      # ─────────────────────────────────────
+      - name: Build MSIX (${{ matrix.arch }})
+        if: vars.MSIX_IDENTITY_NAME != ''
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          pwsh -File installer/msix/scripts/build-msix.ps1 `
+            -PublishDir "$env:GITHUB_WORKSPACE\publish\installer-src" `
+            -OutputMsix "$env:GITHUB_WORKSPACE\publish\OpenDumpViewer_v${version}_${{ matrix.arch }}.msix" `
+            -Version $version `
+            -Architecture ${{ matrix.arch }} `
+            -IdentityName "${{ vars.MSIX_IDENTITY_NAME }}" `
+            -IdentityPublisher "${{ vars.MSIX_IDENTITY_PUBLISHER }}" `
+            -PublisherDisplayName "${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}"
+
+      # ─────────────────────────────────────
+      # 16. ビルドアーティファクトをアップロード
       # ─────────────────────────────────────
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -203,6 +242,7 @@ jobs:
           path: |
             ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}_portable_${{ matrix.arch }}.zip
             ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}_installer_${{ matrix.arch }}.exe
+            ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}_${{ matrix.arch }}.msix
 
       - name: Save version info
         shell: pwsh
@@ -215,6 +255,60 @@ jobs:
         with:
           name: version-info-${{ matrix.arch }}
           path: ./publish/version.txt
+
+  # ═══════════════════════════════════════════
+  # MSIX バンドルジョブ (x64 + arm64 を .msixbundle に統合)
+  # vars.MSIX_IDENTITY_NAME 未設定時はスキップ
+  # ═══════════════════════════════════════════
+  bundle-msix:
+    name: Bundle MSIX
+    needs: build
+    runs-on: windows-latest
+    if: vars.MSIX_IDENTITY_NAME != ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download x64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-x64
+          path: ./artifacts/x64
+
+      - name: Download arm64 artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: build-arm64
+          path: ./artifacts/arm64
+
+      - name: Read version
+        id: get_version
+        shell: pwsh
+        run: |
+          [xml]$xml = Get-Content "Open DUMP Viewer.vbproj"
+          $version = ($xml.Project.PropertyGroup | Where-Object { $_.Version }).Version
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Bundle MSIX
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          $bundleInput = "$env:GITHUB_WORKSPACE\bundle-input"
+          New-Item -ItemType Directory -Path $bundleInput -Force | Out-Null
+          Copy-Item "./artifacts/x64/*.msix" $bundleInput
+          Copy-Item "./artifacts/arm64/*.msix" $bundleInput
+          New-Item -ItemType Directory -Path "./publish" -Force | Out-Null
+          pwsh -File installer/msix/scripts/bundle-msix.ps1 `
+            -InputDir $bundleInput `
+            -OutputBundle "./publish/OpenDumpViewer_v${version}.msixbundle" `
+            -Version $version
+
+      - name: Upload .msixbundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: msixbundle
+          path: ./publish/OpenDumpViewer_v${{ steps.get_version.outputs.VERSION }}.msixbundle
 
   # ═══════════════════════════════════════════
   # リリースジョブ (ビルド完了後に統合)
@@ -248,6 +342,13 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: build-arm64
+          path: ./artifacts
+
+      - name: Download .msixbundle (if MSIX configured)
+        if: vars.MSIX_IDENTITY_NAME != ''
+        uses: actions/download-artifact@v7
+        with:
+          name: msixbundle
           path: ./artifacts
 
       - name: Download version info
@@ -319,13 +420,19 @@ jobs:
           $notesFile = New-TemporaryFile
           $notes | Set-Content -Path $notesFile -Encoding utf8
 
+          $assets = @(
+            "./artifacts/OpenDumpViewer_v${version}_portable_x64.zip",
+            "./artifacts/OpenDumpViewer_v${version}_installer_x64.exe",
+            "./artifacts/OpenDumpViewer_v${version}_portable_arm64.zip",
+            "./artifacts/OpenDumpViewer_v${version}_installer_arm64.exe"
+          )
+          $bundle = "./artifacts/OpenDumpViewer_v${version}.msixbundle"
+          if (Test-Path $bundle) { $assets += $bundle }
+
           gh release create $tag `
             --title "Release $tag" `
             --notes-file $notesFile `
-            "./artifacts/OpenDumpViewer_v${version}_portable_x64.zip" `
-            "./artifacts/OpenDumpViewer_v${version}_installer_x64.exe" `
-            "./artifacts/OpenDumpViewer_v${version}_portable_arm64.zip" `
-            "./artifacts/OpenDumpViewer_v${version}_installer_arm64.exe"
+            @assets
 
           Remove-Item $notesFile
 
@@ -454,3 +561,47 @@ jobs:
           } else {
             Write-Warning "CHOCOLATEY_API_KEY not set — skipping push"
           }
+
+  # ═══════════════════════════════════════════
+  # Microsoft Store 提出ジョブ
+  # vars.STORE_PRODUCT_ID 未設定時はスキップ
+  # ═══════════════════════════════════════════
+  submit-store:
+    name: Submit to Microsoft Store
+    needs: [bundle-msix, release]
+    runs-on: windows-latest
+    if: vars.STORE_PRODUCT_ID != ''
+
+    steps:
+      - name: Download .msixbundle
+        uses: actions/download-artifact@v7
+        with:
+          name: msixbundle
+          path: ./submit
+
+      - name: Setup Microsoft Store CLI
+        uses: microsoft/setup-msstore-cli@v1
+        # Note: action was renamed to microsoft/microsoft-store-apppublisher@v1.1 in 2025-09;
+        # both names redirect to the same package. Pin v1 here for stability.
+
+      - name: Configure msstore CLI
+        shell: pwsh
+        env:
+          MSSTORE_TENANT_ID:     ${{ secrets.AZURE_AD_TENANT_ID }}
+          MSSTORE_CLIENT_ID:     ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          MSSTORE_SELLER_ID:     ${{ secrets.STORE_SELLER_ID }}
+        run: |
+          msstore reconfigure `
+            --tenantId   $env:MSSTORE_TENANT_ID `
+            --sellerId   $env:MSSTORE_SELLER_ID `
+            --clientId   $env:MSSTORE_CLIENT_ID `
+            --clientSecret $env:MSSTORE_CLIENT_SECRET
+
+      - name: Publish to Microsoft Store
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem ./submit/*.msixbundle | Select-Object -First 1
+          if (-not $bundle) { throw "No .msixbundle found to submit" }
+          Write-Host "Submitting: $($bundle.Name)"
+          msstore publish $bundle.FullName -id ${{ vars.STORE_PRODUCT_ID }}

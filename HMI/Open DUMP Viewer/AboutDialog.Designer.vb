@@ -28,6 +28,7 @@ Partial Class AboutDialog
         btnUpdate = New Button()
         prgDownload = New ProgressBar()
         lnkReleasePage = New LinkLabel()
+        lnkSponsor = New LinkLabel()
         btnClose = New Button()
         tblMain.SuspendLayout()
         SuspendLayout()
@@ -45,19 +46,21 @@ Partial Class AboutDialog
         tblMain.Controls.Add(btnUpdate, 0, 4)
         tblMain.Controls.Add(prgDownload, 0, 5)
         tblMain.Controls.Add(lnkReleasePage, 0, 6)
+        tblMain.Controls.Add(lnkSponsor, 0, 7)
         tblMain.Dock = DockStyle.Fill
         tblMain.Location = New Point(0, 0)
         tblMain.Name = "tblMain"
         tblMain.Padding = New Padding(16)
-        tblMain.RowCount = 7
+        tblMain.RowCount = 8
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 36F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 30F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 30F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 30F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 40F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 28F))
+        tblMain.RowStyles.Add(New RowStyle(SizeType.Absolute, 28F))
         tblMain.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        tblMain.Size = New Size(450, 265)
+        tblMain.Size = New Size(450, 295)
         tblMain.TabIndex = 0
         '
         ' lblProductName
@@ -141,18 +144,30 @@ Partial Class AboutDialog
         '
         tblMain.SetColumnSpan(lnkReleasePage, 2)
         lnkReleasePage.Dock = DockStyle.Fill
-        lnkReleasePage.Location = New Point(19, 142)
+        lnkReleasePage.Location = New Point(19, 213)
         lnkReleasePage.Name = "lnkReleasePage"
-        lnkReleasePage.Size = New Size(412, 57)
+        lnkReleasePage.Size = New Size(412, 28)
         lnkReleasePage.TabIndex = 5
-        lnkReleasePage.TextAlign = ContentAlignment.TopCenter
+        lnkReleasePage.TextAlign = ContentAlignment.MiddleCenter
         lnkReleasePage.Visible = False
+        '
+        ' lnkSponsor
+        '
+        tblMain.SetColumnSpan(lnkSponsor, 2)
+        lnkSponsor.Dock = DockStyle.Fill
+        lnkSponsor.LinkColor = Color.FromArgb(219, 97, 161)
+        lnkSponsor.ActiveLinkColor = Color.FromArgb(176, 64, 122)
+        lnkSponsor.Location = New Point(19, 241)
+        lnkSponsor.Name = "lnkSponsor"
+        lnkSponsor.Size = New Size(412, 28)
+        lnkSponsor.TabIndex = 8
+        lnkSponsor.TextAlign = ContentAlignment.MiddleCenter
         '
         ' btnClose
         '
         btnClose.DialogResult = DialogResult.OK
         btnClose.Dock = DockStyle.Bottom
-        btnClose.Location = New Point(0, 265)
+        btnClose.Location = New Point(0, 295)
         btnClose.Name = "btnClose"
         btnClose.Size = New Size(450, 35)
         btnClose.TabIndex = 1
@@ -163,7 +178,7 @@ Partial Class AboutDialog
         AcceptButton = btnClose
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(450, 300)
+        ClientSize = New Size(450, 330)
         Controls.Add(tblMain)
         Controls.Add(btnClose)
         FormBorderStyle = FormBorderStyle.FixedDialog
@@ -185,6 +200,7 @@ Partial Class AboutDialog
     Friend WithEvents btnUpdate As Button
     Friend WithEvents prgDownload As ProgressBar
     Friend WithEvents lnkReleasePage As LinkLabel
+    Friend WithEvents lnkSponsor As LinkLabel
     Friend WithEvents btnClose As Button
 
 End Class

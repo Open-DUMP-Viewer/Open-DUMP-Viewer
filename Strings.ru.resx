@@ -298,6 +298,7 @@ https://www.odv.dev/
   <data name="About_NewVersionAvailable" xml:space="preserve"><value>v{0} (Доступна новая версия)</value></data>
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Используется последняя версия)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Открыть страницу релиза</value></data>
+  <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Поддержать на GitHub</value></data>
   <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>Скачать и запустить установщик последней версии.
 Приложение будет автоматически закрыто.
 

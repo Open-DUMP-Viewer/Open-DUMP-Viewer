@@ -25,7 +25,10 @@ Public Class Open_DUMP_Viewer
         If Not COMMON.IsTrial Then HeartbeatLogic.SendIfNeeded()
 
         ' アップデートチェック（バックグラウンド、通知のみ）
-        UpdateChecker.CheckOnStartupAsync()
+        ' MSIX (Microsoft Store) 配布版では Store が更新を担当するためスキップ
+        If Not PackageContext.IsPackaged Then
+            UpdateChecker.CheckOnStartupAsync()
+        End If
 
         COMMON.ReSet_StatusLavel()
 
