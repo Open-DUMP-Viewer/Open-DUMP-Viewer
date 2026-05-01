@@ -637,18 +637,34 @@ jobs:
         # Note: action was renamed to microsoft/microsoft-store-apppublisher@v1.1 in 2025-09;
         # both names redirect to the same package. Pin v1 here for stability.
 
+      - name: Verify secret lengths (debug)
+        shell: pwsh
+        env:
+          T: ${{ secrets.AZURE_AD_TENANT_ID }}
+          C: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          S: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER: ${{ secrets.STORE_SELLER_ID }}
+        run: |
+          Write-Host "Tenant length: $($env:T.Length) (expect 36)"
+          Write-Host "Tenant trimmed: $($env:T.Trim().Length)"
+          Write-Host "Client length: $($env:C.Length) (expect 36)"
+          Write-Host "Client trimmed: $($env:C.Trim().Length)"
+          Write-Host "Secret length: $($env:S.Length) (expect 40)"
+          Write-Host "Seller length: $($env:SELLER.Length) (expect 8)"
+
       - name: Configure msstore CLI
         shell: pwsh
-        # Secrets are substituted at YAML parse time (direct expression syntax),
-        # rather than via $env:VAR indirection inside the run block. The env-var
-        # approach was failing with "Cannot parse argument" because the values
-        # were not expanding correctly inside PowerShell.
+        env:
+          T: ${{ secrets.AZURE_AD_TENANT_ID }}
+          C: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
+          S: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
+          SELLER: ${{ secrets.STORE_SELLER_ID }}
         run: |
-          msstore reconfigure `
-            --tenantId     "${{ secrets.AZURE_AD_TENANT_ID }}" `
-            --sellerId     "${{ secrets.STORE_SELLER_ID }}" `
-            --clientId     "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" `
-            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+          $tenant = $env:T.Trim()
+          $client = $env:C.Trim()
+          $secret = $env:S.Trim()
+          $seller = $env:SELLER.Trim()
+          msstore reconfigure --tenantId $tenant --sellerId $seller --clientId $client --clientSecret $secret
 
       - name: Publish to Microsoft Store
         shell: pwsh
