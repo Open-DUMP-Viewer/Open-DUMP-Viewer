@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/runtime-.NET%2010.0-purple?style=flat-square" alt=".NET 10">
   <img src="https://img.shields.io/badge/languages-10-orange?style=flat-square" alt="10 Languages">
   <a href="https://www.odv.dev/"><img src="https://img.shields.io/badge/license-free%20for%20personal%20use-brightgreen?style=flat-square" alt="License"></a>
+  <a href="https://github.com/sponsors/Open-DUMP-Viewer"><img src="https://img.shields.io/badge/sponsor-%E2%9D%A4-ff69b4?style=flat-square&logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
 <p align="center">
@@ -259,6 +260,16 @@ cp output/*.dmp ../Open-DUMP-Viewer/test_dumps/11g/
 cd ../Open-DUMP-Viewer/test_dumps
 ./test_parser.exe .               # テスト実行
 ```
+
+---
+
+## Sponsor / スポンサー
+
+開発を支援していただける方は GitHub Sponsors よりご支援いただけます。いただいた支援は機能開発・テスト環境（各 Oracle バージョン）・配布署名証明書などの維持費に充てさせていただきます。
+
+If you'd like to support development, you can sponsor via GitHub Sponsors. Contributions go toward feature development, test environments (multiple Oracle versions), and code-signing certificates.
+
+**[❤️ Sponsor on GitHub](https://github.com/sponsors/Open-DUMP-Viewer)**
 
 ---
 
