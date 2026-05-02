@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.1.1] - 2026-05-02
+
+### 開発・CI
+- Microsoft Store 提出向けに MSIX Package Identity を新ストア用アプリ (`YANAITaketo.ODVforOracleDB`) に切替。これに伴いストア版とそれ以外 (GitHub Release / Winget / Chocolatey) の MSIX が OS 上別アプリ扱いとなるため、両方をインストールしている場合は更新は別系統となる
+- DisplayName / PublisherDisplayName / Capabilities など他のメタデータは v4.1.0 から変更なし
+
 ## [4.1.0] - 2026-05-01
 
 ### 新機能

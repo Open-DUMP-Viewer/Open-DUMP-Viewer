@@ -3,10 +3,10 @@
   Open DUMP Viewer for Oracle database — MSIX manifest template
   ===============================================================
   CI 時に以下のプレースホルダーが置換されます:
-    {{IDENTITY_NAME}}            : Package Identity Name (例: YANAITaketo.OpenDUMPViewer)
-    {{IDENTITY_PUBLISHER}}       : Publisher CN (例: CN=22377CE5-...)
+    {{IDENTITY_NAME}}            : Package Identity Name (例: YANAITaketo.ODVforOracleDB)
+    {{IDENTITY_PUBLISHER}}       : Publisher CN (例: CN=19D88AEC-...)
     {{IDENTITY_VERSION}}         : 4.0.0.0 形式 (vbproj の Version + ".0")
-    {{PUBLISHER_DISPLAY_NAME}}   : 表示用発行者名 (例: YANAITaketo)
+    {{PUBLISHER_DISPLAY_NAME}}   : 表示用発行者名 (例: YANAI Taketo)
     {{PROCESSOR_ARCHITECTURE}}   : x64 / arm64
 -->
 <Package

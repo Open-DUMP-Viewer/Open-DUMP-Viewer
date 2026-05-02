@@ -616,14 +616,25 @@ jobs:
   # ═══════════════════════════════════════════
   # Microsoft Store 公開ジョブ (並列)
   # vars.STORE_PRODUCT_ID 未設定時はスキップ
-  # 初回登録時は手動で Partner Center にて Store listing 設定後、本ジョブが自動で
-  # パッケージを更新提出する
+  #
+  # ★ 初回提出は msstore CLI では実施できません ★
+  #   初回のみ Partner Center で手動で:
+  #     - Store listing (説明・スクリーンショット・年齢レーティング等)
+  #     - 価格・市場の設定
+  #     - 最初の .msixbundle のアップロード
+  #   を行い、Microsoft の認定を通す必要があります。
+  #   2 回目以降のリリースから本ジョブが自動でパッケージを更新提出します。
+  #
+  # 初回提出未完了の状態では本ジョブは失敗しますが、continue-on-error により
+  # 他の配布チャネル (GitHub Release / Winget / Chocolatey) には影響しません。
   # ═══════════════════════════════════════════
   publish-store:
     name: Release / Microsoft Store
     needs: [release, bundle-msix]
     runs-on: windows-latest
     if: ${{ vars.STORE_PRODUCT_ID != '' && needs.bundle-msix.result == 'success' }}
+    # 初回提出未完了の場合の失敗で workflow 全体を失敗にしない
+    continue-on-error: true
 
     steps:
       - name: Download .msixbundle
@@ -636,21 +647,6 @@ jobs:
         uses: microsoft/setup-msstore-cli@v1
         # Note: action was renamed to microsoft/microsoft-store-apppublisher@v1.1 in 2025-09;
         # both names redirect to the same package. Pin v1 here for stability.
-
-      - name: Verify secret lengths (debug)
-        shell: pwsh
-        env:
-          T: ${{ secrets.AZURE_AD_TENANT_ID }}
-          C: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
-          S: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
-          SELLER: ${{ secrets.STORE_SELLER_ID }}
-        run: |
-          Write-Host "Tenant length: $($env:T.Length) (expect 36)"
-          Write-Host "Tenant trimmed: $($env:T.Trim().Length)"
-          Write-Host "Client length: $($env:C.Length) (expect 36)"
-          Write-Host "Client trimmed: $($env:C.Trim().Length)"
-          Write-Host "Secret length: $($env:S.Length) (expect 40)"
-          Write-Host "Seller length: $($env:SELLER.Length) (expect 8)"
 
       - name: Configure msstore CLI
         shell: pwsh
@@ -672,4 +668,27 @@ jobs:
           $bundle = Get-ChildItem ./submit/*.msixbundle | Select-Object -First 1
           if (-not $bundle) { throw "No .msixbundle found to submit" }
           Write-Host "Submitting: $($bundle.Name)"
-          msstore publish $bundle.FullName -id ${{ vars.STORE_PRODUCT_ID }}
+
+          # msstore publish の出力を捕捉して、初回提出エラー時は分かりやすいガイドを表示
+          $output = msstore publish $bundle.FullName -id ${{ vars.STORE_PRODUCT_ID }} 2>&1 | Out-String
+          Write-Host $output
+
+          if ($LASTEXITCODE -ne 0) {
+            if ($output -match "first submission") {
+              Write-Host ""
+              Write-Host "════════════════════════════════════════════════════════════════════"
+              Write-Host "  ⚠ Microsoft Store: First submission requires manual setup"
+              Write-Host ""
+              Write-Host "  msstore CLI does not support FIRST submissions for an app."
+              Write-Host "  Please complete the initial submission manually in Partner Center:"
+              Write-Host "    https://partner.microsoft.com/dashboard/products/${{ vars.STORE_PRODUCT_ID }}"
+              Write-Host ""
+              Write-Host "  Required: Store listing, age rating, pricing/markets,"
+              Write-Host "            and the first .msixbundle upload."
+              Write-Host ""
+              Write-Host "  After first submission is approved, subsequent automated"
+              Write-Host "  releases will work via this CI job."
+              Write-Host "════════════════════════════════════════════════════════════════════"
+            }
+            exit $LASTEXITCODE
+          }

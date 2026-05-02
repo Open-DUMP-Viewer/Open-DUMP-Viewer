@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Open DUMP Viewer の MSIX パッケージをビルドする。
+    Open DUMP Viewer for Oracle database の MSIX パッケージをビルドする。
 
 .DESCRIPTION
     `dotnet publish` で生成された self-contained 出力に Package.appxmanifest と
@@ -21,13 +21,13 @@
     x64 / arm64
 
 .PARAMETER IdentityName
-    Package/Identity/Name (例: YANAITaketo.OpenDUMPViewer)
+    Package/Identity/Name (例: YANAITaketo.ODVforOracleDB)
 
 .PARAMETER IdentityPublisher
-    Package/Identity/Publisher (例: CN=22377CE5-...)
+    Package/Identity/Publisher (例: CN=19D88AEC-...)
 
 .PARAMETER PublisherDisplayName
-    Package/Properties/PublisherDisplayName (例: YANAITaketo)
+    Package/Properties/PublisherDisplayName (例: YANAI Taketo)
 
 .PARAMETER ManifestTemplate
     appxmanifest テンプレートのパス
