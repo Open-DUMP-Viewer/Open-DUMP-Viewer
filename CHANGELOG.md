@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.1.2] - 2026-05-18
+
+### バグ修正
+- **中国語(簡体字)dumpの文字化けを修正** ([#30](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/30))
+  - レガシーEXP形式のヘッダ文字セットバイト判定に GBK レンジ (`0x50-0x5f`) が無く、`ZHS16GBK` / `ZHS16CGB231280` / `ZHS32GB18030` の dump が ASCII 扱いにフォールバックして Latin-1 として表示される問題を修正
+  - 修正後は Windows CP936 (GBK) として正しく UTF-8 に変換されます
+  - 影響箇所: `odv_exp.c::byte_to_charset()`, `odv_detect.c::detect_dump_kind()` の EXP 初期判定
+  - EXPDP 形式は元から `ZHS16GBK` の文字列判定で対応済みのため影響なし
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.1.0 → 4.1.2 に同期（v4.1.1 で更新漏れがあったため）
+
 ## [4.1.1] - 2026-05-02
 
 ### 開発・CI

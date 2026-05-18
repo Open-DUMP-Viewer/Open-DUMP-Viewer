@@ -121,13 +121,15 @@ int detect_dump_kind(ODV_SESSION *s)
         if (pos_exp >= 0) {
             s->dump_type = DUMP_EXP;
 
-            /* Detect charset from header byte */
+            /* Detect charset from header byte (low 8 bits of NLS charset ID) */
             if (n > 0x10) {
                 unsigned char cs_byte = header[0x05];
                 if (cs_byte >= 0x30 && cs_byte <= 0x3f)
                     s->dump_charset = CHARSET_EUC;
                 else if (cs_byte >= 0x40 && cs_byte <= 0x4f)
                     s->dump_charset = CHARSET_SJIS;
+                else if (cs_byte >= 0x50 && cs_byte <= 0x5f)
+                    s->dump_charset = CHARSET_GBK;     /* ZHS16GBK / CGB231280 / GB18030 */
                 else if (cs_byte >= 0x60 && cs_byte <= 0x6f)
                     s->dump_charset = CHARSET_UTF8;
                 else if (cs_byte >= 0xd0 && cs_byte <= 0xdf)

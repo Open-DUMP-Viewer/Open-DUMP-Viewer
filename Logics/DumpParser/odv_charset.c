@@ -4,7 +4,8 @@
     odv_charset.c
     Character set conversion using Win32 MultiByteToWideChar / WideCharToMultiByte
 
-    Supports: UTF-8, Shift_JIS (CP932), EUC-JP (CP20932), UTF-16LE, US-ASCII
+    Supports: UTF-8, Shift_JIS (CP932), EUC-JP (CP20932), GBK (CP936),
+              ISO-8859-1, Windows-1252, ISO-8859-15, UTF-16LE/BE, US-ASCII
 
     Copyright (C) 2026 YANAI Taketo
  *****************************************************************************/

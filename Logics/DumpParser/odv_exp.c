@@ -83,17 +83,20 @@ static const char *extract_identifier(const char *p, char *out, int max_len)
     byte_to_charset
 
     Maps a charset indicator byte from the EXP header to an internal constant.
+    The byte is the low 8 bits of the Oracle NLS_CHARACTERSET ID.
     Byte ranges:
-      0x30-0x3f -> JA16EUC
-      0x40-0x4f -> JA16SJIS
-      0x60-0x6f -> UTF8
-      0xd0-0xdf -> UTF16
+      0x30-0x3f -> JA16EUC                 (e.g. JA16EUC=830=0x33E)
+      0x40-0x4f -> JA16SJIS                (e.g. JA16SJIS=832=0x340)
+      0x50-0x5f -> ZHS16GBK (Simplified Chinese, includes CGB231280/GB18030)
+      0x60-0x6f -> UTF8                    (e.g. AL32UTF8=873=0x369)
+      0xd0-0xdf -> UTF16                   (e.g. AL16UTF16=2000=0x7D0)
       other     -> US7ASCII
  ---------------------------------------------------------------------------*/
 static int byte_to_charset(unsigned char b)
 {
     if (b >= 0x30 && b <= 0x3f) return CHARSET_EUC;
     if (b >= 0x40 && b <= 0x4f) return CHARSET_SJIS;
+    if (b >= 0x50 && b <= 0x5f) return CHARSET_GBK;
     if (b >= 0x60 && b <= 0x6f) return CHARSET_UTF8;
     if (b >= 0xd0 && b <= 0xdf) return CHARSET_UTF16LE;
     return CHARSET_US7;
