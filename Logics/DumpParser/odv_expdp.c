@@ -1631,8 +1631,12 @@ expdp_done:
         {
             static const char path_marker[] = "SCHEMA_EXPORT/TABLE/TABLE_DATA";
             static const int path_len = 30;
-            /* Track per-table occurrence in master table */
-            char scan_keys[ODV_MAX_TABLES][ODV_OBJNAME_LEN * 2 + 2];
+            /* Track per-table occurrence in master table.
+             * Each entry holds a "schema.table" key (built below into a 260-byte
+             * buffer after charset conversion, which can expand names), so the
+             * element size must match that buffer to avoid an overflow when the
+             * key is copied in via odv_strcpy. */
+            char scan_keys[ODV_MAX_TABLES][260];
             int scan_count = 0;
 
             /* Use the already-parsed file — re-open for scanning */

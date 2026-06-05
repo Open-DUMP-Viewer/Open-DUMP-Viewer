@@ -15,6 +15,7 @@ Public Class Open_NativeParser
     Public Const ODV_OK As Integer = 0
     Public Const ODV_ERROR As Integer = -1
     Public Const ODV_ERROR_CANCELLED As Integer = -200
+    Public Const ODV_ERROR_UNSUPPORTED As Integer = -300
 
     ' Dump types
     Public Const DUMP_UNKNOWN As Integer = -1
@@ -534,7 +535,15 @@ Public Class Open_NativeParser
             odv_set_table_callback(session, tableCb, userData)
             odv_set_progress_callback(session, progCb, userData)
 
-            odv_list_tables(session)
+            Dim listRc = odv_list_tables(session)
+            ' 解析不能なダンプ (例: COMPRESSION=ALL でデータ部が圧縮されている)
+            ' の場合は DLL のエラーメッセージを呼び出し元に伝播させる。
+            ' (これまでは戻り値を無視していたため、空のテーブル一覧が返り
+            '  「データベースのスキーマが見つかりません」と表示されていた — issue #31)
+            If listRc <> ODV_OK AndAlso listRc <> ODV_ERROR_CANCELLED Then
+                Dim errMsg = PtrToStringUTF8(odv_get_last_error(session))
+                Throw New Exception(Loc.SF("Parser_DumpParseError", errMsg))
+            End If
 
             ' list_tables 完了後、テーブルエントリからパーティション情報を取得
             ' （コールバック時点では初回 PARTITION_TABLE が TABLE として通知されるため）

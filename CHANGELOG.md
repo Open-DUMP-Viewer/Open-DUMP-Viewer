@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.3] - 2026-06-05
+
+### バグ修正
+- **通常の EXPDP ダンプが「データベースのスキーマが見つかりません」となる問題を修正** ([#31](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/issues/31))
+  - expdp の `COMPRESSION` 既定値は `METADATA_ONLY` で、DDL (CREATE TABLE 文) は KGC ブロックに圧縮されますが、テーブル定義ストリーム (`<?xml ... STRMTABLE_T>`) と行データは非圧縮で残るため、本来は解析可能です
+  - しかし形式判定 (`detect_dump_kind`) が先頭 **1MB** までしか `<?xml` を探索しておらず、オブジェクト数の多い大きなスキーマエクスポートでは先頭の圧縮メタデータ領域が 1MB を超えて最初の可読 XML がその先に位置するため、`COMPRESSION=ALL` の完全圧縮ダンプと誤判定し「非対応」として弾いていました
+  - 修正後は EOF まで（最初の `<?xml` を見つけ次第早期終了）走査するようにし、既定圧縮 (`METADATA_ONLY`) のダンプを正しく `DUMP_EXPDP` として解析します。実際にデータ部が圧縮された `COMPRESSION=ALL` のダンプのみ非対応と判定します
+  - あわせて、解析不能なダンプ時に VB 側が `odv_list_tables` の戻り値を無視していたため一律「データベースのスキーマが見つかりません」と表示されていた点を修正し、DLL のエラーメッセージ（例: 圧縮非対応の案内）を表示するようにしました
+  - 1,000 を超えるテーブルを含むダンプで発生し得た `parse_expdp_dump` 内のバッファオーバーフロー（マスターテーブル走査の `scan_keys`）も修正
+  - 影響箇所: `odv_detect.c::detect_dump_kind()`, `odv_expdp.c::parse_expdp_dump()`, `OraDB_NativeParser.vb::ListTables()`
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.1.2 → 4.1.3 に同期
+
 ## [4.1.2] - 2026-05-18
 
 ### バグ修正

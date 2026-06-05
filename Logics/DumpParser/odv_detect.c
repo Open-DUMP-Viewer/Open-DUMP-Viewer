@@ -14,6 +14,7 @@
  ---------------------------------------------------------------------------*/
 #define CHECK_HEADER_LEN  1280   /* Bytes to read for initial check */
 #define EXPORT_SIGNATURE  "EXPORT:"
+#define DETECT_SCAN_BUF   1048576  /* 1MB scan buffer (multiple of block len) */
 
 /*---------------------------------------------------------------------------
     detect_dump_kind
@@ -92,9 +93,7 @@ int detect_dump_kind(ODV_SESSION *s)
 {
     FILE *fp;
     unsigned char header[ODV_DUMP_BLOCK_LEN];
-    unsigned char block[ODV_DUMP_BLOCK_LEN];
     int n, found_xml, found_kgc;
-    int64_t pos;
     char schema_buf[ODV_OBJNAME_LEN + 1];
     char charset_buf[64];
 
@@ -160,52 +159,69 @@ int detect_dump_kind(ODV_SESSION *s)
     }
 
     /*
-     * EXPDP format detection per block (fixed-offset checks).
-     *   Non-compressed: block offset 4 == "xml version"
-     *   Compressed:     block offset 0 == "KGC" AND offset 5 == "HDR"
+     * EXPDP format classification.
+     *
+     * NOTE: Oracle DataPump files always use KGC block framing regardless of
+     * the COMPRESSION setting.  KGC presence alone does NOT mean the row data
+     * is compressed.  The real differentiator is whether readable XML metadata
+     * (the STRMTABLE_T table-definition streams) exists anywhere in the file:
+     *   XML found  → DUMP_EXPDP            (parseable: NONE or METADATA_ONLY)
+     *   KGC, no XML → DUMP_EXPDP_COMPRESS  (row data compressed: COMPRESSION=ALL)
+     *
+     * IMPORTANT: expdp's DEFAULT is COMPRESSION=METADATA_ONLY.  That compresses
+     * the human-readable DDL (CREATE TABLE text) into KGC blocks but leaves the
+     * internal table-definition streams (<?xml ... STRMTABLE_T>) and the row
+     * data UNCOMPRESSED — such dumps are fully parseable.  In large schema
+     * exports the leading compressed-DDL region can be several MB, pushing the
+     * first readable <?xml far past the start of the file.  The probe therefore
+     * scans to EOF (with an early exit on the first <?xml) instead of giving up
+     * after a fixed window, so default-compression dumps are not misclassified
+     * as fully-compressed (COMPRESSION=ALL).  See issue #31.
      */
     found_xml = 0;
     found_kgc = 0;
 
-    /* Check first block.
-     * NOTE: Oracle DataPump files always use KGC block framing regardless of
-     * whether COMPRESSION=ALL is set.  KGC presence alone does NOT mean the
-     * data is compressed.  The real differentiator is whether readable XML
-     * metadata exists anywhere in the file.
-     *   XML found  → DUMP_EXPDP   (standard uncompressed DataPump)
-     *   KGC, no XML → DUMP_EXPDP_COMPRESS (Enterprise KGC-compressed) */
+    /* Check first block. */
     if (n >= 8 && memcmp(header, "KGC", 3) == 0
                && memcmp(header + 5, "HDR", 3) == 0)
         found_kgc = 1;
     if (find_bytes(header, n, "<?xml", 5) >= 0)
         found_xml = 1;
 
-    /* Scan subsequent blocks until XML is found (or 1 MB limit) */
+    /* Scan the remainder of the file until XML is found or EOF is reached.
+     * <?xml always begins at (block boundary + 2); because the scan buffer is a
+     * multiple of ODV_DUMP_BLOCK_LEN and reads are block-aligned, the marker can
+     * never straddle a buffer boundary, so a simple per-buffer search is safe. */
     if (!found_xml) {
-        pos = ODV_DUMP_BLOCK_LEN;
-        while (pos < s->dump_size && pos < 1048576) {
-            odv_fseek(fp, pos, SEEK_SET);
-            n = (int)fread(block, 1, ODV_DUMP_BLOCK_LEN, fp);
-            if (n < 8) break;
+        unsigned char *scan = (unsigned char *)malloc(DETECT_SCAN_BUF);
+        if (scan) {
+            odv_fseek(fp, ODV_DUMP_BLOCK_LEN, SEEK_SET);
+            for (;;) {
+                int m = (int)fread(scan, 1, DETECT_SCAN_BUF, fp);
+                if (m < 8) break;
 
-            if (!found_kgc && memcmp(block, "KGC", 3) == 0
-                           && memcmp(block + 5, "HDR", 3) == 0)
-                found_kgc = 1;
+                if (!found_kgc && memcmp(scan, "KGC", 3) == 0
+                              && memcmp(scan + 5, "HDR", 3) == 0)
+                    found_kgc = 1;
 
-            if (find_bytes(block, n, "<?xml", 5) >= 0) {
-                found_xml = 1;
-                break;
+                if (find_bytes(scan, m, "<?xml", 5) >= 0) {
+                    found_xml = 1;
+                    break;
+                }
+
+                if (m < DETECT_SCAN_BUF) break;   /* short read = EOF */
             }
-
-            pos += ODV_DUMP_BLOCK_LEN;
+            free(scan);
         }
     }
 
     fclose(fp);
 
-    /* XML takes priority: uncompressed DataPump has KGC framing AND readable XML.
+    /* XML takes priority: a parseable DataPump dump (COMPRESSION=NONE or the
+     * default METADATA_ONLY) has KGC framing AND readable XML metadata.
      * Only classify as EXPDP_COMPRESS when KGC framing is present but no XML
-     * can be found (indicating the data blocks are actually compressed). */
+     * can be found anywhere (indicating the row data itself is compressed,
+     * i.e. COMPRESSION=ALL). */
     if (found_xml) {
         s->dump_type = DUMP_EXPDP;
         s->dump_charset = get_charset_from_name(charset_buf);
