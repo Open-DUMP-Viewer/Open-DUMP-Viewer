@@ -1,0 +1,77 @@
+# CLA Assistant Lite（自己ホスト型。contributor-assistant/github-action）。
+#
+# 外部ホストサービス（cla-assistant.io）から移行した。移行理由:
+#   cla-assistant.io は署名対象の文書として **Gist しか指定できない** ため、リポジトリの
+#   CLA.md とは別に必ず写しを持つ構造になる。実際にこの写しが腐り、CLA.md が
+#   「Open DUMP Viewer for Oracle database」へ改称された後も、Gist は旧名称
+#   「OraDB DUMP Viewer」のまま署名を集め続けていた（2026-07-18 に発覚）。
+#   本方式は path-to-document がリポジトリ内のファイルを直接指すため、この乖離が起きない。
+#   あわせて、署名者の情報が第三者サービスへ渡らず自リポジトリ内に留まる。
+#
+# 署名文書は リポジトリルートの CLA.md（著作権譲渡型）。
+#
+# 前提:
+#   1. **[要オーナー作業]** リポジトリ Secret `PERSONAL_ACCESS_TOKEN` を登録する
+#      （fine-grained PAT。本リポジトリに対して Contents: Read and write /
+#      Pull requests: Read and write）。本 Action が署名台帳をコミットするために使う
+#      （既定の GITHUB_TOKEN では別ブランチへの書き込み・再チェックが安定しないため
+#      専用 PAT を要求する仕様）。**未登録だと本 Action は失敗する。**
+#   2. [済] 署名台帳の保存先ブランチ `cla-signatures`（orphan）を作成済み（2026-07-18）
+#   3. **[要オーナー作業]** cla-assistant.io 側の連携を解除する（二重に CLA チェックが
+#      走るのを避けるため）
+#
+# バージョン固定（供給網統治）: 可変タグではなくコミット SHA で固定する。
+# Vendored: contributor-assistant/github-action v2.6.1
+# (commit ca4a40a7d1004f18d9960b404b97e5f30a505a08, verified GitHub API = v2.6.1 が最新, 2026-07-18)
+
+name: CLA Assistant
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: CLA Assistant
+        # 署名/再チェックのコメント、または PR イベントのときのみ実行する。
+        if: >-
+          (github.event.comment.body == 'recheck' ||
+           github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA') ||
+          github.event_name == 'pull_request_target'
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # オーナーが登録する専用 PAT（前提 1）。未登録だと本 Action は失敗する。
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        with:
+          # 署名文書。リポジトリ内のファイルを直接指すため写しを持たない。
+          path-to-document: 'https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/CLA.md'
+          # 署名台帳の保存先（前提 2 の専用ブランチ）。
+          path-to-signatures: 'signatures/version1/cla.json'
+          branch: 'cla-signatures'
+          # 署名を要求しない主体（オーナー本人・各種 bot）。
+          allowlist: 'Yanai-Taketo,dependabot[bot],github-actions[bot]'
+          # 署名の定型文（CLA.md の記載と一致させる）。
+          custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
+          custom-notsigned-prcomment: >-
+            この Pull Request をマージするには、コントリビューターライセンス同意書（CLA）への署名が必要です。
+            [CLA 文書](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/CLA.md)を読み、
+            未署名の方は以下の定型文を**この PR にコメント**してください。
+            / To merge this Pull Request, you need to sign the
+            [Contributor License Agreement](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/CLA.md).
+            Please read it and post the following statement as a comment on this PR:
+          custom-allsigned-prcomment: >-
+            すべてのコントリビューターが CLA に署名済みです。ありがとうございます。
+            / All contributors have signed the CLA. Thank you.
