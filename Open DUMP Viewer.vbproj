@@ -114,10 +114,10 @@
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.105.0" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3124.44" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.3" />
-    <PackageReference Include="System.Data.OleDb" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.10" />
+    <PackageReference Include="System.Data.OleDb" Version="10.0.10" />
   </ItemGroup>
 
   <!-- WebView2 WPF DLL の WindowsBase バージョン競合警告を抑制 (WinForms アプリのため WPF DLL は不使用) -->
