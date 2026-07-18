@@ -18,6 +18,15 @@ on:
         type: boolean
         default: true
 
+# 同一ブランチのリリース実行が重ならないようにする(連続 push で 2 本のリリースが
+# 並走し、Release 作成や Store 提出が競合するのを防ぐ)。
+# cancel-in-progress は **false**。本ワークフローは実リリースを作成し Microsoft Store へ
+# 提出するため、途中でキャンセルすると中途半端な成果物や提出が残りうる。後続の実行は
+# 割り込まずに待たせる。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ═══════════════════════════════════════════
   # ビルドジョブ (x64 / ARM64 並列)

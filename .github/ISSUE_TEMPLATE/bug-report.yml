@@ -1,0 +1,82 @@
+name: バグ報告 / Bug report
+description: 動作不良・想定外の挙動の報告 / Report broken or unexpected behavior
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語・英語どちらでも歓迎です。/ Reports are welcome in Japanese or English.
+
+        脆弱性の報告は公開 Issue ではなく inquiry@ta-yan.ai へメールでお願いします([SECURITY.md](https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/SECURITY.md) 参照)。
+        / For security vulnerabilities, please email inquiry@ta-yan.ai instead of opening a public issue.
+
+        > **.dmp ファイルの添付にご注意ください** — DUMP ファイルには業務データが含まれます。添付する場合は機密情報を含まない再現用の最小データにしてください。
+        > / **Be careful attaching .dmp files** — they contain your database contents. Attach only minimal, non-confidential reproduction data.
+  - type: input
+    id: version
+    attributes:
+      label: バージョン / Version
+      description: ヘルプ > バージョン情報、またはインストーラーのファイル名で確認できます / See Help > About, or the installer filename
+      placeholder: "4.1.3"
+    validations:
+      required: true
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: 導入方法 / Install method
+      options:
+        - インストーラー版 EXE / Installer (EXE)
+        - ポータブル版 ZIP / Portable (ZIP)
+        - Microsoft Store
+        - winget
+        - ソースからビルド / Built from source
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: チャネル / Channel
+      options:
+        - 安定版 / Stable
+        - ベータ版 / Beta
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Windows 11 24H2 x64 / Windows 11 ARM64 など"
+    validations:
+      required: true
+  - type: dropdown
+    id: dump-format
+    attributes:
+      label: DUMP 形式 / Dump format
+      description: 解析対象のファイル形式。不明な場合は「不明」で構いません / Leave as unknown if unsure
+      options:
+        - EXPDP (DataPump)
+        - EXP (レガシー / legacy)
+        - 該当しない・不明 / Not applicable or unknown
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 再現手順 / Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: 期待した動作と実際の動作 / Expected vs actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: エラーメッセージ・スクリーンショット / Error messages & screenshots
+      description: エラーダイアログの全文や画面のスクリーンショットがあると調査が速くなります / Full error text and screenshots speed up investigation

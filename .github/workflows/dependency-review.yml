@@ -1,0 +1,29 @@
+# 依存差分レビュー(依存の脆弱性対策の「PR 差分審査」層。三層構成は
+# .github/dependabot.yml 冒頭のコメントを参照)。
+#
+# NuGet パッケージの脆弱性は NuGet Audit(restore 時)が既にビルドを止めるため、
+# 本ワークフローが主に足すのは (1) GitHub Actions 依存の脆弱性検知、(2) PR 差分として
+# 入る依存の一覧化(検出時に PR コメントへ要約を出す)。情報源はリポジトリの
+# dependency graph(Dependabot アラートの前提として有効化済み)。
+name: Dependency Review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # comment-summary-in-pr が PR コメントを書くために必要
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5
+        with:
+          comment-summary-in-pr: on-failure

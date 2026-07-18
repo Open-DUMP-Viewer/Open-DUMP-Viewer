@@ -1,0 +1,84 @@
+# CodeQL 静的解析(C ネイティブ DLL + GitHub Actions ワークフロー)。結果は Security タブ
+# (code scanning alerts)に集約される。public リポジトリのため無償。
+#
+# ■ 解析対象と、対象外の明示
+#
+# CodeQL は VB.NET を解析できない(対応言語は C/C++・C#・GitHub Actions・Go・Java・Kotlin・
+# JavaScript・Python・Ruby・Rust・Swift・TypeScript。csharp 解析も .vb は対象にしない。
+# 検証日 2026-07-18、codeql.github.com/docs/codeql-overview/supported-languages-and-frameworks/)。
+# したがって HMI/ と Logics/ の VB.NET コードは本ワークフローの対象外である。
+#
+# 対象に含めるのは次の 2 つ:
+#   - c-cpp  : Logics/DumpParser の C11 実装。**信頼できない .dmp ファイルを直接パースする**
+#              最も攻撃面の大きい層であり、SECURITY.md が「対象となる脆弱性」の筆頭に挙げる
+#              「.dmp ファイル解析時のバッファオーバーフロー」がまさにここで起きる
+#   - actions: ワークフロー自身の脆弱性(script injection・過剰な権限など)
+#
+# VB.NET 側の穴埋めは NuGet Audit(vbproj の NuGetAuditMode=all)が依存の脆弱性を担当する。
+# 三層構成の全体像は .github/dependabot.yml 冒頭のコメントを参照。
+#
+# ■ ビルドモード
+#
+# c-cpp は build-mode: manual とし、Logics/DumpParser の POSIX 向け Makefile を gcc で
+# 実際にコンパイルして解析する。C/C++ は build-mode: none も選べるが、マクロ展開とヘッダ
+# 解決が不完全になり検出精度が落ちるため、実ビルドを通す方を採る(この Makefile は
+# 外部依存のない自己完結の C11 実装であり、ubuntu ランナー上で完結する)。
+#
+# ■ 週次 schedule
+#
+# 「コード側の変更がなくても、CodeQL のクエリ更新(新規に公表された脆弱性パターン)を
+# 既存コードへ適用する」ための定期実行。
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 20 * * 0' # 毎週月曜 05:30 JST(日曜 20:30 UTC)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # code scanning への結果アップロードに必要
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: c-cpp
+            build-mode: manual
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # build-mode: manual の言語のみ。init と analyze の間で実ビルドを通す必要がある。
+      - name: Build native dump parser (c-cpp)
+        if: matrix.language == 'c-cpp'
+        run: make
+        working-directory: Logics/DumpParser
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"

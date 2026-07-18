@@ -1,0 +1,39 @@
+# Dependabot 設定(依存の脆弱性対策の「継続監視」層)。
+#
+# 依存の脆弱性検知は三層で構成する:
+#   1. NuGet Audit — Open DUMP Viewer.vbproj の NuGetAuditMode=all + WarningsAsErrors(NU1900-1904)。
+#      restore/build のたびに照合し、脆弱な依存が入るとビルドを止める
+#   2. dependency-review-action(.github/workflows/dependency-review.yml)— PR 差分として
+#      入ってくる依存(GitHub Actions を含む)を審査する
+#   3. Dependabot(本ファイル + リポジトリ設定の脆弱性アラート / 自動セキュリティ更新)—
+#      マージ後・リリース後も継続監視し、脆弱性公表時に修正 PR を自動作成する
+#
+# C ネイティブ DLL(Logics/DumpParser)は外部ライブラリに依存しない自己完結の C11 実装のため
+# パッケージエコシステムの対象外。こちらの脆弱性は CodeQL の c-cpp 解析(codeql.yml)が担当する。
+#
+# AGENTS.md「バージョンポリシー」の「すべてのランタイム・SDK・ツールは常に最新バージョンを
+# 使用する」を機械化する役割も兼ねる(GitHub Actions の版追従を人手に依存させない)。
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Tokyo"
+    # 通常の版追従はまとめて 1 本の PR にする(minor / patch)。major は個別 PR。
+    # セキュリティ更新はグループ化の対象外で、常に個別 PR として即時作成される。
+    groups:
+      nuget-minor-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5

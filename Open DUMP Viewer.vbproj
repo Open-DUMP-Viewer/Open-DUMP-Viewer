@@ -125,4 +125,22 @@
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
+  <!--
+    NuGet Audit (依存の脆弱性対策の第1層。三層構成は .github/dependabot.yml 冒頭のコメント参照)。
+
+    CodeQL は VB.NET を解析できないため、VB.NET 側で機械的に守れるのは「依存の脆弱性」の層に
+    なる。restore のたびに GitHub Advisory Database と照合し、脆弱なパッケージが入った時点で
+    ビルドを止める (警告のままだと見逃されるため warning-as-error 化する)。
+
+      NuGetAuditMode=all   : 直接依存だけでなく推移的依存も監査する
+      NuGetAuditLevel=low  : low 以上のすべての深刻度を報告する
+      NU1900-NU1904        : 監査の警告群 (1900=監査自体の失敗, 1901-1904=深刻度別の検出)
+  -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <WarningsAsErrors>$(WarningsAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
 </Project>

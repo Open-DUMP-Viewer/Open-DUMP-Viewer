@@ -95,9 +95,15 @@ Open DUMP Viewer for Oracle database/
 │  ├─ ChineseSimplified.isl               # 中国語（簡体字）翻訳（CI で自動DL）
 │  ├─ WizardImage.bmp                     # バナー画像（CI で自動生成）
 │  └─ WizardSmallImage.bmp               # 小バナー画像（CI で自動生成）
-├─ .github/workflows/
-│  ├─ build-and-release.yml                # CI/CD 正式版（release ブランチ）
-│  └─ build-and-release-beta.yml           # CI/CD ベータ版（beta ブランチ）
+├─ .github/
+│  ├─ dependabot.yml                       # 依存の継続監視（NuGet / GitHub Actions）
+│  ├─ PULL_REQUEST_TEMPLATE.md             # PR テンプレート
+│  ├─ ISSUE_TEMPLATE/                      # Issue テンプレート（バグ報告・機能要望）
+│  └─ workflows/
+│     ├─ build-and-release.yml             # CI/CD 正式版（release ブランチ）
+│     ├─ build-and-release-beta.yml        # CI/CD ベータ版（beta ブランチ）
+│     ├─ codeql.yml                        # 静的解析（C ネイティブ + Actions・週次）
+│     └─ dependency-review.yml             # PR 差分の依存審査
 ├─ README.md                               # プロジェクト説明
 ├─ CHANGELOG.md                            # リリースノート
 ├─ CLA.md                                  # コントリビューターライセンス同意書
@@ -205,6 +211,31 @@ git push origin main:release
 | Winget ID | `OpenDumpViewer.OpenDumpViewer` | `OpenDumpViewer.OpenDumpViewer.BETA` |
 
 同一 PC に両方インストール可能。
+
+## Security Automation
+
+依存とコードの脆弱性を**三層**で検知する。
+
+| 層 | 仕組み | 対象 | いつ効くか |
+|---|---|---|---|
+| 1. NuGet Audit | `Open DUMP Viewer.vbproj` の `NuGetAuditMode=all` + NU1900-1904 の warning-as-error | NuGet 依存（推移的含む） | restore / build のたび |
+| 2. Dependency Review | `.github/workflows/dependency-review.yml` | PR 差分で入る依存（GitHub Actions 含む） | PR ごと |
+| 3. Dependabot | `.github/dependabot.yml` + リポジトリの脆弱性アラート / 自動セキュリティ更新 | NuGet・GitHub Actions | 週次 + CVE 公表時に随時 |
+
+コードの静的解析は `.github/workflows/codeql.yml`（push / PR / **週次 cron**）。
+
+### CodeQL の対象範囲（重要）
+
+**CodeQL は VB.NET を解析できない**（対応言語は C/C++・C#・GitHub Actions・Go・Java・Kotlin・JavaScript・Python・Ruby・Rust・Swift・TypeScript。`csharp` 解析も `.vb` は対象外。検証日 2026-07-18）。
+
+- **対象**: `Logics/DumpParser` の C 実装（`c-cpp`、build-mode `manual` で Makefile を実ビルド）、ワークフロー自身（`actions`）
+- **対象外**: `HMI/` と `Logics/` の VB.NET コード全般
+
+C を対象に含める理由は、**信頼できない .dmp ファイルを直接パースする最も攻撃面の大きい層**であり、SECURITY.md が「対象となる脆弱性」の筆頭に挙げる「.dmp ファイル解析時のバッファオーバーフロー」がまさにここで起きるため。VB.NET 側は層 1 の NuGet Audit が依存の脆弱性を担当する。
+
+### リリースワークフローの concurrency
+
+`build-and-release*.yml` は `cancel-in-progress: false`。実リリース作成と Microsoft Store 提出まで進むため、後続 push で**割り込みキャンセルしてはならない**（待たせる）。
 
 ## License & Authentication
 
