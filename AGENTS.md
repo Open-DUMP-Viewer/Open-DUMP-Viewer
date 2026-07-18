@@ -230,6 +230,32 @@ cla-assistant.io は署名対象の文書として **Gist しか指定できな�
 
 **`CLA.md` を改訂したら、それがそのまま署名対象になる**（同期作業は不要）。
 
+## 権利・ライセンスの扱い
+
+### 第三者ライセンスの表示
+
+`THIRD-PARTY-NOTICES.txt`（リポジトリルート）が、**実際に再配布しているすべての第三者コンポーネント**の著作権表示とライセンス全文を保持する。MIT・Apache-2.0 いずれも「複製物に著作権表示と許諾表示を含めること」を条件にしているため、これは任意の親切ではなく**再配布の条件**である。
+
+- 対象は**推移的依存を含む**（`dotnet list package --include-transitive` が正）。self-contained 発行で同梱される .NET ランタイム、インストーラーに含まれる Inno Setup 自身のコードも対象
+- MIT が大半だが、**SixLabors.Fonts は Apache-2.0**、**Microsoft.Web.WebView2 は BSD 系の独自条件**、**Microsoft.Data.SqlClient.SNI は Microsoft ソフトウェアライセンス条項**と、条件が異なるものが混在する。一括で「MIT です」と書かないこと
+- **依存を追加・更新したら `THIRD-PARTY-NOTICES.txt` を更新する**。Dependabot の PR も例外ではない（新規パッケージが増えたら追記が要る）。ライセンス種別は推測せず、NuGet キャッシュの `.nuspec`（`<license>` / `<copyright>`）と同梱の LICENSE ファイルから確認する
+- Oracle Instant Client は**同梱していない**（利用者が明示的に選択したときのみ取得）。ただし配布経路が自社ドメインのため OTN ライセンス条件の確認が別途必要
+
+配布物への同梱は `Open DUMP Viewer.vbproj` の `None Include` で行う。publish 出力がインストーラー版・ポータブル版の共通の元になるため、ここに入れれば両方に入る。
+
+### インストーラーでの使用許諾の表示
+
+`installer/setup.iss` の `[Languages]` で言語ごとに `LicenseFile` を指定し、インストール時に同意画面を出す。
+
+| 言語 | 表示する文書 |
+|---|---|
+| 日本語 | `EULA-ja.txt`（`EULA.md` を平文化。詳細な正本） |
+| その他 9 言語 | `LICENSE-en.txt`（`LICENSE` の写し。英語） |
+
+**この 2 ファイルは commit しない。** 法的文書の文面を二重管理すると原本と乖離するため、CI（`build-and-release*.yml` の `Generate license files for installer`）が `EULA.md` / `LICENSE` から毎回生成する（`.gitignore` 済み）。
+
+> 未対応: 日本語以外の利用者には、より簡潔な英語 `LICENSE` が表示される。EULA 本文（13 条）の多言語版は未整備。
+
 ## Security Automation
 
 依存とコードの脆弱性を**三層**で検知する。

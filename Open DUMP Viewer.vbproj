@@ -37,6 +37,26 @@
     </None>
   </ItemGroup>
 
+  <!--
+    権利関係の文書をビルド出力へコピーする。
+    publish 出力はインストーラー版・ポータブル版の双方の元になるため、ここに入れることで
+    どちらの配布形態にも同梱される（MIT ライセンス等が求める「複製物への著作権表示と
+    許諾表示の同梱」を満たすために必要）。THIRD-PARTY-NOTICES.txt の更新については
+    AGENTS.md「第三者ライセンスの表示」を参照。
+  -->
+  <ItemGroup>
+    <None Include="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>LICENSE.txt</Link>
+    </None>
+    <None Include="EULA.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="THIRD-PARTY-NOTICES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <!-- ヘルプファイルをビルド出力にコピー -->
   <ItemGroup>
     <None Include="Help\OpenDumpViewer.chm" Condition="Exists('Help\OpenDumpViewer.chm')">
