@@ -162,6 +162,29 @@ jobs:
             -OutFile "installer/ChineseSimplified.isl"
 
       # ─────────────────────────────────────
+      # 11b. インストーラーの使用許諾画面用テキストを生成
+      #     原本 (EULA.md / LICENSE) から平文を作る。文面を二重管理しないため
+      #     installer/ 配下には commit せずビルド時に生成する。
+      #     Inno Setup に非 ASCII を正しく読ませるため BOM 付き UTF-8 で書く。
+      # ─────────────────────────────────────
+      - name: Generate license files for installer
+        shell: pwsh
+        run: |
+          # EULA.md -> EULA-ja.txt (Markdown 記法を落として平文化)
+          Get-Content "EULA.md" -Encoding UTF8 |
+            ForEach-Object {
+              $_ -replace '^#{1,6}\s*', '' -replace '\*\*', '' -replace '^---+$', ('-' * 70)
+            } | Set-Content "installer/EULA-ja.txt" -Encoding UTF8
+
+          # LICENSE -> LICENSE-en.txt (そのまま)
+          Copy-Item "LICENSE" "installer/LICENSE-en.txt" -Force
+
+          foreach ($f in @("installer/EULA-ja.txt", "installer/LICENSE-en.txt")) {
+            if (-not (Test-Path $f)) { Write-Error "$f の生成に失敗しました"; exit 1 }
+            Write-Host "$f ($((Get-Item $f).Length) bytes)"
+          }
+
+      # ─────────────────────────────────────
       # 12. ウィザード用バナー画像を app.ico から生成
       # ─────────────────────────────────────
       - name: Generate wizard banner images

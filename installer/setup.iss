@@ -68,17 +68,23 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; ============================================================
 ; [Languages] - 10言語対応 (OS言語を自動検出)
 ; ============================================================
+; LicenseFile: 使用許諾契約の同意画面で表示する文書。
+;   日本語 = EULA (EULA.md を平文化したもの。日本語版が詳細な正本)
+;   その他 = LICENSE (英語。EULA と同一の権利関係を英語で定めたもの)
+; どちらも CI が生成する (build-and-release*.yml の "Generate license files for
+; installer" ステップ)。原本は リポジトリルートの EULA.md / LICENSE であり、
+; ここで文面を二重管理しないためにビルド時生成としている。
 [Languages]
-Name: "japanese";             MessagesFile: "compiler:Languages\Japanese.isl"
-Name: "english";              MessagesFile: "compiler:Default.isl"
-Name: "german";               MessagesFile: "compiler:Languages\German.isl"
-Name: "spanish";              MessagesFile: "compiler:Languages\Spanish.isl"
-Name: "french";               MessagesFile: "compiler:Languages\French.isl"
-Name: "italian";              MessagesFile: "compiler:Languages\Italian.isl"
-Name: "korean";               MessagesFile: "compiler:Languages\Korean.isl"
-Name: "brazilianportuguese";  MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
-Name: "russian";              MessagesFile: "compiler:Languages\Russian.isl"
-Name: "chinesesimplified";    MessagesFile: "ChineseSimplified.isl"
+Name: "japanese";             MessagesFile: "compiler:Languages\Japanese.isl";             LicenseFile: "EULA-ja.txt"
+Name: "english";              MessagesFile: "compiler:Default.isl";                        LicenseFile: "LICENSE-en.txt"
+Name: "german";               MessagesFile: "compiler:Languages\German.isl";               LicenseFile: "LICENSE-en.txt"
+Name: "spanish";              MessagesFile: "compiler:Languages\Spanish.isl";              LicenseFile: "LICENSE-en.txt"
+Name: "french";               MessagesFile: "compiler:Languages\French.isl";               LicenseFile: "LICENSE-en.txt"
+Name: "italian";              MessagesFile: "compiler:Languages\Italian.isl";              LicenseFile: "LICENSE-en.txt"
+Name: "korean";               MessagesFile: "compiler:Languages\Korean.isl";               LicenseFile: "LICENSE-en.txt"
+Name: "brazilianportuguese";  MessagesFile: "compiler:Languages\BrazilianPortuguese.isl";  LicenseFile: "LICENSE-en.txt"
+Name: "russian";              MessagesFile: "compiler:Languages\Russian.isl";              LicenseFile: "LICENSE-en.txt"
+Name: "chinesesimplified";    MessagesFile: "ChineseSimplified.isl";                       LicenseFile: "LICENSE-en.txt"
 
 ; ============================================================
 ; [CustomMessages] - カスタムメッセージ (各言語)
