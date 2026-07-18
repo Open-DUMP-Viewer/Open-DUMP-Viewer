@@ -163,18 +163,7 @@ jobs:
       # ─────────────────────────────────────
       - name: Generate license files for installer
         shell: pwsh
-        run: |
-          Get-Content "EULA.md" -Encoding UTF8 |
-            ForEach-Object {
-              $_ -replace '^#{1,6}\s*', '' -replace '\*\*', '' -replace '^---+$', ('-' * 70)
-            } | Set-Content "installer/EULA-ja.txt" -Encoding UTF8
-
-          Copy-Item "LICENSE" "installer/LICENSE-en.txt" -Force
-
-          foreach ($f in @("installer/EULA-ja.txt", "installer/LICENSE-en.txt")) {
-            if (-not (Test-Path $f)) { Write-Error "$f の生成に失敗しました"; exit 1 }
-            Write-Host "$f ($((Get-Item $f).Length) bytes)"
-          }
+        run: ./installer/Convert-LicenseFiles.ps1
 
       # ─────────────────────────────────────
       # 12. ウィザード用バナー画像を app.ico から生成
