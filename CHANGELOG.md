@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.2.0] - 2026-07-18
+
+### ライセンス・権利表示
+- **第三者ライセンスの表示を追加**: 本製品が再配布しているすべての第三者コンポーネントの著作権表示とライセンス全文を `THIRD-PARTY-NOTICES.txt` に収録し、インストーラー版・ポータブル版の双方に同梱するようにしました
+  - 対象は推移的依存を含む 29 パッケージ、self-contained 発行で同梱される .NET ランタイム、インストーラーに含まれる Inno Setup
+  - MIT が大半ですが、SixLabors.Fonts は Apache-2.0、Microsoft.Web.WebView2 は BSD 系の独自条件、Microsoft.Data.SqlClient.SNI は Microsoft ソフトウェアライセンス条項と、条件が異なるものが混在します
+- **インストール時に使用許諾契約の同意画面を表示**するようにしました（日本語は EULA、その他の言語は英語版 LICENSE）
+- `LICENSE.txt` / `EULA.md` / `THIRD-PARTY-NOTICES.txt` をインストール先にも配置するようにしました
+- 商標表示に「本製品は Oracle Corporation とは無関係であり、承認・提携・後援されていない」旨を明記しました
+
+### 依存関係の更新
+- Microsoft.Data.SqlClient 6.1.4 → 7.0.2
+- Microsoft.Web.WebView2 1.0.3124.44 → 1.0.4078.44
+- System.Data.Odbc / System.Data.OleDb 10.0.3 → 10.0.10
+
+### 開発・CI
+- 依存とコードの脆弱性検知を三層で導入: NuGet Audit（ビルド時）・Dependency Review（PR 時）・Dependabot（週次と CVE 公表時）
+- CodeQL による静的解析を追加（C ネイティブ DLL と GitHub Actions ワークフローが対象。週次実行）
+- PR / Issue テンプレートを日英併記で追加
+- CLA の受付を外部サービスから自己ホスト方式へ移行（署名文書がリポジトリ内の `CLA.md` と乖離しない構成に変更）
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.1.3 → 4.2.0 に同期
+
 ## [4.1.3] - 2026-06-05
 
 ### バグ修正
