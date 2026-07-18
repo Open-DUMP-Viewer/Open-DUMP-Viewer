@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 脆弱性の報告 / Report a security vulnerability
+    url: https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/blob/main/SECURITY.md
+    about: 脆弱性は公開 Issue ではなく inquiry@ta-yan.ai へメールでご報告ください / Please email inquiry@ta-yan.ai, not a public issue. See SECURITY.md
+  - name: ライセンス・購入に関するお問い合わせ / Licensing & purchase
+    url: https://www.odv.dev/
+    about: ライセンスの取得・プラン・お支払いに関するご相談は公式サイトへ / License plans and purchasing are handled on the official site
