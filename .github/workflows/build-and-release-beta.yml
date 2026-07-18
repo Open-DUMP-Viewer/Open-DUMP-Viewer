@@ -39,7 +39,7 @@ jobs:
       # 1. ソースコードをチェックアウト
       # ─────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # ─────────────────────────────────────
       # 2. .NET SDK のセットアップ (.NET 10)
@@ -249,7 +249,7 @@ jobs:
       #    (CHANGELOG.md 読み取り用)
       # ─────────────────────────────────────
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # ─────────────────────────────────────
       # 2. 全アーキテクチャのアーティファクトをダウンロード
@@ -359,7 +359,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download x64 artifacts
         uses: actions/download-artifact@v7
@@ -457,7 +457,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download x64 artifacts
         uses: actions/download-artifact@v7
