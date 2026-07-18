@@ -77,3 +77,4 @@ jobs:
           custom-allsigned-prcomment: >-
             すべてのコントリビューターが CLA に署名済みです。ありがとうございます。
             / All contributors have signed the CLA. Thank you.
+# (Throwaway change for the CLA PAT connectivity test. This PR is closed, not merged.)
