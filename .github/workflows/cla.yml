@@ -62,9 +62,9 @@ jobs:
           path-to-signatures: 'signatures/version1/cla.json'
           branch: 'cla-signatures'
           # 署名を要求しない主体（オーナー本人・各種 bot）。
-          # [一時変更 2026-07-18] PAT の疎通確認のため Yanai-Taketo を一時的に除外から外す。
-          # 確認完了後ただちに 'Yanai-Taketo,dependabot[bot],github-actions[bot]' へ戻すこと。
-          allowlist: 'dependabot[bot],github-actions[bot]'
+          # PAT の疎通は 2026-07-18 に実証済み（PR #39 で allowlist を一時的に外して検証。
+          # PR へのコメント投稿と signatures/version1/cla.json の生成の両方を確認）。
+          allowlist: 'Yanai-Taketo,dependabot[bot],github-actions[bot]'
           # 署名の定型文（CLA.md の記載と一致させる）。
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           custom-notsigned-prcomment: >-
