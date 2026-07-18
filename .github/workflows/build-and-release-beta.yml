@@ -141,13 +141,21 @@ jobs:
 
       # ─────────────────────────────────────
       # 11. 中国語簡体字の言語ファイルをダウンロード
+      #     詳細は build-and-release.yml の同名ステップのコメントを参照。
       # ─────────────────────────────────────
       - name: Download Chinese Simplified language file
         shell: pwsh
         run: |
           Invoke-WebRequest `
-            -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl" `
+            -Uri "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/ChineseSimplified.isl" `
             -OutFile "installer/ChineseSimplified.isl"
+
+          $size = (Get-Item "installer/ChineseSimplified.isl").Length
+          if ($size -lt 1000) {
+            Write-Error "ChineseSimplified.isl の取得結果が小さすぎます ($size bytes)。上流の移動を疑ってください。"
+            exit 1
+          }
+          Write-Host "ChineseSimplified.isl ($size bytes)"
 
       # ─────────────────────────────────────
       # 11b. インストーラーの使用許諾画面用テキストを生成
