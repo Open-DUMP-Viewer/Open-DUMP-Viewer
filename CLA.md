@@ -58,8 +58,12 @@ Pull Request を提出することにより、以下のすべての条項に同�
 
 ## 署名方法
 
-Pull Request を提出すると、CLA Assistant が自動的に署名を求めます。
-PR のコメント欄で指示に従い、CLA に署名してください。
+Pull Request を提出すると、CLA Assistant Lite（自己ホスト型の GitHub Action）が自動的に署名を求めます。
+本同意書を読んだうえで、以下の定型文を**その Pull Request にコメント**してください。
 
-署名は GitHub アカウントに紐づけて記録されます。
+> **I have read the CLA Document and I hereby sign the CLA**
+
+署名（GitHub ユーザー名）は、本リポジトリの `cla-signatures` ブランチにある署名台帳
+（`signatures/version1/cla.json`）に記録されます。**第三者のホスト型サービスへは送信されません。**
+
 一度署名すれば、以降の PR では再署名は不要です。

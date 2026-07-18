@@ -212,6 +212,24 @@ git push origin main:release
 
 同一 PC に両方インストール可能。
 
+## CLA（コントリビューターライセンス同意書）
+
+署名は **CLA Assistant Lite**（`.github/workflows/cla.yml`。自己ホスト型の GitHub Action）で受け付ける。
+
+- **署名文書**: リポジトリルートの `CLA.md`（著作権譲渡型）。Action が直接この URL を参照する
+- **署名方法**: PR に `I have read the CLA Document and I hereby sign the CLA` とコメント
+- **署名台帳**: `cla-signatures` ブランチ（orphan）の `signatures/version1/cla.json`。第三者サービスへは送信しない
+- **除外**: `Yanai-Taketo` / `dependabot[bot]` / `github-actions[bot]`
+- **再チェック**: PR に `recheck` とコメント
+
+### なぜ自己ホストなのか（cla-assistant.io から移行した理由）
+
+cla-assistant.io は署名対象の文書として **Gist しか指定できない**。そのためリポジトリの `CLA.md` とは別に必ず写しを持つ構造になり、実際にその写しが腐った——`CLA.md` を Oracle 商標対応で「Open DUMP Viewer for Oracle database」へ改称した後も、**Gist は旧名称「OraDB DUMP Viewer」のまま署名を集め続けていた**（2026-07-18 に発覚。外部署名者ゼロのため実害はなし）。
+
+自己ホスト方式は `path-to-document` がリポジトリ内のファイルを直接指すため、この乖離が構造的に起きない。あわせて署名者の情報が第三者サービスへ渡らず、記録が自分の管理下に残る。
+
+**`CLA.md` を改訂したら、それがそのまま署名対象になる**（同期作業は不要）。
+
 ## Security Automation
 
 依存とコードの脆弱性を**三層**で検知する。
