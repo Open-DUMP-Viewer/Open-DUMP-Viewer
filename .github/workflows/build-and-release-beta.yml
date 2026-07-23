@@ -24,6 +24,12 @@ jobs:
     name: Build (${{ matrix.arch }})
     runs-on: windows-latest
 
+    # コード署名の承認ゲート: 詳細は build-and-release.yml の同じブロックのコメントを参照。
+    environment: release-signing
+    permissions:
+      contents: read
+      id-token: write  # WIF の OIDC トークン発行に必要
+
     strategy:
       matrix:
         include:
@@ -101,6 +107,55 @@ jobs:
             --runtime ${{ matrix.rid }} `
             --self-contained true `
             --output ./publish/app
+
+      # ─────────────────────────────────────
+      # 7b. コード署名 (自前バイナリ)
+      #     詳細は build-and-release.yml の同名ステップのコメントを参照。
+      # ─────────────────────────────────────
+      - name: Authenticate to Google Cloud (WIF)
+        if: vars.ODV_SIGNING == 'enabled'
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SIGNER_SA }}
+          token_format: access_token
+
+      - name: Setup Java (jsign 実行用)
+        if: vars.ODV_SIGNING == 'enabled'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download and verify jsign 7.5
+        if: vars.ODV_SIGNING == 'enabled'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://github.com/ebourg/jsign/releases/download/7.5/jsign-7.5.jar' -OutFile jsign.jar
+          $hash = (Get-FileHash jsign.jar -Algorithm SHA256).Hash.ToLower()
+          $expected = '602a51c3545a6dc4fb99bd2ea7152b26d1345916d0c93ddfbd5936cb735af91c'
+          if ($hash -ne $expected) { throw "jsign SHA256 不一致: got=$hash expected=$expected" }
+          Write-Host 'jsign 7.5 SHA256 OK'
+
+      - name: Sign own binaries (${{ matrix.arch }})
+        if: vars.ODV_SIGNING == 'enabled'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            "./publish/app/Open DUMP Viewer.exe",
+            "./publish/app/Open DUMP Viewer.dll",
+            "./publish/app/Open_DumpParser.dll"
+          )
+          ./installer/sign/Invoke-OdvSign.ps1 -JsignJar jsign.jar `
+            -KeyRingResource '${{ vars.GCP_KEYRING }}' -KeyAlias '${{ vars.GCP_KEY_ALIAS }}' `
+            -CertFile installer/sign/codesign-chain.pem `
+            -AccessToken '${{ steps.auth.outputs.access_token }}' `
+            -ExpectedSubject '${{ vars.SIGNER_SUBJECT }}' -Files $files
 
       - name: Copy build output for portable and installer
         shell: pwsh
