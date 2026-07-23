@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.3.0] - 2026-07-24
+
+### 配布・セキュリティ
+- **リリース成果物に Authenticode コード署名を導入しました**
+  - 署名対象: アプリ本体 (`Open DUMP Viewer.exe` / `Open DUMP Viewer.dll` / `Open_DumpParser.dll`) とインストーラー EXE。ポータブル版 ZIP の中身も署名済みです
+  - 署名者: 柳井建人（Sectigo 発行の OV コード署名証明書。秘密鍵は Google Cloud KMS の HSM 内にあり、CI にも手元にも存在しません）
+  - インストーラー実行時の SmartScreen / UAC で発行元が表示されるようになります（SmartScreen の評価が蓄積されるまでは警告が出る場合があります）
+  - Microsoft Store 版 (MSIX) は従来どおり Store の署名で配布されます
+  - 検証方法: ファイルのプロパティ →「デジタル署名」タブ、または PowerShell の `Get-AuthenticodeSignature`
+
+### 開発・CI
+- リリースワークフローに署名ステップと承認ゲート（GitHub Environment `release-signing`）を追加。実行前にオーナー承認が必要になりました
+- 手動実行 (`workflow_dispatch`) の既定を「公開なしのビルド・署名確認のみ」に変更（`publish_release` 入力で明示した場合のみ公開）。従来の `skip_store_submit` 入力は未配線だったため置き換えました
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.2.1 → 4.3.0 に同期
+
 ## [4.2.1] - 2026-07-18
 
 ### バグ修正

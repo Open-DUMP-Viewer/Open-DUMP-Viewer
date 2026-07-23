@@ -2,10 +2,11 @@ name: Build and Release
 
 # ───────────────────────────────────────────
 # トリガー:
-#   - release ブランチへの push 時に通常実行
+#   - release ブランチへの push 時に通常実行 (リリース・公開まで行う)
 #   - workflow_dispatch で任意ブランチから手動実行 (テスト用)
-#     ※ 手動実行時も Store 提出ジョブは vars.STORE_PRODUCT_ID が
-#        セットされていれば動くため、テスト時は注意
+#     既定 (publish_release=false) では GitHub Release 作成と
+#     Winget/Chocolatey/Store 公開を行わず、ビルド + 署名までを確認する。
+#     (旧 skip_store_submit 入力はどこからも参照されていなかったため置き換えた)
 # ───────────────────────────────────────────
 on:
   push:
@@ -13,10 +14,10 @@ on:
       - release
   workflow_dispatch:
     inputs:
-      skip_store_submit:
-        description: 'Skip Microsoft Store submission (testing only)'
+      publish_release:
+        description: 'true で GitHub Release 作成と Winget/Chocolatey/Store 公開まで行う(既定 false = ビルド・署名の動作確認のみ)'
         type: boolean
-        default: true
+        default: false
 
 # 同一ブランチのリリース実行が重ならないようにする(連続 push で 2 本のリリースが
 # 並走し、Release 作成や Store 提出が競合するのを防ぐ)。
@@ -34,6 +35,15 @@ jobs:
   build:
     name: Build (${{ matrix.arch }})
     runs-on: windows-latest
+
+    # コード署名の承認ゲート: 署名ステップが WIF の OIDC トークンを必要とし、GCP 側の信頼条件が
+    # Environment `release-signing` を要求するため、build ジョブ全体をこの Environment に載せる。
+    # required reviewers = オーナーのため、本ワークフローの実行はビルド開始前に承認 1 回を要する
+    # (x64/arm64 の 2 ジョブは 1 回の承認でまとめて通る)。
+    environment: release-signing
+    permissions:
+      contents: read
+      id-token: write  # WIF の OIDC トークン発行に必要
 
     strategy:
       matrix:
@@ -113,6 +123,59 @@ jobs:
             --runtime ${{ matrix.rid }} `
             --self-contained true `
             --output ./publish/app
+
+      # ─────────────────────────────────────
+      # 7b. コード署名 (自前バイナリ)
+      #     vars.ODV_SIGNING == 'enabled' のときだけ動く (緊急オフスイッチ)。
+      #     秘密鍵は GCP KMS の HSM にあり、WIF の短命トークンで署名する (長期 Secret なし)。
+      #     portable / installer / MSIX へ複製する前に publish 出力そのものを署名する。
+      #     詳細: installer/sign/README.md (署名基盤は Yagura プロジェクトと共有)
+      # ─────────────────────────────────────
+      - name: Authenticate to Google Cloud (WIF)
+        if: vars.ODV_SIGNING == 'enabled'
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SIGNER_SA }}
+          token_format: access_token
+
+      - name: Setup Java (jsign 実行用)
+        if: vars.ODV_SIGNING == 'enabled'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 供給網保護: jsign を版固定 + SHA256 照合してから使う。
+      - name: Download and verify jsign 7.5
+        if: vars.ODV_SIGNING == 'enabled'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          Invoke-WebRequest -Uri 'https://github.com/ebourg/jsign/releases/download/7.5/jsign-7.5.jar' -OutFile jsign.jar
+          $hash = (Get-FileHash jsign.jar -Algorithm SHA256).Hash.ToLower()
+          $expected = '602a51c3545a6dc4fb99bd2ea7152b26d1345916d0c93ddfbd5936cb735af91c'
+          if ($hash -ne $expected) { throw "jsign SHA256 不一致: got=$hash expected=$expected" }
+          Write-Host 'jsign 7.5 SHA256 OK'
+
+      - name: Sign own binaries (${{ matrix.arch }})
+        if: vars.ODV_SIGNING == 'enabled'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            "./publish/app/Open DUMP Viewer.exe",
+            "./publish/app/Open DUMP Viewer.dll",
+            "./publish/app/Open_DumpParser.dll"
+          )
+          ./installer/sign/Invoke-OdvSign.ps1 -JsignJar jsign.jar `
+            -KeyRingResource '${{ vars.GCP_KEYRING }}' -KeyAlias '${{ vars.GCP_KEY_ALIAS }}' `
+            -CertFile installer/sign/codesign-chain.pem `
+            -AccessToken '${{ steps.auth.outputs.access_token }}' `
+            -ExpectedSubject '${{ vars.SIGNER_SUBJECT }}' -Files $files
 
       - name: Copy build output for portable and installer
         shell: pwsh
@@ -235,6 +298,24 @@ jobs:
             installer\setup.iss
 
       # ─────────────────────────────────────
+      # 13b. インストーラー EXE の署名
+      #      (中身の自前バイナリは 7b で署名済み。MSIX は Store が署名するため対象外)
+      # ─────────────────────────────────────
+      - name: Sign EXE installer (${{ matrix.arch }})
+        if: vars.ODV_SIGNING == 'enabled'
+        shell: pwsh
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          ./installer/sign/Invoke-OdvSign.ps1 -JsignJar jsign.jar `
+            -KeyRingResource '${{ vars.GCP_KEYRING }}' -KeyAlias '${{ vars.GCP_KEY_ALIAS }}' `
+            -CertFile installer/sign/codesign-chain.pem `
+            -AccessToken '${{ steps.auth.outputs.access_token }}' `
+            -ExpectedSubject '${{ vars.SIGNER_SUBJECT }}' `
+            -Files @("./publish/OpenDumpViewer_v${version}_installer_${{ matrix.arch }}.exe")
+
+      # ─────────────────────────────────────
       # 14. MSIX 用 Visual Assets を生成
       #     vars.MSIX_IDENTITY_NAME が未設定の場合はスキップ
       # ─────────────────────────────────────
@@ -349,8 +430,14 @@ jobs:
     needs: [build, bundle-msix]
     # bundle-msix は vars.MSIX_IDENTITY_NAME 未設定時に skip される。
     # その場合でも release は実行する必要があるため if: always() を使用し、
-    # build が成功していることだけを必須条件にする
-    if: ${{ always() && needs.build.result == 'success' }}
+    # build が成功していることだけを必須条件にする。
+    # workflow_dispatch では publish_release=true の場合のみ実リリースを作成する
+    # (既定 false = ビルド・署名の動作確認のみ。後続の publish-* も release の
+    # 成功を条件にしているため連動して skip される)。
+    if: |
+      always() && needs.build.result == 'success' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true'))
     runs-on: windows-latest
 
     permissions:
