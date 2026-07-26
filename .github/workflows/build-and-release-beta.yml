@@ -1,13 +1,23 @@
 name: Build and Release (Beta)
 
 # ───────────────────────────────────────────
-# トリガー: beta ブランチへの push 時に実行
+# トリガー:
+#   - beta ブランチへの push 時に実行
+#   - workflow_dispatch で手動実行 (beta ブランチを指定して使う)
 # 開発フロー: main (開発) → beta (ベータ公開) → release (正式公開)
+#
+# workflow_dispatch を置く理由: 本ワークフローは build ジョブが Environment
+# `release-signing` の承認ゲートを通るため、**承認前にキャンセルすると再開できない**。
+# push しか受け付けないと、beta が既に目的の commit を指している状態では「同じ
+# commit を push し直す」ことができず、再実行の手段が UI の Re-run only になる。
+# (build-and-release.yml には以前から workflow_dispatch があり、beta 側だけが
+#  欠けていた。2026-07-26 に実際にこれで詰まったため追加した。)
 # ───────────────────────────────────────────
 on:
   push:
     branches:
       - beta
+  workflow_dispatch:
 
 # GITHUB_TOKEN の既定を read-only に絞る。詳細は build-and-release.yml の同じ
 # ブロックのコメントを参照。
