@@ -144,6 +144,16 @@ winget install OpenDumpViewer.OpenDumpViewer
 | `*_installer_{arch}.exe` | ショートカット・ファイル関連付け (.dmp) 付き |
 | `*_portable_{arch}.zip` | 解凍してすぐ使える。レジストリ変更なし |
 
+#### コード署名と実行時の警告について / Code signing & SmartScreen
+
+v4.3.0 以降の配布物（インストーラー EXE・ポータブル版のアプリ本体）には、開発者本人（**柳井建人** / YANAI Taketo）の Authenticode コード署名（タイムスタンプ付き）を付与しています。署名の実績が SmartScreen に蓄積されるまでの間は、警告画面が表示されることがあります。
+
+- **SmartScreen の青い警告画面では、発行元の日本語名が文字化けして見えることがあります**（例: `���縺�` のような表示）。これは Windows 側の既知の表示問題（非 ASCII の発行元名を ANSI で誤デコードする）で、署名自体の異常ではありません
+- **正確な発行元は、ファイルのプロパティ →「デジタル署名」タブ、または UAC の昇格ダイアログで確認してください**（こちらは正しく「柳井建人」と表示されます）。PowerShell の `Get-AuthenticodeSignature` でも確認できます
+- v4.2.1 以前の配布物は未署名のため、発行元が「不明」と表示されます
+
+Binaries from v4.3.0 onward are Authenticode-signed (with RFC 3161 timestamp) by the developer (柳井建人 / YANAI Taketo). Note: the SmartScreen dialog may garble the Japanese publisher name on some systems — a known Windows display issue, not a problem with the signature. Verify the publisher via the file's Digital Signatures property tab or `Get-AuthenticodeSignature`.
+
 ### Use / 使い方
 
 ```
