@@ -14,6 +14,7 @@
 
 #include "odv_types.h"
 #include <stdio.h>
+#include <stdarg.h>
 #include <ctype.h>
 
 /*---------------------------------------------------------------------------
@@ -291,6 +292,135 @@ static ODV_CONSTRAINT *find_constraint_by_name(ODV_SESSION *s, const char *name)
 }
 
 /*---------------------------------------------------------------------------
+    Growable JSON text buffer
+
+    snprintf() returns the length it *would* have written, so accumulating
+    that return value into a position without checking turns a silent
+    truncation into a **negative** size argument on the next call. Negative
+    converts to a huge size_t, and the write runs off the end of the heap
+    block. Every string serialized below (constraint names, CHECK
+    conditions, table/column comments) comes straight out of an untrusted
+    .dmp file, so the buffer grows to fit instead of trusting a fixed
+    per-item budget.
+
+    All appenders are no-ops once an allocation has failed; the failure is
+    reported by buf == NULL at the end, so callers need one check, not one
+    per append.
+ ---------------------------------------------------------------------------*/
+typedef struct {
+    char *buf;   /* NUL-terminated, or NULL after an allocation failure */
+    int   size;  /* allocated bytes */
+    int   pos;   /* bytes used, excluding the terminating NUL */
+} ODV_JBUF;
+
+static int jbuf_init(ODV_JBUF *b, int initial)
+{
+    b->buf  = (char *)malloc(initial);
+    b->size = b->buf ? initial : 0;
+    b->pos  = 0;
+    if (b->buf) b->buf[0] = '\0';
+    return b->buf != NULL;
+}
+
+static void jbuf_fail(ODV_JBUF *b)
+{
+    free(b->buf);
+    b->buf  = NULL;
+    b->size = 0;
+    b->pos  = 0;
+}
+
+/* Make room for `extra` more bytes plus the terminating NUL. */
+static int jbuf_reserve(ODV_JBUF *b, int extra)
+{
+    int grown;
+    char *p;
+
+    if (!b->buf) return 0;
+    if (extra < 0 || b->pos > INT_MAX - extra - 1) { jbuf_fail(b); return 0; }
+    if (b->pos + extra + 1 <= b->size) return 1;
+
+    grown = b->size;
+    while (grown < b->pos + extra + 1) {
+        if (grown > INT_MAX / 2) { grown = b->pos + extra + 1; break; }
+        grown *= 2;
+    }
+
+    p = (char *)realloc(b->buf, grown);
+    if (!p) { jbuf_fail(b); return 0; }
+    b->buf  = p;
+    b->size = grown;
+    return 1;
+}
+
+static void jbuf_putc(ODV_JBUF *b, char c)
+{
+    if (!jbuf_reserve(b, 1)) return;
+    b->buf[b->pos++] = c;
+    b->buf[b->pos] = '\0';
+}
+
+static void jbuf_puts(ODV_JBUF *b, const char *str)
+{
+    size_t len;
+
+    if (!str) return;
+    len = strlen(str);
+    if (len > (size_t)INT_MAX || !jbuf_reserve(b, (int)len)) return;
+    memcpy(b->buf + b->pos, str, len);
+    b->pos += (int)len;
+    b->buf[b->pos] = '\0';
+}
+
+static void jbuf_printf(ODV_JBUF *b, const char *fmt, ...)
+{
+    va_list ap, ap_write;
+    int n;
+
+    if (!b->buf) return;
+
+    /* Measure first (vsnprintf into NULL/0), grow, then write. The size
+       argument passed below is always the real remaining space. */
+    va_start(ap, fmt);
+    va_copy(ap_write, ap);
+    n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+
+    if (n < 0 || !jbuf_reserve(b, n)) { va_end(ap_write); return; }
+    vsnprintf(b->buf + b->pos, (size_t)(b->size - b->pos), fmt, ap_write);
+    va_end(ap_write);
+    b->pos += n;
+}
+
+/* Append `str` as a complete JSON string literal, including the quotes.
+   Escapes the control characters System.Text.Json rejects on the VB.NET
+   side, and cannot truncate its input (no fixed-size scratch buffer). */
+static void jbuf_put_json_string(ODV_JBUF *b, const char *str)
+{
+    const unsigned char *p = (const unsigned char *)str;
+
+    jbuf_putc(b, '"');
+    if (str) {
+        for (; *p; p++) {
+            switch (*p) {
+            case '"':  jbuf_puts(b, "\\\""); break;
+            case '\\': jbuf_puts(b, "\\\\"); break;
+            case '\b': jbuf_puts(b, "\\b");  break;
+            case '\f': jbuf_puts(b, "\\f");  break;
+            case '\n': jbuf_puts(b, "\\n");  break;
+            case '\r': jbuf_puts(b, "\\r");  break;
+            case '\t': jbuf_puts(b, "\\t");  break;
+            default:
+                if (*p < 0x20) jbuf_printf(b, "\\u%04x", (unsigned int)*p);
+                else           jbuf_putc(b, (char)*p);
+                break;
+            }
+        }
+    }
+    jbuf_putc(b, '"');
+}
+
+/*---------------------------------------------------------------------------
     serialize_constraints_json
 
     Serialize constraint array to JSON string.
@@ -298,169 +428,96 @@ static ODV_CONSTRAINT *find_constraint_by_name(ODV_SESSION *s, const char *name)
  ---------------------------------------------------------------------------*/
 static char *serialize_constraints_json(ODV_SESSION *s)
 {
+    ODV_JBUF b;
     int i, j;
-    int buf_size = 4096;
-    int pos = 0;
-    char *buf;
+    int has_comment;
 
     if (s->table.constraint_count == 0) {
-        buf = (char *)malloc(3);
+        char *buf = (char *)malloc(3);
         if (buf) { buf[0] = '['; buf[1] = ']'; buf[2] = '\0'; }
         return buf;
     }
 
-    buf = (char *)malloc(buf_size);
-    if (!buf) return NULL;
+    if (!jbuf_init(&b, 4096)) return NULL;
 
-    buf[pos++] = '[';
+    jbuf_putc(&b, '[');
     for (i = 0; i < s->table.constraint_count; i++) {
         ODV_CONSTRAINT *c = &s->table.constraints[i];
-        char tmp[2048];
-        int n;
 
-        /* Ensure buffer space */
-        if (pos + 2048 > buf_size) {
-            buf_size *= 2;
-            { char *tmp_ptr = (char *)realloc(buf, buf_size);
-              if (!tmp_ptr) { free(buf); return NULL; }
-              buf = tmp_ptr; }
-        }
-
-        if (i > 0) buf[pos++] = ',';
+        if (i > 0) jbuf_putc(&b, ',');
 
         /* type, name */
-        n = snprintf(tmp, sizeof(tmp),
-            "{\"type\":%d,\"name\":\"%s\",\"columns\":[", c->type, c->name);
-        memcpy(buf + pos, tmp, n); pos += n;
+        jbuf_printf(&b, "{\"type\":%d,\"name\":", c->type);
+        jbuf_put_json_string(&b, c->name);
 
         /* columns */
+        jbuf_puts(&b, ",\"columns\":[");
         for (j = 0; j < c->col_count; j++) {
-            if (j > 0) buf[pos++] = ',';
-            n = snprintf(tmp, sizeof(tmp), "\"%s\"", c->columns[j]);
-            memcpy(buf + pos, tmp, n); pos += n;
+            if (j > 0) jbuf_putc(&b, ',');
+            jbuf_put_json_string(&b, c->columns[j]);
         }
-        buf[pos++] = ']';
+        jbuf_putc(&b, ']');
 
         /* FK ref */
         if (c->type == CONSTRAINT_FK) {
-            n = snprintf(tmp, sizeof(tmp),
-                ",\"ref_schema\":\"%s\",\"ref_table\":\"%s\",\"ref_columns\":[",
-                c->ref_schema, c->ref_table);
-            memcpy(buf + pos, tmp, n); pos += n;
+            jbuf_puts(&b, ",\"ref_schema\":");
+            jbuf_put_json_string(&b, c->ref_schema);
+            jbuf_puts(&b, ",\"ref_table\":");
+            jbuf_put_json_string(&b, c->ref_table);
+            jbuf_puts(&b, ",\"ref_columns\":[");
             for (j = 0; j < c->ref_col_count; j++) {
-                if (j > 0) buf[pos++] = ',';
-                n = snprintf(tmp, sizeof(tmp), "\"%s\"", c->ref_columns[j]);
-                memcpy(buf + pos, tmp, n); pos += n;
+                if (j > 0) jbuf_putc(&b, ',');
+                jbuf_put_json_string(&b, c->ref_columns[j]);
             }
-            buf[pos++] = ']';
+            jbuf_putc(&b, ']');
         }
 
         /* CHECK condition */
         if (c->type == CONSTRAINT_CHECK && c->condition[0]) {
-            /* JSON-escape the condition (double-quotes and backslashes) */
-            char esc[2048];
-            int ei = 0;
-            const char *cp = c->condition;
-            while (*cp && ei < (int)sizeof(esc) - 2) {
-                if (*cp == '"' || *cp == '\\') esc[ei++] = '\\';
-                esc[ei++] = *cp++;
-            }
-            esc[ei] = '\0';
-            n = snprintf(tmp, sizeof(tmp), ",\"condition\":\"%s\"", esc);
-            if (pos + n + 8 > buf_size) {
-                buf_size *= 2;
-                { char *tmp_ptr = (char *)realloc(buf, buf_size);
-                  if (!tmp_ptr) { free(buf); return NULL; }
-                  buf = tmp_ptr; }
-            }
-            memcpy(buf + pos, tmp, n); pos += n;
+            jbuf_puts(&b, ",\"condition\":");
+            jbuf_put_json_string(&b, c->condition);
         }
 
         /* INDEX expression */
         if (c->type == CONSTRAINT_INDEX && c->index_expr[0]) {
-            char esc[2048];
-            int ei = 0;
-            const char *cp = c->index_expr;
-            while (*cp && ei < (int)sizeof(esc) - 2) {
-                if (*cp == '"' || *cp == '\\') esc[ei++] = '\\';
-                esc[ei++] = *cp++;
-            }
-            esc[ei] = '\0';
-            n = snprintf(tmp, sizeof(tmp), ",\"index_expr\":\"%s\"", esc);
-            if (pos + n + 8 > buf_size) {
-                buf_size *= 2;
-                { char *tmp_ptr = (char *)realloc(buf, buf_size);
-                  if (!tmp_ptr) { free(buf); return NULL; }
-                  buf = tmp_ptr; }
-            }
-            memcpy(buf + pos, tmp, n); pos += n;
+            jbuf_puts(&b, ",\"index_expr\":");
+            jbuf_put_json_string(&b, c->index_expr);
         }
 
-        buf[pos++] = '}';
+        jbuf_putc(&b, '}');
     }
 
     /* Append comments entry (type=5) if table or any column has a comment */
-    {
-        int has_comment = (s->table.comment[0] != '\0');
-        if (!has_comment) {
-            for (i = 0; i < s->table.col_count; i++) {
-                if (s->table.columns[i].comment[0]) { has_comment = 1; break; }
-            }
-        }
-        if (has_comment) {
-            /* Ensure buffer space (generous: 512 per col + 512 for table) */
-            int needed = (s->table.col_count + 1) * 600 + 128;
-            if (pos + needed > buf_size) {
-                buf_size = pos + needed;
-                { char *tmp_ptr = (char *)realloc(buf, buf_size);
-                  if (!tmp_ptr) { free(buf); return NULL; }
-                  buf = tmp_ptr; }
-            }
-
-            if (s->table.constraint_count > 0 || pos > 1) buf[pos++] = ',';
-
-            /* JSON-escape helper inline */
-            #define JSON_ESC_COMMENT(src, dst, dst_size) do { \
-                int _ei = 0; const char *_cp = (src); \
-                while (*_cp && _ei < (int)(dst_size) - 2) { \
-                    if (*_cp == '"' || *_cp == '\\') (dst)[_ei++] = '\\'; \
-                    (dst)[_ei++] = *_cp++; \
-                } (dst)[_ei] = '\0'; \
-            } while(0)
-
-            char esc[1024];
-            int n;
-
-            /* table_comment */
-            JSON_ESC_COMMENT(s->table.comment, esc, sizeof(esc));
-            n = snprintf(buf + pos, buf_size - pos,
-                "{\"type\":5,\"table_comment\":\"%s\",\"col_comments\":{", esc);
-            pos += n;
-
-            /* col_comments */
-            int first_col = 1;
-            for (i = 0; i < s->table.col_count; i++) {
-                if (s->table.columns[i].comment[0]) {
-                    char col_esc[256], cmt_esc[1024];
-                    JSON_ESC_COMMENT(s->table.columns[i].name, col_esc, sizeof(col_esc));
-                    JSON_ESC_COMMENT(s->table.columns[i].comment, cmt_esc, sizeof(cmt_esc));
-                    if (!first_col) buf[pos++] = ',';
-                    n = snprintf(buf + pos, buf_size - pos,
-                        "\"%s\":\"%s\"", col_esc, cmt_esc);
-                    pos += n;
-                    first_col = 0;
-                }
-            }
-            n = snprintf(buf + pos, buf_size - pos, "}}");
-            pos += n;
-
-            #undef JSON_ESC_COMMENT
-        }
+    has_comment = (s->table.comment[0] != '\0');
+    for (i = 0; !has_comment && i < s->table.col_count; i++) {
+        if (s->table.columns[i].comment[0]) has_comment = 1;
     }
 
-    buf[pos++] = ']';
-    buf[pos] = '\0';
-    return buf;
+    if (has_comment) {
+        int first_col = 1;
+
+        jbuf_putc(&b, ',');
+
+        /* table_comment */
+        jbuf_puts(&b, "{\"type\":5,\"table_comment\":");
+        jbuf_put_json_string(&b, s->table.comment);
+
+        /* col_comments */
+        jbuf_puts(&b, ",\"col_comments\":{");
+        for (i = 0; i < s->table.col_count; i++) {
+            if (!s->table.columns[i].comment[0]) continue;
+            if (!first_col) jbuf_putc(&b, ',');
+            jbuf_put_json_string(&b, s->table.columns[i].name);
+            jbuf_putc(&b, ':');
+            jbuf_put_json_string(&b, s->table.columns[i].comment);
+            first_col = 0;
+        }
+        jbuf_puts(&b, "}}");
+    }
+
+    jbuf_putc(&b, ']');
+
+    return b.buf;  /* NULL if any allocation along the way failed */
 }
 
 /*---------------------------------------------------------------------------

@@ -316,11 +316,17 @@ ODV_API const char * ODV_CALL odv_get_table_constraints_json(ODV_SESSION *s, int
         return json_buf;
     }
 
+    /* Reserve one byte for the closing ']' so the loop can never consume the
+       space it needs. snprintf() returns the length it *would* have written,
+       so `pos` is only advanced when the write actually fit — advancing it by
+       an unclamped return value would push `pos` past the buffer and make the
+       next call's `sizeof(json_buf) - pos` wrap to a huge size_t. Constraint
+       names come from the dump file, so this is reachable input, not theory. */
     json_buf[pos++] = '[';
     for (i = 0; i < e->meta_constraint_count; i++) {
         ODV_CONSTRAINT_NAME *mc = &e->meta_constraints[i];
         char esc_name[ODV_OBJNAME_LEN * 2 + 1];
-        int ei = 0;
+        int ei = 0, n, remain;
         const char *cp = mc->name;
         while (*cp && ei < (int)sizeof(esc_name) - 2) {
             if (*cp == '"' || *cp == '\\') esc_name[ei++] = '\\';
@@ -328,10 +334,17 @@ ODV_API const char * ODV_CALL odv_get_table_constraints_json(ODV_SESSION *s, int
         }
         esc_name[ei] = '\0';
 
-        if (i > 0) json_buf[pos++] = ',';
-        int n = snprintf(json_buf + pos, sizeof(json_buf) - pos,
-            "{\"type\":%d,\"name\":\"%s\",\"columns\":[]}", mc->type, esc_name);
-        if (n > 0) pos += n;
+        remain = (int)sizeof(json_buf) - pos - 2;  /* keep room for "]\0" */
+        n = snprintf(json_buf + pos, (size_t)(remain + 1),
+            "%s{\"type\":%d,\"name\":\"%s\",\"columns\":[]}",
+            (i > 0) ? "," : "", mc->type, esc_name);
+        if (n < 0 || n > remain) {
+            /* Would not fit: drop this and the remaining entries rather than
+               emit a half-written object that breaks the JSON. */
+            json_buf[pos] = '\0';
+            break;
+        }
+        pos += n;
     }
     json_buf[pos++] = ']';
     json_buf[pos] = '\0';

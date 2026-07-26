@@ -9,6 +9,11 @@ on:
     branches:
       - beta
 
+# GITHUB_TOKEN の既定を read-only に絞る。詳細は build-and-release.yml の同じ
+# ブロックのコメントを参照。
+permissions:
+  contents: read
+
 # 同一ブランチのリリース実行が重ならないようにする。cancel-in-progress は **false**
 # (実行の途中で Pre-release 作成や Store 提出まで進むため、割り込みキャンセルはしない)。
 # 詳細は build-and-release.yml の同じブロックのコメントを参照。
