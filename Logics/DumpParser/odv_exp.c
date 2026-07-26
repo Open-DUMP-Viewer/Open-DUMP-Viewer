@@ -425,18 +425,17 @@ static void jbuf_put_json_string(ODV_JBUF *b, const char *str)
 
     Serialize constraint array to JSON string.
     Caller must free the returned buffer.
+
+    The array also carries the table/column comments as a trailing type=5
+    entry, so it must be built even for a table with no constraints at all —
+    returning "[]" early on constraint_count == 0 silently dropped the
+    comments of every table that happened to have none.
  ---------------------------------------------------------------------------*/
 static char *serialize_constraints_json(ODV_SESSION *s)
 {
     ODV_JBUF b;
     int i, j;
     int has_comment;
-
-    if (s->table.constraint_count == 0) {
-        char *buf = (char *)malloc(3);
-        if (buf) { buf[0] = '['; buf[1] = ']'; buf[2] = '\0'; }
-        return buf;
-    }
 
     if (!jbuf_init(&b, 4096)) return NULL;
 
@@ -496,7 +495,8 @@ static char *serialize_constraints_json(ODV_SESSION *s)
     if (has_comment) {
         int first_col = 1;
 
-        jbuf_putc(&b, ',');
+        /* Only separate from a preceding constraint object, not from '[' */
+        if (s->table.constraint_count > 0) jbuf_putc(&b, ',');
 
         /* table_comment */
         jbuf_puts(&b, "{\"type\":5,\"table_comment\":");
