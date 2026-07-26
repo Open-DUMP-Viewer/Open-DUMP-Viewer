@@ -241,6 +241,22 @@ cla-assistant.io は署名対象の文書として **Gist しか指定できな�
 - **依存を追加・更新したら `THIRD-PARTY-NOTICES.txt` を更新する**。Dependabot の PR も例外ではない（新規パッケージが増えたら追記が要る）。ライセンス種別は推測せず、NuGet キャッシュの `.nuspec`（`<license>` / `<copyright>`）と同梱の LICENSE ファイルから確認する
 - Oracle Instant Client は**同梱していない**（利用者が明示的に選択したときのみ取得）。ただし配布経路が自社ドメインのため OTN ライセンス条件の確認が別途必要
 
+#### SixLabors.Fonts を直接参照にしてはならない（2026-07-26 調査）
+
+SixLabors.Fonts は **2.0.0 でライセンスが変わっている**。1.0.x は nuspec が `Apache-2.0` を表明する素の Apache-2.0 だが、2.0.0 以降は同梱 LICENSE ファイルの **Six Labors Split License Version 1.0** になり、Apache-2.0 が適用されるのは条文 2 条の付与要件を満たす場合のみになる。
+
+本製品で Apache-2.0 が適用される根拠は、要件のうち次の一項である。
+
+> - You are consuming the Work as a **Transitive Package Dependency**.
+>   （"Transitive Package Dependency" = Six Labors と無関係な第三者依存によって間接的にインストールされる Work）
+
+SixLabors.Fonts は **ClosedXML 経由の推移的依存**であり、直接参照していない。この形である限りバージョンが 2.x に上がっても Apache-2.0 のままで、売上要件は掛からない。`THIRD-PARTY-NOTICES.txt` が Apache-2.0 の節に置いているのはこの根拠による。
+
+**したがって `Open DUMP Viewer.vbproj` に `SixLabors.Fonts` の `PackageReference` を足してはならない。** 直接参照（Direct Package Dependency）にすると付与要件が変わり、2.x では「年間総収入 100 万 USD 未満の営利」または「非営利・登録慈善団体」に該当しない限り Six Labors 商用ライセンスの購入が必要になる。バージョン固定の目的であっても、推移的依存のまま置くこと。
+
+- ClosedXML 0.105.1 時点で依存範囲は `[1.0.0, 3.0.0)`。NuGet は既定で条件を満たす最小版を採るため実際の解決は **1.0.0**（他に SixLabors.Fonts を要求する依存はない）
+- 3.0.0 以降は ClosedXML 側の上限で入らない。上限が緩む更新が来たら、推移的依存のままかを再確認する
+
 配布物への同梱は `Open DUMP Viewer.vbproj` の `None Include` で行う。publish 出力がインストーラー版・ポータブル版の共通の元になるため、ここに入れれば両方に入る。
 
 ### インストーラーでの使用許諾の表示

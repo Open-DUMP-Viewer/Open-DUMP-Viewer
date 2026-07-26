@@ -49,30 +49,42 @@ static int format_date_custom(const char *fmt_str, int yyyy, int mm, int dd,
     const char *p = fmt_str;
     int pos = 0;
 
+    /* snprintf() returns the length it *would* have written, so adding it to
+       `pos` unclamped lets `pos` pass out_size - 1 on a truncated token and
+       makes the final out[pos] = '\0' write past the end of the buffer.
+       APPEND_NUM only advances by what actually fit. */
+#define APPEND_NUM(fmt, val) do { \
+        int _n = snprintf(out + pos, (size_t)(out_size - pos), (fmt), (val)); \
+        if (_n < 0 || _n >= out_size - pos) { pos = out_size - 1; } \
+        else { pos += _n; } \
+    } while (0)
+
     while (*p && pos < out_size - 1) {
         if (strncmp(p, "YYYY", 4) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%04d", yyyy);
+            APPEND_NUM("%04d", yyyy);
             p += 4;
         } else if (strncmp(p, "MM", 2) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%02d", mm);
+            APPEND_NUM("%02d", mm);
             p += 2;
         } else if (strncmp(p, "DD", 2) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%02d", dd);
+            APPEND_NUM("%02d", dd);
             p += 2;
         } else if (strncmp(p, "HH24", 4) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%02d", hh);
+            APPEND_NUM("%02d", hh);
             p += 4;
         } else if (strncmp(p, "MI", 2) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%02d", mi);
+            APPEND_NUM("%02d", mi);
             p += 2;
         } else if (strncmp(p, "SS", 2) == 0) {
-            pos += snprintf(out + pos, out_size - pos, "%02d", ss);
+            APPEND_NUM("%02d", ss);
             p += 2;
         } else {
             out[pos++] = *p++;
         }
     }
     out[pos] = '\0';
+
+#undef APPEND_NUM
     return ODV_OK;
 }
 

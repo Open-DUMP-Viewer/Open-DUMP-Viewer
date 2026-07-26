@@ -19,6 +19,21 @@ on:
         type: boolean
         default: false
 
+# GITHUB_TOKEN の既定を read-only に絞る。宣言がないと、ジョブはリポジトリ設定の
+# 既定権限(write を含みうる)をそのまま受け取る——CodeQL の
+# actions/missing-workflow-permissions が指摘していた状態。
+#
+# 書き込みが要るジョブだけが自分の permissions ブロックで上書きする(ジョブ側の
+# 宣言はワークフロー側を継承ではなく **置換** する):
+#   - build   : id-token: write (WIF の OIDC トークン発行)
+#   - release : contents: write (gh release create)
+# 残りのジョブ (bundle-msix / publish-winget / publish-chocolatey / publish-store)
+# は checkout と同一 run 内の artifact 授受しか行わず、外部公開はいずれも
+# GITHUB_TOKEN ではなく専用のシークレット (WINGET_TOKEN・CHOCOLATEY_API_KEY・
+# Azure AD 資格情報) を使うため read-only で足りる。
+permissions:
+  contents: read
+
 # 同一ブランチのリリース実行が重ならないようにする(連続 push で 2 本のリリースが
 # 並走し、Release 作成や Store 提出が競合するのを防ぐ)。
 # cancel-in-progress は **false**。本ワークフローは実リリースを作成し Microsoft Store へ

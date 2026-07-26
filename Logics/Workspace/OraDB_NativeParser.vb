@@ -919,8 +919,14 @@ Public Class Open_NativeParser
             End If
 
             ' 制約 JSON を保持
-            If constraintCount > 0 AndAlso constraintsJsonPtr <> IntPtr.Zero Then
-                ctx.ConstraintsJson(key) = PtrToStringUTF8(constraintsJsonPtr)
+            ' constraintCount は制約の件数しか数えておらず、同じ JSON に載る
+            ' コメント (type=5) は含まない。件数で弾くと「制約はないがコメントは
+            ' ある表」のコメントを取りこぼすため、JSON の中身で判定する。
+            If constraintsJsonPtr <> IntPtr.Zero Then
+                Dim constraintsJson = PtrToStringUTF8(constraintsJsonPtr)
+                If Not String.IsNullOrEmpty(constraintsJson) AndAlso constraintsJson <> "[]" Then
+                    ctx.ConstraintsJson(key) = constraintsJson
+                End If
             End If
 
         Catch
