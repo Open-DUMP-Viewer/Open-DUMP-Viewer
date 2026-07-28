@@ -1022,8 +1022,12 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 }
                 st->col_remaining--;
                 if (st->col_remaining <= 0) {
-                    /* Column complete — decode */
-                    decode_column_value(s, ac);
+                    /* Column complete — decode.
+                       In list_only the decoded value is never delivered to the
+                       caller, so skip the NUMBER/DATE/charset conversion work:
+                       listing a large dump only needs the row count. */
+                    if (!list_only)
+                        decode_column_value(s, ac);
                     st->col_idx++;
                     st->data_step = DS_COL_LENGTH;
 
@@ -1357,6 +1361,277 @@ END_PARSE:
 }
 
 /*---------------------------------------------------------------------------
+    scan_master_metadata
+
+    Post-parse scan of the master table area for information that is not in
+    the per-table XML DDL:
+
+      - SCHEMA_EXPORT/TABLE/TABLE_DATA            → partition name
+      - SCHEMA_EXPORT/TABLE/CONSTRAINT/CONSTRAINT → PK / UNIQUE / CHECK name
+      - SCHEMA_EXPORT/TABLE/CONSTRAINT/REF_CONSTRAINT → FK name
+      - SCHEMA_EXPORT/TABLE/INDEX/INDEX           → index name
+
+    These four markers used to be searched in four independent passes over the
+    whole dump file (one for partitions, then one per constraint path), so a
+    plain table listing read a large dump five times end to end.  They are all
+    plain byte-pattern searches, so a single pass finds every one of them.
+
+    Ordering is preserved: constraint/index matches are staged in a growable
+    array and only written into table_list afterwards, grouped by marker in the
+    original path order.  That matters because meta_constraints[] is capped at
+    ODV_MAX_META_CONSTRAINTS — appending them in file order instead would drop
+    a different subset than before on tables that exceed the cap.
+ ---------------------------------------------------------------------------*/
+typedef struct {
+    int  table_index;                   /* index into s->table_list */
+    int  path_index;                    /* 0=CONSTRAINT, 1=REF_CONSTRAINT, 2=INDEX */
+    int  type;                          /* CONSTRAINT_PK / _FK / _INDEX */
+    char name[ODV_OBJNAME_LEN + 1];
+} ODV_META_MATCH;
+
+/* Marker table. Order defines the order meta_constraints[] is filled in. */
+static const struct {
+    const char *path;
+    int         path_len;
+    int         constraint_type;
+} odv_meta_paths[] = {
+    { "SCHEMA_EXPORT/TABLE/CONSTRAINT/CONSTRAINT",     41, CONSTRAINT_PK },     /* PK/UNIQUE/CHECK — type refined later */
+    { "SCHEMA_EXPORT/TABLE/CONSTRAINT/REF_CONSTRAINT", 45, CONSTRAINT_FK },
+    { "SCHEMA_EXPORT/TABLE/INDEX/INDEX\xff",           31, CONSTRAINT_INDEX }
+};
+#define ODV_META_PATH_COUNT 3
+
+/* Shortest marker plus the trailing structure it needs to stay inside the
+   block (INDEX: 31 + 50). A block smaller than this cannot hold any marker,
+   so it is the cut-off for the final short block. Each marker still applies
+   its own tail requirement inside the loop. */
+#define ODV_META_SCAN_MIN_BLOCK  81
+
+static void scan_master_metadata(ODV_SESSION *s)
+{
+    static const char path_marker[] = "SCHEMA_EXPORT/TABLE/TABLE_DATA";
+    static const int  path_len = 30;
+
+    /* part_occ[i] = which occurrence (0-based) of this schema.table the
+       table_list entry i is (e.g. 4 partitions → occ 0,1,2,3). */
+    int *part_occ = NULL;
+    /* Per-table occurrence counter while scanning the master table. Each entry
+       holds a "schema.table" key built after charset conversion, which can
+       expand names, so the element size must match that buffer. */
+    char (*scan_keys)[260] = NULL;
+    int scan_count = 0;
+
+    ODV_META_MATCH *matches = NULL;
+    int match_count = 0, match_alloc = 0;
+
+    FILE *sfp = NULL;
+    unsigned char blk[8192];
+    int blk_len;
+    int ti, k, mi, pass;
+
+    if (s->table_count <= 0) return;
+
+    part_occ  = (int *)malloc((size_t)s->table_count * sizeof(int));
+    scan_keys = (char (*)[260])malloc((size_t)ODV_MAX_TABLES * 260);
+    if (!part_occ || !scan_keys) goto scan_cleanup;
+
+    for (ti = 0; ti < s->table_count; ti++) {
+        part_occ[ti] = 0;
+        for (k = 0; k < ti; k++) {
+            if (strcmp(s->table_list[k].schema, s->table_list[ti].schema) == 0 &&
+                strcmp(s->table_list[k].name,   s->table_list[ti].name)   == 0) {
+                part_occ[ti]++;
+            }
+        }
+    }
+
+    sfp = fopen(s->dump_path, "rb");
+    if (!sfp) goto scan_cleanup;
+    setvbuf(sfp, NULL, _IOFBF, 65536);
+
+    while (!s->cancelled) {
+        int si;
+
+        blk_len = (int)fread(blk, 1, sizeof(blk), sfp);
+        if (blk_len < ODV_META_SCAN_MIN_BLOCK) break;   /* EOF / final short block */
+
+        /* Walk every offset; each marker applies its own tail requirement so
+           the scan range per marker matches what its dedicated pass used. */
+        for (si = 0; si < blk_len; si++) {
+
+            /* ---- SCHEMA_EXPORT/TABLE/TABLE_DATA → partition name ---- */
+            if (si <= blk_len - path_len - 50 &&
+                memcmp(blk + si, path_marker, path_len) == 0) {
+                /* Structure after the path:
+                 * [ff]...[len]TABLE[len]SCHEMA[ff][02]...[ff][len]PART[ff] */
+                int p = si + path_len;
+                char tn[64] = {0}, sn[64] = {0}, pn[64] = {0};
+                int tl, sl;
+
+                while (p < blk_len && blk[p] == 0xff) p++;
+                if (p + 3 >= blk_len) continue;
+
+                tl = blk[p++];
+                if (tl <= 0 || tl > 60 || p + tl + 3 >= blk_len) continue;
+                memcpy(tn, blk + p, tl); p += tl;
+
+                sl = blk[p++];
+                if (sl <= 0 || sl > 60 || p + sl >= blk_len) continue;
+                memcpy(sn, blk + p, sl); p += sl;
+
+                /* After schema: skip binary pattern [ff][02][c1][02][ff][ff][ff]
+                 * and find partition name [len]NAME (printable ASCII).
+                 * Scan forward looking for a valid len+name pattern. */
+                {
+                    int limit = ODV_MIN(p + 20, blk_len - 2);
+                    while (p < limit && !pn[0]) {
+                        int pl = blk[p];
+                        if (pl >= 4 && pl <= 60 && p + 1 + pl <= blk_len) {
+                            /* Check if next pl bytes are all printable ASCII */
+                            int ok = 1, q;
+                            for (q = 0; q < pl; q++) {
+                                if (blk[p+1+q] < 0x20 || blk[p+1+q] > 0x7e) { ok = 0; break; }
+                            }
+                            if (ok) {
+                                memcpy(pn, blk + p + 1, pl);
+                                pn[pl] = '\0';
+                            }
+                        }
+                        p++;
+                    }
+                }
+
+                {
+                    char ct[260], cs2[260], key[260];
+                    int occ = 0, pi;
+
+                    convert_name(tn, s->dump_charset, s->out_charset, ct, sizeof(ct));
+                    convert_name(sn, s->dump_charset, s->out_charset, cs2, sizeof(cs2));
+
+                    snprintf(key, sizeof(key), "%s.%s", cs2, ct);
+                    for (pi = 0; pi < scan_count; pi++) {
+                        if (strcmp(scan_keys[pi], key) == 0) occ++;
+                    }
+                    if (scan_count < ODV_MAX_TABLES)
+                        odv_strcpy(scan_keys[scan_count++], key, 259);
+
+                    if (pn[0]) {
+                        for (ti = 0; ti < s->table_count; ti++) {
+                            if (strcmp(s->table_list[ti].schema, cs2) == 0 &&
+                                strcmp(s->table_list[ti].name,   ct)  == 0 &&
+                                part_occ[ti] == occ) {
+                                odv_strcpy(s->table_list[ti].partition, pn,
+                                           ODV_OBJNAME_LEN);
+                                break;
+                            }
+                        }
+                    }
+                }
+                continue;   /* markers cannot overlap */
+            }
+
+            /* ---- constraint / index markers ---- */
+            for (mi = 0; mi < ODV_META_PATH_COUNT; mi++) {
+                int mlen = odv_meta_paths[mi].path_len;
+                int p, tl, sl, cl;
+                char tn[64] = {0}, sn[64] = {0}, cn[64] = {0};
+
+                if (si > blk_len - mlen - 30) continue;
+                if (memcmp(blk + si, odv_meta_paths[mi].path, mlen) != 0) continue;
+
+                p = si + mlen;
+                while (p < blk_len && blk[p] == 0xff) p++;
+                if (p + 4 >= blk_len) break;
+
+                /* [len]TABLE_NAME */
+                tl = blk[p++];
+                if (tl <= 0 || tl > 60 || p + tl + 3 >= blk_len) break;
+                memcpy(tn, blk + p, tl); p += tl;
+
+                /* [len]SCHEMA */
+                sl = blk[p++];
+                if (sl <= 0 || sl > 60 || p + sl + 2 >= blk_len) break;
+                memcpy(sn, blk + p, sl); p += sl;
+
+                /* [len]CONSTRAINT/INDEX_NAME */
+                cl = blk[p++];
+                if (cl <= 0 || cl > 60 || p + cl > blk_len) break;
+                memcpy(cn, blk + p, cl); p += cl;
+
+                /* Validate: all printable */
+                {
+                    int valid = 1, q;
+                    for (q = 0; q < tl; q++) if (tn[q] < 0x20) { valid = 0; break; }
+                    if (!valid) break;
+                    for (q = 0; q < cl; q++) if (cn[q] < 0x20) { valid = 0; break; }
+                    if (!valid) break;
+                }
+
+                {
+                    char ct[260], cs2[260], cc[260];
+
+                    convert_name(tn, s->dump_charset, s->out_charset, ct, sizeof(ct));
+                    convert_name(sn, s->dump_charset, s->out_charset, cs2, sizeof(cs2));
+                    convert_name(cn, s->dump_charset, s->out_charset, cc, sizeof(cc));
+
+                    /* Find matching table (first occurrence for partitioned
+                     * tables) and stage the name for later insertion. */
+                    for (ti = 0; ti < s->table_count; ti++) {
+                        if (strcmp(s->table_list[ti].schema, cs2) != 0) continue;
+                        if (strcmp(s->table_list[ti].name,   ct)  != 0) continue;
+
+                        if (match_count >= match_alloc) {
+                            int new_alloc = match_alloc ? match_alloc * 2 : 256;
+                            ODV_META_MATCH *nm = (ODV_META_MATCH *)realloc(
+                                matches, (size_t)new_alloc * sizeof(ODV_META_MATCH));
+                            if (!nm) goto scan_apply;   /* keep what we have */
+                            matches = nm;
+                            match_alloc = new_alloc;
+                        }
+                        matches[match_count].table_index = ti;
+                        matches[match_count].path_index  = mi;
+                        matches[match_count].type        = odv_meta_paths[mi].constraint_type;
+                        odv_strcpy(matches[match_count].name, cc, ODV_OBJNAME_LEN);
+                        match_count++;
+                        break;
+                    }
+                }
+                break;      /* one marker can only match one path */
+            }
+        }
+
+        /* No seek-back: 8KB blocks are large enough that boundary
+         * splits of ~80-byte structures are extremely rare. */
+    }
+
+scan_apply:
+    /* Fill meta_constraints[] grouped by marker, in odv_meta_paths order, so
+       the result is byte-for-byte what the old four-pass scan produced. */
+    for (pass = 0; pass < ODV_META_PATH_COUNT; pass++) {
+        for (k = 0; k < match_count; k++) {
+            ODV_TABLE_ENTRY *te;
+            ODV_CONSTRAINT_NAME *mc;
+
+            if (matches[k].path_index != pass) continue;
+
+            te = &s->table_list[matches[k].table_index];
+            if (te->meta_constraint_count >= ODV_MAX_META_CONSTRAINTS) continue;
+
+            mc = &te->meta_constraints[te->meta_constraint_count];
+            odv_strcpy(mc->name, matches[k].name, ODV_OBJNAME_LEN);
+            mc->type = matches[k].type;
+            te->meta_constraint_count++;
+        }
+    }
+
+scan_cleanup:
+    if (sfp) fclose(sfp);
+    free(matches);
+    free(scan_keys);
+    free(part_occ);
+}
+
+/*---------------------------------------------------------------------------
     parse_expdp_dump
 
     Main EXPDP parsing loop:
@@ -1602,237 +1877,11 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
     }
 
 expdp_done:
-    /* Post-parse: populate partition names from master table area.
-     * The master table binary records contain TABLE_DATA entries with
-     * the pattern: SCHEMA_EXPORT/TABLE/TABLE_DATA [ff]...[len]TABLE_NAME
-     * [len]SCHEMA [ff][02][c1][02][ff][ff][ff][len]PARTITION_NAME[ff]
-     * For non-partitioned tables, PARTITION_NAME is absent (just [ff]s). */
-    if (list_only && s->table_count > 0) {
-        /* Build per-table occurrence counters for partition matching.
-         * part_occ[i] = which occurrence (0-based) of this schema.table
-         * in the table_list (e.g., 4 partitions → occ 0,1,2,3). */
-        int part_occ[ODV_MAX_TABLES];
-        {
-            int ti;
-            for (ti = 0; ti < s->table_count; ti++) {
-                part_occ[ti] = 0;
-                int k;
-                for (k = 0; k < ti; k++) {
-                    if (strcmp(s->table_list[k].schema, s->table_list[ti].schema) == 0 &&
-                        strcmp(s->table_list[k].name, s->table_list[ti].name) == 0) {
-                        part_occ[ti]++;
-                    }
-                }
-            }
-        }
-
-        /* Scan file for SCHEMA_EXPORT/TABLE/TABLE_DATA entries.
-         * Simple approach: search byte-by-byte, then seek+read the structure. */
-        {
-            static const char path_marker[] = "SCHEMA_EXPORT/TABLE/TABLE_DATA";
-            static const int path_len = 30;
-            /* Track per-table occurrence in master table.
-             * Each entry holds a "schema.table" key (built below into a 260-byte
-             * buffer after charset conversion, which can expand names), so the
-             * element size must match that buffer to avoid an overflow when the
-             * key is copied in via odv_strcpy. */
-            char scan_keys[ODV_MAX_TABLES][260];
-            int scan_count = 0;
-
-            /* Use the already-parsed file — re-open for scanning */
-            FILE *sfp = fopen(s->dump_path, "rb");
-            if (sfp) {
-                unsigned char blk[8192];
-                int blk_len = 0;
-
-                while (!s->cancelled) {
-                    blk_len = (int)fread(blk, 1, sizeof(blk), sfp);
-                    if (blk_len < path_len + 60) break;
-
-                    int si;
-                    for (si = 0; si <= blk_len - path_len - 50; si++) {
-                        if (memcmp(blk + si, path_marker, path_len) != 0) continue;
-
-                        /* Found path. Structure after:
-                         * [ff]...[len]TABLE[len]SCHEMA[ff][02]...[ff][len]PART[ff] */
-                        int p = si + path_len;
-
-                        /* Skip ff */
-                        while (p < blk_len && blk[p] == 0xff) p++;
-                        if (p + 3 >= blk_len) continue;
-
-                        /* [len]TABLE */
-                        int tl = blk[p++];
-                        if (tl <= 0 || tl > 60 || p + tl + 3 >= blk_len) continue;
-                        char tn[64] = {0};
-                        memcpy(tn, blk + p, tl); p += tl;
-
-                        /* [len]SCHEMA */
-                        int sl = blk[p++];
-                        if (sl <= 0 || sl > 60 || p + sl >= blk_len) continue;
-                        char sn[64] = {0};
-                        memcpy(sn, blk + p, sl); p += sl;
-
-                        /* After schema: skip binary pattern [ff][02][c1][02][ff][ff][ff]
-                         * and find partition name [len]NAME (printable ASCII).
-                         * Scan forward looking for a valid len+name pattern. */
-                        char pn[64] = {0};
-                        {
-                            int limit = ODV_MIN(p + 20, blk_len - 2);
-                            while (p < limit && !pn[0]) {
-                                int pl = blk[p];
-                                if (pl >= 4 && pl <= 60 && p + 1 + pl <= blk_len) {
-                                    /* Check if next pl bytes are all printable ASCII */
-                                    int ok = 1, q;
-                                    for (q = 0; q < pl; q++) {
-                                        if (blk[p+1+q] < 0x20 || blk[p+1+q] > 0x7e) { ok = 0; break; }
-                                    }
-                                    if (ok) {
-                                        memcpy(pn, blk + p + 1, pl);
-                                        pn[pl] = '\0';
-                                    }
-                                }
-                                p++;
-                            }
-                        }
-
-                        /* Convert charset for matching */
-                        char ct[260], cs2[260];
-                        convert_name(tn, s->dump_charset, s->out_charset, ct, sizeof(ct));
-                        convert_name(sn, s->dump_charset, s->out_charset, cs2, sizeof(cs2));
-
-                        /* Count occurrence */
-                        int occ = 0;
-                        {
-                            char key[260];
-                            snprintf(key, sizeof(key), "%s.%s", cs2, ct);
-                            int pi;
-                            for (pi = 0; pi < scan_count; pi++) {
-                                if (strcmp(scan_keys[pi], key) == 0) occ++;
-                            }
-                            if (scan_count < ODV_MAX_TABLES)
-                                odv_strcpy(scan_keys[scan_count++], key, 259);
-                        }
-
-                        /* Assign partition name to matching table_list entry */
-                        if (pn[0]) {
-                            int ti;
-                            for (ti = 0; ti < s->table_count; ti++) {
-                                if (strcmp(s->table_list[ti].schema, cs2) == 0 &&
-                                    strcmp(s->table_list[ti].name, ct) == 0 &&
-                                    part_occ[ti] == occ) {
-                                    odv_strcpy(s->table_list[ti].partition, pn,
-                                               ODV_OBJNAME_LEN);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    /* No seek-back: 8KB blocks are large enough that boundary
-                     * splits of ~80-byte structures are extremely rare. */
-                }
-                fclose(sfp);
-            }
-        }
-    }
-
-    /* Post-parse: populate constraints/indexes from master table.
-     * Scan for SCHEMA_EXPORT/TABLE/CONSTRAINT/CONSTRAINT,
-     * SCHEMA_EXPORT/TABLE/CONSTRAINT/REF_CONSTRAINT, and
-     * SCHEMA_EXPORT/TABLE/INDEX/INDEX patterns.
-     * Structure after path: [ff]...[len]TABLE[len]SCHEMA[len]CONSTRAINT_NAME[len]SCHEMA */
-    if (list_only && s->table_count > 0) {
-        static const struct {
-            const char *path;
-            int path_len;
-            int constraint_type;  /* CONSTRAINT_PK or CONSTRAINT_FK or CONSTRAINT_INDEX */
-        } meta_paths[] = {
-            { "SCHEMA_EXPORT/TABLE/CONSTRAINT/CONSTRAINT",     41, CONSTRAINT_PK },     /* PK/UNIQUE/CHECK — type refined later */
-            { "SCHEMA_EXPORT/TABLE/CONSTRAINT/REF_CONSTRAINT", 45, CONSTRAINT_FK },
-            { "SCHEMA_EXPORT/TABLE/INDEX/INDEX\xff",           31, CONSTRAINT_INDEX },
-            { NULL, 0, 0 }
-        };
-
-        FILE *sfp2 = fopen(s->dump_path, "rb");
-        if (sfp2) {
-            unsigned char blk2[8192];
-            int mi;
-            for (mi = 0; meta_paths[mi].path; mi++) {
-                const char *mpath = meta_paths[mi].path;
-                int mlen = meta_paths[mi].path_len;
-                int mtype = meta_paths[mi].constraint_type;
-
-                odv_fseek(sfp2, 0, SEEK_SET);
-                while (!s->cancelled) {
-                    int nr = (int)fread(blk2, 1, sizeof(blk2), sfp2);
-                    if (nr < mlen + 50) break;
-
-                    int si;
-                    for (si = 0; si <= nr - mlen - 30; si++) {
-                        if (memcmp(blk2 + si, mpath, mlen) != 0) continue;
-
-                        int p = si + mlen;
-                        /* Skip [ff] */
-                        while (p < nr && blk2[p] == 0xff) p++;
-                        if (p + 4 >= nr) continue;
-
-                        /* [len]TABLE_NAME */
-                        int tl = blk2[p++];
-                        if (tl <= 0 || tl > 60 || p + tl + 3 >= nr) continue;
-                        char tn[64] = {0};
-                        memcpy(tn, blk2 + p, tl); p += tl;
-
-                        /* [len]SCHEMA */
-                        int sl = blk2[p++];
-                        if (sl <= 0 || sl > 60 || p + sl + 2 >= nr) continue;
-                        char sn[64] = {0};
-                        memcpy(sn, blk2 + p, sl); p += sl;
-
-                        /* [len]CONSTRAINT/INDEX_NAME */
-                        int cl = blk2[p++];
-                        if (cl <= 0 || cl > 60 || p + cl > nr) continue;
-                        char cn[64] = {0};
-                        memcpy(cn, blk2 + p, cl); p += cl;
-
-                        /* Validate: all printable */
-                        {
-                            int valid = 1, q;
-                            for (q = 0; q < tl; q++) if (tn[q] < 0x20) { valid = 0; break; }
-                            if (!valid) continue;
-                            for (q = 0; q < cl; q++) if (cn[q] < 0x20) { valid = 0; break; }
-                            if (!valid) continue;
-                        }
-
-                        /* Convert charset */
-                        char ct[260], cs2[260], cc[260];
-                        convert_name(tn, s->dump_charset, s->out_charset, ct, sizeof(ct));
-                        convert_name(sn, s->dump_charset, s->out_charset, cs2, sizeof(cs2));
-                        convert_name(cn, s->dump_charset, s->out_charset, cc, sizeof(cc));
-
-                        /* Find matching table in table_list (first occurrence for
-                         * partitioned tables) and add constraint name. */
-                        int ti;
-                        for (ti = 0; ti < s->table_count; ti++) {
-                            if (strcmp(s->table_list[ti].schema, cs2) == 0 &&
-                                strcmp(s->table_list[ti].name, ct) == 0) {
-                                ODV_TABLE_ENTRY *te = &s->table_list[ti];
-                                if (te->meta_constraint_count < ODV_MAX_META_CONSTRAINTS) {
-                                    ODV_CONSTRAINT_NAME *mc =
-                                        &te->meta_constraints[te->meta_constraint_count];
-                                    odv_strcpy(mc->name, cc, ODV_OBJNAME_LEN);
-                                    mc->type = mtype;
-                                    te->meta_constraint_count++;
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            fclose(sfp2);
-        }
-    }
+    /* Post-parse: pull partition names, constraint names and index names out
+     * of the master table area. All four byte markers are found in one pass
+     * over the file (see scan_master_metadata). */
+    if (list_only)
+        scan_master_metadata(s);
 
     free(ddl_buf);
     fclose(fp);

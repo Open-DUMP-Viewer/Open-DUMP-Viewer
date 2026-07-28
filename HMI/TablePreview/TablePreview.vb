@@ -91,6 +91,22 @@ Public Class TablePreview
     Private _sortAscending As Boolean = True
 
     ''' <summary>
+    ''' BLOB セルのサムネイル画像キャッシュ (キー: 行インデックスと列インデックスの合成値)
+    '''
+    ''' VirtualMode の CellValueNeeded は「表示のたび」に呼ばれるため、ここで毎回
+    ''' 画像を生成すると GDI+ のビットマップが際限なく積み上がる。生成済みの画像を
+    ''' 保持して使い回し、ページ切替・フィルタ・フォーム終了で明示的に破棄する。
+    ''' 値が Nothing のエントリは「画像ではないと判定済み」を意味する（再判定の抑止）。
+    ''' </summary>
+    Private ReadOnly _thumbnailCache As New Dictionary(Of Long, Image)
+
+    ''' <summary>サムネイルキャッシュの上限。超えたら全破棄して作り直す</summary>
+    Private Const ThumbnailCacheLimit As Integer = 2000
+
+    ''' <summary>大きなテーブルを閉じた後に LOH 圧縮を行う行数のしきい値</summary>
+    Private Const LohCompactionRowThreshold As Integer = 50000
+
+    ''' <summary>
     ''' コンストラクタ
     '''
     ''' テーブルデータ、列名、テーブル名を受け取り、フォームを初期化する。
@@ -246,8 +262,67 @@ Public Class TablePreview
     End Sub
 
     ''' <summary>
+    ''' フォームを閉じたときの後始末
+    '''
+    ''' このフォームは表の全行 (_tableData) をメモリ上に持つ。ウィンドウを閉じた
+    ''' だけではフォーム自身が回収されるまで行データも解放されないため、参照を
+    ''' 明示的に切って即座に回収可能にする。あわせてサムネイル画像 (GDI+) と
+    ''' DataGridView の行・列も解放する。
+    '''
+    ''' 大きな表を閉じた場合は、行データの配列が大きなオブジェクトヒープ (LOH) に
+    ''' 載っている。LOH は既定では圧縮されず、解放してもプロセスのメモリ使用量が
+    ''' 下がって見えないため、明示的に圧縮を伴う回収を要求する。
+    ''' </summary>
+    Private Sub TablePreview_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        Dim rowsHeld As Integer = _totalRows
+
+        Try
+            ClearThumbnailCache()
+
+            ' CellValueNeeded がこれ以降データを参照しないようにしてから解放する
+            dataGridViewData.RowCount = 0
+            dataGridViewData.Columns.Clear()
+            comboBoxColumns.Items.Clear()
+        Catch
+            ' 破棄処理中の例外は無視（後始末なので続行する）
+        End Try
+
+        _tableData = Nothing
+        _filteredData = Nothing
+        _columnNames = Nothing
+        _columnIndexMap = Nothing
+        _columnTypes = Nothing
+        _columnNotNulls = Nothing
+        _columnDefaults = Nothing
+        _currentSearchCondition = Nothing
+        _lastSearchCondition = Nothing
+        _lobColumnIndices.Clear()
+        _blobColumnIndices.Clear()
+
+        If rowsHeld >= LohCompactionRowThreshold Then
+            CompactLargeObjectHeap()
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' 大きなオブジェクトヒープを圧縮して、解放済みメモリを OS に返す。
+    ''' 数百万行を閉じた直後にだけ呼ぶ（それ以外では回収コストに見合わない）。
+    ''' </summary>
+    Private Shared Sub CompactLargeObjectHeap()
+        Try
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode =
+                System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, True, True)
+            GC.WaitForPendingFinalizers()
+            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, True, True)
+        Catch
+            ' 回収の失敗は致命的ではない
+        End Try
+    End Sub
+
+    ''' <summary>
     ''' シンプル検索ボタンのクリックイベントハンドラー
-    ''' 
+    '''
     ''' （非表示であるため、通常は呼び出されない）
     ''' 列とキーワードでシンプル検索を実行
     ''' </summary>
@@ -283,30 +358,33 @@ Public Class TablePreview
     ''' </summary>
     Private Sub OpenAdvancedSearchForm()
         ' AdvancedSearchForm インスタンスを作成
-        Dim advancedForm As New AdvancedSearchForm(_columnNames)
+        ' Using で確実に破棄する。ShowDialog はフォームを破棄しないため、
+        ' 検索のたびにコントロール一式とウィンドウハンドルが残っていた。
+        Using advancedForm As New AdvancedSearchForm(_columnNames)
 
-        ' 前回の検索条件があれば復元
-        If _lastSearchCondition IsNot Nothing Then
-            advancedForm.SetSearchCondition(_lastSearchCondition)
-        End If
+            ' 前回の検索条件があれば復元
+            If _lastSearchCondition IsNot Nothing Then
+                advancedForm.SetSearchCondition(_lastSearchCondition)
+            End If
 
-        ' モーダルダイアログで表示
-        If advancedForm.ShowDialog(Me) = DialogResult.OK Then
-            ' ページを最初に戻す
-            _currentPage = 1
+            ' モーダルダイアログで表示
+            If advancedForm.ShowDialog(Me) = DialogResult.OK Then
+                ' ページを最初に戻す
+                _currentPage = 1
 
-            ' 検索条件を取得
-            _currentSearchCondition = advancedForm.SearchConditionResult
+                ' 検索条件を取得
+                _currentSearchCondition = advancedForm.SearchConditionResult
 
-            ' 検索条件を保持（ディープコピー）
-            _lastSearchCondition = CopySearchCondition(_currentSearchCondition)
+                ' 検索条件を保持（ディープコピー）
+                _lastSearchCondition = CopySearchCondition(_currentSearchCondition)
 
-            ' データをフィルタリング
-            FilterData()
+                ' データをフィルタリング
+                FilterData()
 
-            ' 表示を更新
-            UpdateDataDisplay()
-        End If
+                ' 表示を更新
+                UpdateDataDisplay()
+            End If
+        End Using
     End Sub
 
     ''' <summary>
@@ -642,6 +720,10 @@ Public Class TablePreview
     Private _displayStartRow As Integer = 0
 
     Private Sub UpdateDataDisplay()
+        ' 表示内容が入れ替わるため、前ページ分のサムネイル画像を解放する。
+        ' 画面はこの後 Invalidate で再描画され、必要な分だけ作り直される。
+        ClearThumbnailCache()
+
         ' 総ページ数を計算（データが0件の場合は1を使用）
         Dim totalPages As Integer = CInt(Math.Ceiling(If(_filteredData.Count = 0, 1, CDbl(_filteredData.Count) / _pageCount)))
 
@@ -671,10 +753,22 @@ Public Class TablePreview
     End Sub
 
     ''' <summary>
+    ''' サムネイルキャッシュを破棄する（保持している GDI+ 画像を解放）
+    ''' </summary>
+    Private Sub ClearThumbnailCache()
+        For Each img In _thumbnailCache.Values
+            img?.Dispose()
+        Next
+        _thumbnailCache.Clear()
+    End Sub
+
+    ''' <summary>
     ''' VirtualMode 用: セル値をオンデマンドで返す
     ''' DataGridView が表示に必要なセルだけを要求するため、メモリ効率が高い
     ''' </summary>
     Private Sub dataGridViewData_CellValueNeeded(sender As Object, e As DataGridViewCellValueEventArgs) Handles dataGridViewData.CellValueNeeded
+        If _filteredData Is Nothing OrElse _columnNames Is Nothing Then Return
+
         Dim dataIndex = _displayStartRow + e.RowIndex
         If dataIndex < 0 OrElse dataIndex >= _filteredData.Count Then Return
         If e.ColumnIndex < 0 OrElse e.ColumnIndex >= _columnNames.Count Then Return
@@ -688,16 +782,30 @@ Public Class TablePreview
         Dim cellValue = row(e.ColumnIndex)
 
         ' BLOB カラム: hex 文字列から画像サムネイルを生成
+        ' 生成結果はキャッシュする。CellValueNeeded は再描画のたびに呼ばれるため、
+        ' 毎回生成すると GDI+ ビットマップが解放されずに増え続ける。
         If _blobColumnIndices.Contains(e.ColumnIndex) Then
-            If Not String.IsNullOrEmpty(cellValue) Then
-                Dim img = TryCreateThumbnailFromHex(cellValue)
-                If img IsNot Nothing Then
-                    e.Value = img
-                    Return
-                End If
+            If String.IsNullOrEmpty(cellValue) Then
+                e.Value = Nothing
+                Return
             End If
-            ' 画像でない or 空の場合は Nothing（ImageColumn はテキスト不可）
-            e.Value = Nothing
+
+            Dim cacheKey As Long = (CLng(dataIndex) << 20) Or CLng(e.ColumnIndex)
+            Dim cached As Image = Nothing
+            If _thumbnailCache.TryGetValue(cacheKey, cached) Then
+                ' Nothing のエントリは「画像ではない」と判定済みの意味
+                e.Value = cached
+                Return
+            End If
+
+            If _thumbnailCache.Count >= ThumbnailCacheLimit Then
+                ClearThumbnailCache()
+            End If
+
+            Dim img = TryCreateThumbnailFromHex(cellValue)
+            _thumbnailCache(cacheKey) = img
+            ' 画像でない場合は Nothing（ImageColumn はテキスト不可）
+            e.Value = img
             Return
         End If
 
@@ -800,16 +908,23 @@ Public Class TablePreview
             Next
 
             ' 画像として表示を試みる
+            ' MemoryStream は Image の生存期間中は開いたままにする必要があるため、
+            ' ShowDialog を Using の内側で行う。Image は PictureBox の破棄では
+            ' 解放されないので、閉じた時点で明示的に破棄する。
             Try
                 Using ms As New IO.MemoryStream(bytes)
                     Dim img = Image.FromStream(ms, True, True)
-                    Dim pb As New PictureBox() With {
-                        .Dock = DockStyle.Fill,
-                        .SizeMode = PictureBoxSizeMode.Zoom,
-                        .Image = img
-                    }
-                    frm.Controls.Add(pb)
-                    frm.ShowDialog(Me)
+                    Try
+                        Dim pb As New PictureBox() With {
+                            .Dock = DockStyle.Fill,
+                            .SizeMode = PictureBoxSizeMode.Zoom,
+                            .Image = img
+                        }
+                        frm.Controls.Add(pb)
+                        frm.ShowDialog(Me)
+                    Finally
+                        img.Dispose()
+                    End Try
                     Return
                 End Using
             Catch
@@ -838,26 +953,26 @@ Public Class TablePreview
 
     ''' <summary>CLOB データのポップアッププレビュー（テキスト表示）</summary>
     Private Sub ShowClobPreview(textData As String, columnName As String)
-        Dim frm As New Form() With {
+        ' Using で、途中で例外が出た場合もウィンドウを確実に破棄する
+        Using frm As New Form() With {
             .Text = $"CLOB Preview - {columnName}",
             .Size = New Size(640, 480),
             .StartPosition = FormStartPosition.CenterParent,
             .MinimizeBox = False,
             .MaximizeBox = True
         }
-
-        Dim tb As New TextBox() With {
-            .Dock = DockStyle.Fill,
-            .Multiline = True,
-            .ScrollBars = ScrollBars.Both,
-            .Font = New Font("Consolas", 10),
-            .ReadOnly = True,
-            .WordWrap = True,
-            .Text = textData
-        }
-        frm.Controls.Add(tb)
-        frm.ShowDialog(Me)
-        frm.Dispose()
+            Dim tb As New TextBox() With {
+                .Dock = DockStyle.Fill,
+                .Multiline = True,
+                .ScrollBars = ScrollBars.Both,
+                .Font = New Font("Consolas", 10),
+                .ReadOnly = True,
+                .WordWrap = True,
+                .Text = textData
+            }
+            frm.Controls.Add(tb)
+            frm.ShowDialog(Me)
+        End Using
     End Sub
 
     ''' <summary>

@@ -1592,8 +1592,11 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             non_null_lob_cols[non_null_lob_count++] = col_idx;
         }
 
-        /* Decode and store */
-        if (col_idx < s->table.col_count) {
+        /* Decode and store.
+           In list_only the decoded value is never delivered to the caller, so
+           skip the NUMBER/DATE/charset conversion work: listing a large dump
+           only needs the row count. */
+        if (!list_only && col_idx < s->table.col_count) {
             decode_exp_column(s, col_idx, col_buf, col_len);
         }
         col_idx++;
