@@ -727,8 +727,9 @@ Public Class Open_DUMP_Viewer
 
 #Region "メニューイベント: オプション"
     Private Sub オプションOToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles オプションOToolStripMenuItem.Click
-        Dim dlg As New ExportOptionsDialog()
-        dlg.ShowDialog(Me)
+        Using dlg As New ExportOptionsDialog()
+            dlg.ShowDialog(Me)
+        End Using
     End Sub
 #End Region
 
@@ -742,15 +743,17 @@ Public Class Open_DUMP_Viewer
     Private Sub エラー報告RToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles エラー報告RToolStripMenuItem.Click
         Dim ws = Me.MdiChildren.OfType(Of Workspace)().FirstOrDefault()
         Dim dumpPath As String = If(ws IsNot Nothing, ws.DumpFilePath, Nothing)
-        Dim dlg As New ErrorReportDialog(dumpPath)
-        dlg.ShowDialog(Me)
+        Using dlg As New ErrorReportDialog(dumpPath)
+            dlg.ShowDialog(Me)
+        End Using
     End Sub
 #End Region
 
 #Region "メニューイベント: バージョン情報"
     Private Sub バージョン情報AToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles バージョン情報AToolStripMenuItem.Click
-        Dim dlg As New AboutDialog()
-        dlg.ShowDialog(Me)
+        Using dlg As New AboutDialog()
+            dlg.ShowDialog(Me)
+        End Using
     End Sub
 #End Region
 
@@ -803,11 +806,14 @@ Public Class Open_DUMP_Viewer
         If Not COMMON.CheckTrialRestriction() Then Return
         Dim ctx = GetExportContext()
 
-        ' DBMS 選択ダイアログ
-        Dim sqlDlg As New SqlExportDialog()
-        If sqlDlg.ShowDialog(Me) <> DialogResult.OK Then Return
-        Dim dbmsType = sqlDlg.SelectedDbmsType
-        Dim dbName = sqlDlg.DatabaseName
+        ' DBMS 選択ダイアログ（ShowDialog は破棄しないので Using で確実に解放する）
+        Dim dbmsType As Integer = 0
+        Dim dbName As String = Nothing
+        Using sqlDlg As New SqlExportDialog()
+            If sqlDlg.ShowDialog(Me) <> DialogResult.OK Then Return
+            dbmsType = sqlDlg.SelectedDbmsType
+            dbName = sqlDlg.DatabaseName
+        End Using
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
@@ -1070,12 +1076,17 @@ Public Class Open_DUMP_Viewer
         Dim ctx = GetExportContext()
 
         ' DB 接続ダイアログ (SQL Server タブ)
-        Dim connDlg As New DatabaseConnectionDialog()
-        If connDlg.ShowDialog(Me) <> DialogResult.OK Then Return
-        If Not connDlg.IsSqlServer Then
-            MessageBox.Show(Loc.S("Msg_ConnectViaSqlServer"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Return
-        End If
+        ' ShowDialog はフォームを破棄しないため、必要な値を取り出したうえで
+        ' Using で確実に解放する。
+        Dim connectionString As String = Nothing
+        Using connDlg As New DatabaseConnectionDialog()
+            If connDlg.ShowDialog(Me) <> DialogResult.OK Then Return
+            If Not connDlg.IsSqlServer Then
+                MessageBox.Show(Loc.S("Msg_ConnectViaSqlServer"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+            connectionString = connDlg.ConnectionString
+        End Using
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
@@ -1085,7 +1096,7 @@ Public Class Open_DUMP_Viewer
             Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
-                Dim connStr = connDlg.ConnectionString
+                Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim rows As List(Of String()) = Nothing
@@ -1121,7 +1132,7 @@ Public Class Open_DUMP_Viewer
             If contexts Is Nothing Then Return
 
             Using dlg As New ExportProgressDialog()
-                Dim connStr = connDlg.ConnectionString
+                Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim ok = BulkExportLogic.ExportSqlServer(contexts, connStr, worker)
@@ -1140,12 +1151,17 @@ Public Class Open_DUMP_Viewer
         Dim ctx = GetExportContext()
 
         ' DB 接続ダイアログ (ODBC タブを初期選択)
-        Dim connDlg As New DatabaseConnectionDialog(selectOdbcTab:=True)
-        If connDlg.ShowDialog(Me) <> DialogResult.OK Then Return
-        If connDlg.IsSqlServer Then
-            MessageBox.Show(Loc.S("Msg_ConnectViaOdbc"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
-            Return
-        End If
+        ' ShowDialog はフォームを破棄しないため、必要な値を取り出したうえで
+        ' Using で確実に解放する。
+        Dim connectionString As String = Nothing
+        Using connDlg As New DatabaseConnectionDialog(selectOdbcTab:=True)
+            If connDlg.ShowDialog(Me) <> DialogResult.OK Then Return
+            If connDlg.IsSqlServer Then
+                MessageBox.Show(Loc.S("Msg_ConnectViaOdbc"), Loc.S("Title_Info"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+            connectionString = connDlg.ConnectionString
+        End Using
 
         If ctx IsNot Nothing Then
             ' === 単一テーブル ===
@@ -1155,7 +1171,7 @@ Public Class Open_DUMP_Viewer
             Dim preview = GetActiveTablePreview()
 
             Using dlg As New ExportProgressDialog()
-                Dim connStr = connDlg.ConnectionString
+                Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim rows As List(Of String()) = Nothing
@@ -1191,7 +1207,7 @@ Public Class Open_DUMP_Viewer
             If contexts Is Nothing Then Return
 
             Using dlg As New ExportProgressDialog()
-                Dim connStr = connDlg.ConnectionString
+                Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim ok = BulkExportLogic.ExportOdbc(contexts, connStr, worker)

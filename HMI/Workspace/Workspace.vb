@@ -121,6 +121,32 @@ Public Class Workspace
     End Sub
 
     ''' <summary>
+    ''' ワークスペースを閉じたときの後始末
+    '''
+    ''' テーブル一覧のメタデータ（表エントリ・列名・列型・制約 JSON）は表の数と
+    ''' 列数に比例して大きくなる。ウィンドウを閉じた時点で参照を切り、回収可能に
+    ''' しておく。ListView / TreeView の項目も同時に解放する。
+    ''' </summary>
+    Private Sub Workspace_FormClosed(sender As Object, e As FormClosedEventArgs) Handles MyBase.FormClosed
+        Try
+            lstTableList.Items.Clear()
+            treeDBList.Nodes.Clear()
+        Catch
+            ' 破棄処理中の例外は無視（後始末なので続行する）
+        End Try
+
+        _tableList.Clear()
+        _columnNamesMap.Clear()
+        _columnTypesMap.Clear()
+        _columnNotNullsMap.Clear()
+        _columnDefaultsMap.Clear()
+        _constraintsJsonMap.Clear()
+        _excludedTables.Clear()
+        _undoStack.Clear()
+        _redoStack.Clear()
+    End Sub
+
+    ''' <summary>
     ''' テーブル検索テキストボックスの入力変更時のイベント
     ''' 入力文字列で現在のスキーマのテーブル一覧を絞り込む
     ''' </summary>
@@ -276,9 +302,10 @@ Public Class Workspace
             columnTypes = _columnTypesMap(tableKey)
         End If
 
-        ' プロパティダイアログを表示
-        Dim dlg As New TablePropertyDialog(_currentSchema, tableName, columnNames, columnTypes, rowCount)
-        dlg.ShowDialog(Me)
+        ' プロパティダイアログを表示（ShowDialog は破棄しないので Using で確実に解放する）
+        Using dlg As New TablePropertyDialog(_currentSchema, tableName, columnNames, columnTypes, rowCount)
+            dlg.ShowDialog(Me)
+        End Using
     End Sub
 #End Region
 
