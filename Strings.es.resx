@@ -279,13 +279,6 @@ Asegúrese de que Open_DumpParser.dll esté en la misma carpeta que el ejecutabl
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Usando la última versión)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Abrir página de lanzamiento</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Patrocinar en GitHub</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve">
-    <value>Descargar y ejecutar el instalador de la última versión.
-La aplicación se cerrará automáticamente.
-
-¿Continuar?</value>
-  </data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Confirmación de actualización</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Descargando...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Iniciando instalador...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Error en la descarga: {0}</value></data>
@@ -481,6 +474,12 @@ Por favor, instale el runtime Microsoft Edge WebView2.</value>
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Actualización disponible</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>Una nueva versión v{0} está disponible (actual: v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>¿Abrir la página de lanzamiento?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>¿Descargar y actualizar ahora? (La aplicación se cerrará automáticamente.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Error al actualizar: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Actualización</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Descargando el instalador...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Descargando el instalador... {0} %</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Cancelando...</value></data>
   <!-- Versión de prueba -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Versión de prueba]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Restricción de la versión de prueba</value></data>

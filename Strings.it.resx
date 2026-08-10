@@ -298,13 +298,6 @@ Assicurarsi che Open_DumpParser.dll sia nella stessa cartella dell'eseguibile.</
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Versione più recente in uso)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Apri pagina di rilascio</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Sponsorizza su GitHub</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve">
-    <value>Scaricare ed eseguire l'ultimo programma di installazione.
-L'applicazione si chiuderà automaticamente.
-
-Continuare?</value>
-  </data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Conferma aggiornamento</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Download in corso...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Avvio del programma di installazione...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Download fallito: {0}</value></data>
@@ -515,6 +508,12 @@ Installare il runtime Microsoft Edge WebView2.</value>
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Aggiornamento disponibile</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>È disponibile una nuova versione v{0} (attuale: v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>Aprire la pagina di rilascio?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>Scaricare e aggiornare ora? (L'applicazione verrà chiusa automaticamente.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Aggiornamento non riuscito: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Aggiornamento</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Download del programma di installazione in corso...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Download del programma di installazione in corso... {0} %</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Annullamento in corso...</value></data>
   <!-- Versione di prova -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Versione di prova]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Limitazione della versione di prova</value></data>

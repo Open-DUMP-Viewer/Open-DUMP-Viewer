@@ -1,7 +1,5 @@
-Imports System.IO
-Imports System.Net.Http
 Imports System.Reflection
-Imports System.Text.Json
+Imports System.Threading
 
 ''' <summary>
 ''' バージョン情報ダイアログ
@@ -11,8 +9,6 @@ Imports System.Text.Json
 Partial Public Class AboutDialog
     Implements ILocalizable
 
-    Private Const GitHubApiUrl As String = "https://api.github.com/repos/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
-    Private Const ReleasesPageUrl As String = "https://github.com/Open-DUMP-Viewer/Open-DUMP-Viewer/releases/latest"
     Private Const SponsorPageUrl As String = "https://github.com/sponsors/Open-DUMP-Viewer"
 
     ''' <summary>最新リリースのインストーラーダウンロードURL（更新ボタン押下時に使用）</summary>
@@ -50,104 +46,59 @@ Partial Public Class AboutDialog
     ''' </summary>
     Private Async Sub CheckLatestVersionAsync(currentVersion As String)
         Try
-            Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
-                client.Timeout = TimeSpan.FromSeconds(5)
+            Dim latest = Await UpdateLogic.GetLatestReleaseAsync()
 
-                Dim response = Await client.GetAsync(GitHubApiUrl)
-                If Not response.IsSuccessStatusCode Then
-                    lblLatestVersion.Text = Loc.S("About_CheckFailed")
-                    Return
+            ' 確認中にダイアログが閉じられていた場合は何もしない
+            If IsDisposed Then Return
+
+            If latest Is Nothing Then
+                lblLatestVersion.Text = Loc.S("About_CheckFailed")
+                Return
+            End If
+
+            ' インストーラーダウンロードURL（実行中のアーキテクチャに合致するもの）
+            _installerDownloadUrl = latest.InstallerUrl
+
+            ' バージョン比較
+            Dim currentVer As Version = Nothing
+            Dim latestVer As Version = Nothing
+            Dim canParseCurrent = Version.TryParse(currentVersion, currentVer)
+            Dim canParseLatest = Version.TryParse(latest.Version, latestVer)
+
+            If canParseCurrent AndAlso canParseLatest Then
+                If latestVer > currentVer Then
+                    ' 新しいバージョンがある
+                    lblLatestVersion.Text = Loc.SF("About_NewVersionAvailable", latest.Version)
+                    lblLatestVersion.ForeColor = Color.OrangeRed
+
+                    ' 更新ボタンを表示（インストーラーURLがある場合のみ）
+                    If _installerDownloadUrl IsNot Nothing Then
+                        btnUpdate.Visible = True
+                    End If
+
+                    lnkReleasePage.Text = Loc.S("About_OpenReleasePage")
+                    lnkReleasePage.Visible = True
+                Else
+                    ' 最新版を使用中
+                    lblLatestVersion.Text = Loc.SF("About_LatestInUse", latest.Version)
+                    lblLatestVersion.ForeColor = Color.Green
                 End If
+            Else
+                lblLatestVersion.Text = latest.TagName
+            End If
 
-                Dim json = Await response.Content.ReadAsStringAsync()
-                Using doc = JsonDocument.Parse(json)
-                    Dim root = doc.RootElement
-
-                    ' tag_name を取得
-                    Dim tagProp As JsonElement
-                    Dim tagName As String = ""
-                    If root.TryGetProperty("tag_name", tagProp) Then
-                        tagName = tagProp.GetString()
-                    End If
-
-                    If String.IsNullOrEmpty(tagName) Then
-                        lblLatestVersion.Text = Loc.S("About_CheckFailed")
-                        Return
-                    End If
-
-                    ' インストーラーダウンロードURLを検索 (実行中のアーキテクチャに合致するものを選択)
-                    Dim archSuffix = If(Runtime.InteropServices.RuntimeInformation.OSArchitecture = Runtime.InteropServices.Architecture.Arm64,
-                                        "_arm64.exe", "_x64.exe")
-                    Dim assetsProp As JsonElement
-                    If root.TryGetProperty("assets", assetsProp) Then
-                        For Each asset In assetsProp.EnumerateArray()
-                            Dim nameProp As JsonElement
-                            If asset.TryGetProperty("name", nameProp) Then
-                                Dim assetName = nameProp.GetString()
-                                If assetName IsNot Nothing AndAlso
-                                   assetName.Contains("installer", StringComparison.OrdinalIgnoreCase) AndAlso
-                                   assetName.EndsWith(archSuffix, StringComparison.OrdinalIgnoreCase) Then
-                                    Dim urlProp As JsonElement
-                                    If asset.TryGetProperty("browser_download_url", urlProp) Then
-                                        _installerDownloadUrl = urlProp.GetString()
-                                    End If
-                                    Exit For
-                                End If
-                            End If
-                        Next
-                    End If
-
-                    ' "v0.1.1" → "0.1.1"
-                    Dim latestVersion = tagName.TrimStart("v"c)
-
-                    ' バージョン比較
-                    Dim currentVer As Version = Nothing
-                    Dim latestVer As Version = Nothing
-                    Dim canParseCurrent = Version.TryParse(currentVersion, currentVer)
-                    Dim canParseLatest = Version.TryParse(latestVersion, latestVer)
-
-                    If canParseCurrent AndAlso canParseLatest Then
-                        If latestVer > currentVer Then
-                            ' 新しいバージョンがある
-                            lblLatestVersion.Text = Loc.SF("About_NewVersionAvailable", latestVersion)
-                            lblLatestVersion.ForeColor = Color.OrangeRed
-
-                            ' 更新ボタンを表示（インストーラーURLがある場合のみ）
-                            If _installerDownloadUrl IsNot Nothing Then
-                                btnUpdate.Visible = True
-                            End If
-
-                            lnkReleasePage.Text = Loc.S("About_OpenReleasePage")
-                            lnkReleasePage.Visible = True
-                        Else
-                            ' 最新版を使用中
-                            lblLatestVersion.Text = Loc.SF("About_LatestInUse", latestVersion)
-                            lblLatestVersion.ForeColor = Color.Green
-                        End If
-                    Else
-                        lblLatestVersion.Text = $"{tagName}"
-                    End If
-                End Using
-            End Using
         Catch
             ' ネットワークエラー・タイムアウト等 → エラーにしない
-            lblLatestVersion.Text = Loc.S("About_CheckFailedOffline")
+            If Not IsDisposed Then lblLatestVersion.Text = Loc.S("About_CheckFailedOffline")
         End Try
     End Sub
 
     ''' <summary>
-    ''' 更新ボタンクリック: MSIをダウンロードしてインストーラーを起動する
+    ''' 更新ボタンクリック: インストーラーをダウンロードして起動する
+    ''' 画面上で明示的に押された操作なので、確認ダイアログは挟まない
     ''' </summary>
     Private Async Sub btnUpdate_Click(sender As Object, e As EventArgs) Handles btnUpdate.Click
         If _installerDownloadUrl Is Nothing Then Return
-
-        ' 確認ダイアログ
-        Dim res = MessageBox.Show(
-            Loc.S("About_UpdateConfirmMessage"),
-            Loc.S("About_UpdateConfirmTitle"), MessageBoxButtons.YesNo, MessageBoxIcon.Question)
-
-        If res <> DialogResult.Yes Then Return
 
         btnUpdate.Enabled = False
         btnUpdate.Text = Loc.S("About_Downloading")
@@ -155,51 +106,15 @@ Partial Public Class AboutDialog
         prgDownload.Style = ProgressBarStyle.Marquee
 
         Try
-            ' 一時フォルダにインストーラーをダウンロード
-            Dim tempDir = Path.Combine(Path.GetTempPath(), "OpenDumpViewer_Update")
-            Directory.CreateDirectory(tempDir)
-            Dim installerFileName = Path.GetFileName(New Uri(_installerDownloadUrl).LocalPath)
-            Dim installerPath = Path.Combine(tempDir, installerFileName)
+            Dim progress As New Progress(Of Integer)(AddressOf OnDownloadProgress)
+            Dim installerPath = Await UpdateLogic.DownloadInstallerAsync(_installerDownloadUrl, progress, CancellationToken.None)
 
-            Using client As New HttpClient()
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Open-DUMP-Viewer")
-                client.Timeout = TimeSpan.FromMinutes(5)
-
-                Using response = Await client.GetAsync(_installerDownloadUrl, HttpCompletionOption.ResponseHeadersRead)
-                    response.EnsureSuccessStatusCode()
-
-                    Dim totalBytes = response.Content.Headers.ContentLength
-                    If totalBytes.HasValue Then
-                        prgDownload.Style = ProgressBarStyle.Continuous
-                        prgDownload.Maximum = 100
-                    End If
-
-                    Using contentStream = Await response.Content.ReadAsStreamAsync()
-                        Using fileStream As New FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None)
-                            Dim buffer(8191) As Byte
-                            Dim totalRead As Long = 0
-                            Dim bytesRead As Integer
-
-                            Do
-                                bytesRead = Await contentStream.ReadAsync(buffer, 0, buffer.Length)
-                                If bytesRead = 0 Then Exit Do
-                                Await fileStream.WriteAsync(buffer, 0, bytesRead)
-                                totalRead += bytesRead
-
-                                If totalBytes.HasValue AndAlso totalBytes.Value > 0 Then
-                                    prgDownload.Value = CInt(totalRead * 100 \ totalBytes.Value)
-                                End If
-                            Loop
-                        End Using
-                    End Using
-                End Using
-            End Using
-
+            prgDownload.Style = ProgressBarStyle.Continuous
             prgDownload.Value = 100
             btnUpdate.Text = Loc.S("About_LaunchingInstaller")
 
             ' バッチファイルでアプリ終了後にインストーラーを実行
-            LaunchInstallerAndExit(installerPath)
+            UpdateLogic.LaunchInstallerAndExit(installerPath)
 
         Catch ex As Exception
             prgDownload.Visible = False
@@ -210,47 +125,24 @@ Partial Public Class AboutDialog
         End Try
     End Sub
 
-    ''' <summary>
-    ''' バッチファイルを作成し、アプリ終了後にインストーラーを起動する
-    ''' </summary>
-    Private Sub LaunchInstallerAndExit(installerPath As String)
-        ' インストーラーパスを検証（パストラバーサル・コマンドインジェクション防止）
-        Dim fullPath = Path.GetFullPath(installerPath)
-        If Not fullPath.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) Then
-            Throw New InvalidOperationException("Invalid installer path")
-        End If
-        If Not File.Exists(fullPath) Then
-            Throw New FileNotFoundException("Installer not found", fullPath)
+    ''' <summary>ダウンロード進捗の反映（UIスレッドで呼ばれる）</summary>
+    Private Sub OnDownloadProgress(percent As Integer)
+        ' 閉じた後に届いた通知は無視する
+        If IsDisposed Then Return
+
+        If percent = UpdateLogic.ProgressUnknown Then
+            ' 全体サイズが不明 → 進捗率を出せないのでマーキー表示のままにする
+            prgDownload.Style = ProgressBarStyle.Marquee
+            Return
         End If
 
-        Dim batPath = Path.Combine(Path.GetTempPath(), "OpenDumpViewer_Update", "update.bat")
-        Dim escapedPath = fullPath.Replace("^", "^^").Replace("&", "^&").Replace("|", "^|").
-                                   Replace("<", "^<").Replace(">", "^>").Replace("%", "%%")
-        Dim batContent =
-            "@echo off" & vbCrLf &
-            Loc.S("About_UpdateBatchMessage") & vbCrLf &
-            "timeout /t 2 /nobreak >nul" & vbCrLf &
-            $"start """" ""{escapedPath}""" & vbCrLf &
-            "exit"
-
-        File.WriteAllText(batPath, batContent, New System.Text.UTF8Encoding(False))
-
-        Dim psi As New ProcessStartInfo()
-        psi.FileName = batPath
-        psi.CreateNoWindow = True
-        psi.WindowStyle = ProcessWindowStyle.Hidden
-        Process.Start(psi)
-
-        ' アプリケーションを終了
-        Application.Exit()
+        prgDownload.Style = ProgressBarStyle.Continuous
+        prgDownload.Maximum = 100
+        prgDownload.Value = Math.Max(0, Math.Min(percent, 100))
     End Sub
 
     Private Sub lnkReleasePage_LinkClicked(sender As Object, e As EventArgs) Handles lnkReleasePage.LinkClicked
-        Try
-            Process.Start(New ProcessStartInfo(ReleasesPageUrl) With {.UseShellExecute = True})
-        Catch
-            ' ブラウザ起動失敗は無視
-        End Try
+        UpdateLogic.OpenReleasesPage()
     End Sub
 
     Private Sub lnkSponsor_LinkClicked(sender As Object, e As EventArgs) Handles lnkSponsor.LinkClicked

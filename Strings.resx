@@ -299,11 +299,6 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (最新版を利用中)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>リリースページを開く</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>GitHub Sponsors で開発を支援する</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>最新バージョンのインストーラーをダウンロードして実行します。
-アプリケーションは自動的に終了します。
-
-続行しますか？</value></data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>更新の確認</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>ダウンロード中...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>インストーラーを起動中...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>ダウンロードに失敗しました: {0}</value></data>
@@ -521,6 +516,12 @@ Microsoft Edge WebView2 ランタイムをインストールしてください�
   <data name="UpdateCheck_Title" xml:space="preserve"><value>アップデート通知</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>新しいバージョン v{0} が利用可能です（現在 v{1}）。</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>リリースページを開きますか？</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>今すぐダウンロードして更新しますか？（更新時にアプリケーションは自動的に終了します）</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>更新に失敗しました: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>アップデート</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>インストーラーをダウンロードしています...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>インストーラーをダウンロードしています... {0}%</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>キャンセルしています...</value></data>
   <!-- 試用版 -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[試用版]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>試用版の制限</value></data>

@@ -299,11 +299,6 @@ https://www.odv.dev/
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (已是最新版本)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>打开发布页面</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>在 GitHub 上赞助</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>将下载并运行最新版本的安装程序。
-应用程序将自动退出。
-
-是否继续?</value></data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>更新确认</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>正在下载...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>正在启动安装程序...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>下载失败: {0}</value></data>
@@ -520,6 +515,12 @@ https://www.odv.dev/
   <data name="UpdateCheck_Title" xml:space="preserve"><value>更新通知</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>新版本 v{0} 可用（当前版本：v{1}）。</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>是否打开发布页面？</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>是否立即下载并更新？（更新时应用程序将自动退出。）</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>更新失败：{0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>更新</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>正在下载安装程序...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>正在下载安装程序... {0}%</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>正在取消...</value></data>
   <!-- 试用版 -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[试用版]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>试用版限制</value></data>

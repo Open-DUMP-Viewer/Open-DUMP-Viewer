@@ -299,11 +299,6 @@ Certifique-se de que Open_DumpParser.dll está na mesma pasta do executável.</v
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Usando a versão mais recente)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Abrir página de lançamento</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Patrocinar no GitHub</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>Baixar e executar o instalador da versão mais recente.
-O aplicativo será encerrado automaticamente.
-
-Continuar?</value></data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Confirmação de atualização</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Baixando...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Iniciando o instalador...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Falha no download: {0}</value></data>
@@ -521,6 +516,12 @@ Por favor, instale o runtime Microsoft Edge WebView2.</value></data>
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Atualização disponível</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>Uma nova versão v{0} está disponível (atual: v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>Abrir a página de lançamento?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>Baixar e atualizar agora? (O aplicativo será encerrado automaticamente.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Falha na atualização: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Atualização</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Baixando o instalador...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Baixando o instalador... {0}%</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Cancelando...</value></data>
   <!-- Versão de avaliação -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Versão de avaliação]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Restrição da versão de avaliação</value></data>

@@ -299,11 +299,6 @@ https://www.odv.dev/
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Используется последняя версия)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Открыть страницу релиза</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Поддержать на GitHub</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve"><value>Скачать и запустить установщик последней версии.
-Приложение будет автоматически закрыто.
-
-Продолжить?</value></data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Подтверждение обновления</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Загрузка...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Запуск установщика...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Ошибка загрузки: {0}</value></data>
@@ -521,6 +516,12 @@ https://www.odv.dev/
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Доступно обновление</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>Доступна новая версия v{0} (текущая: v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>Открыть страницу релиза?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>Скачать и обновить сейчас? (Приложение будет закрыто автоматически.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Не удалось выполнить обновление: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Обновление</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Загрузка установщика...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Загрузка установщика... {0} %</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Отмена...</value></data>
   <!-- Пробная версия -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Пробная версия]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Ограничение пробной версии</value></data>

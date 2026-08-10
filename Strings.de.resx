@@ -279,13 +279,6 @@ Stellen Sie sicher, dass Open_DumpParser.dll im selben Ordner wie die ausführba
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Neueste Version wird verwendet)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Release-Seite öffnen</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Auf GitHub sponsern</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve">
-    <value>Das neueste Installationsprogramm herunterladen und ausführen.
-Die Anwendung wird automatisch beendet.
-
-Fortfahren?</value>
-  </data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Update-Bestätigung</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Herunterladen...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Installationsprogramm wird gestartet...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Download fehlgeschlagen: {0}</value></data>
@@ -481,6 +474,12 @@ Bitte installieren Sie die Microsoft Edge WebView2-Laufzeit.</value>
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Update verfügbar</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>Eine neue Version v{0} ist verfügbar (aktuell: v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>Release-Seite öffnen?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>Jetzt herunterladen und aktualisieren? (Die Anwendung wird automatisch beendet.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Update fehlgeschlagen: {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Update</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Installationsprogramm wird heruntergeladen...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Installationsprogramm wird heruntergeladen... {0} %</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Wird abgebrochen...</value></data>
   <!-- Testversion -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Testversion]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Einschränkung der Testversion</value></data>

@@ -305,13 +305,6 @@ Assurez-vous que Open_DumpParser.dll se trouve dans le même dossier que l'exéc
   <data name="About_LatestInUse" xml:space="preserve"><value>v{0} (Dernière version utilisée)</value></data>
   <data name="About_OpenReleasePage" xml:space="preserve"><value>Ouvrir la page de publication</value></data>
   <data name="About_SponsorOnGitHub" xml:space="preserve"><value>Sponsoriser sur GitHub</value></data>
-  <data name="About_UpdateConfirmMessage" xml:space="preserve">
-    <value>Télécharger et exécuter le dernier installateur.
-L'application se fermera automatiquement.
-
-Continuer ?</value>
-  </data>
-  <data name="About_UpdateConfirmTitle" xml:space="preserve"><value>Confirmation de mise à jour</value></data>
   <data name="About_Downloading" xml:space="preserve"><value>Téléchargement...</value></data>
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Lancement de l'installateur...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Échec du téléchargement : {0}</value></data>
@@ -537,6 +530,12 @@ Veuillez installer le runtime Microsoft Edge WebView2.</value>
   <data name="UpdateCheck_Title" xml:space="preserve"><value>Mise à jour disponible</value></data>
   <data name="UpdateCheck_NewVersionAvailable" xml:space="preserve"><value>Une nouvelle version v{0} est disponible (actuelle : v{1}).</value></data>
   <data name="UpdateCheck_OpenReleasePage" xml:space="preserve"><value>Ouvrir la page de publication ?</value></data>
+  <data name="UpdateCheck_DownloadAndUpdate" xml:space="preserve"><value>Télécharger et mettre à jour maintenant ? (L'application se fermera automatiquement.)</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>Échec de la mise à jour : {0}</value></data>
+  <data name="UpdateDownload_FormTitle" xml:space="preserve"><value>Mise à jour</value></data>
+  <data name="UpdateDownload_Downloading" xml:space="preserve"><value>Téléchargement du programme d'installation...</value></data>
+  <data name="UpdateDownload_Progress" xml:space="preserve"><value>Téléchargement du programme d'installation... {0} %</value></data>
+  <data name="UpdateDownload_Cancelling" xml:space="preserve"><value>Annulation...</value></data>
   <!-- Version d'essai -->
   <data name="Trial_TitleSuffix" xml:space="preserve"><value>[Version d'essai]</value></data>
   <data name="Trial_Title" xml:space="preserve"><value>Restriction de la version d'essai</value></data>
