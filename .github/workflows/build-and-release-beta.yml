@@ -459,6 +459,49 @@ jobs:
           name: beta-build-arm64
           path: ./artifacts
 
+      # wingetcreate は submit の直前に winget-pkgs のフォークを upstream と同期するが、
+      # フォークが取り残されている・分岐していると自動同期が失敗し、
+      # "The forked repository could not be synced with the upstream commits" で
+      # submit ごと落ちる (2026-08-10 のラン #63 で発生。マニフェスト自体は検証を通っていた)。
+      # winget-pkgs は 1 日あたりの commit 数が多く、リリース間隔が空くほど確実に取り残される
+      # ため、submit の前にこちらから明示的に同期しておく。
+      #
+      # --force は分岐していた場合にフォークの既定ブランチを upstream へハードリセットする。
+      # このフォークは submit 用のミラーで、wingetcreate は PR ごとに別ブランチを切るため、
+      # 既定ブランチに残しておくべき変更はない。
+      #
+      # 所有者名を固定で書かないのは、WINGET_TOKEN のアカウントが変わっても壊れないようにするため。
+      - name: Sync winget-pkgs fork
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          # 同期の失敗でリリースを止めない (wingetcreate 側の自動同期に委ねる)。
+          # PowerShell 7.4 以降は native コマンドの非ゼロ終了が既定で終端エラーになるため、
+          # $LASTEXITCODE で判定できるよう明示的に無効化する。
+          $ErrorActionPreference = 'Continue'
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $owner = gh api user --jq '.login'
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($owner)) {
+            Write-Host "::warning::WINGET_TOKEN の所有者を特定できなかったため同期をスキップする"
+            exit 0
+          }
+
+          # 初回は wingetcreate がフォークを作るので、無い場合は同期不要
+          gh repo view "$owner/winget-pkgs" --json name 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::notice::$owner/winget-pkgs が無いため同期をスキップする (wingetcreate が作成する)"
+            exit 0
+          }
+
+          Write-Host "Syncing $owner/winget-pkgs with microsoft/winget-pkgs"
+          gh repo sync "$owner/winget-pkgs" --force
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::warning::フォークの同期に失敗した。wingetcreate 側の自動同期に委ねる"
+          }
+          exit 0
+
       - name: Publish to Winget (Beta)
         shell: pwsh
         run: |
