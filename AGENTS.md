@@ -135,6 +135,16 @@ dotnet build "Open DUMP Viewer.vbproj"
 - 言語: Visual Basic .NET
 - UI: Windows Forms (WinForms)
 
+#### Windows 以外でのコンパイル確認
+
+Linux / macOS でも**ビルドだけ**は通せる。Windows Desktop の参照アセンブリを NuGet から取る指示が要る。
+
+```bash
+dotnet build "Open DUMP Viewer.vbproj" -p:EnableWindowsTargeting=true
+```
+
+実行はできない（WinForms のランタイムが Windows にしか無い）。ロジック層の動作を確認したい場合は、対象の `.vb` を `net10.0` のコンソールプロジェクトへ `<Compile Include>` でリンクし、WinForms に触れる箇所（`Application.Exit` など）と `Loc` だけをスタブに差し替えれば、実ソースのまま実行して検証できる。
+
 ### バージョンポリシー
 
 **すべてのランタイム・SDK・ツールは常に最新バージョンを使用する。**
