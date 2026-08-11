@@ -222,6 +222,33 @@ git push origin main:release
 
 同一 PC に両方インストール可能。
 
+### Microsoft Store の「このバージョンの新機能」
+
+Store のこの欄は **`CHANGELOG.md` から自動生成**する。文面を二重管理しない（インストーラーの使用許諾と同じ方針）。
+
+実体は提出 JSON の `listings.<言語>.baseListing.releaseNotes`。MSIX パッケージ側（`Package.appxmanifest`）には対応する要素が無く、提出メタデータを更新する以外に設定する方法はない。
+
+そのため `publish-store` ジョブは単発の `msstore publish` ではなく **3 段構え**で提出する（`build-and-release.yml`）。`msstore publish` は既定でコミットまで進み、コミット済みの提出はメタデータを差し替えられないため。
+
+| # | ステップ | コマンド |
+|---|---|---|
+| 1 | パッケージを上げ、下書きで止める | `msstore publish <bundle> -id <id> --noCommit` |
+| 2 | `releaseNotes` を差し替える | `msstore submission get` → 差し替え → `msstore submission updateMetadata` |
+| 3 | コミット（認定へ） | `msstore submission publish` |
+
+押さえる点:
+
+- **平文しか描画しない。** `installer/msix/scripts/Convert-ReleaseNotes.ps1` が Markdown を落とす（`### 見出し` → `■ 見出し`、`- ` → `・`）。生成物にマークアップが残っていたらスクリプトが停止する
+- **上限 1500 文字。** 超える場合は行の切れ目で打ち切り、末尾に GitHub Releases への案内を付ける。全 43 セクション中、超えるのは 1.0.0 と 4.0.0 の 2 件
+- **本文の生成は Store を触る前に行う。** CHANGELOG に当該バージョンの節が無ければそこで停止し、Partner Center に中途半端な下書きを残さない
+- **`updateMetadata` は差分マージではなく提出全体の置換。** `get` した JSON をそのまま返す必要があるため、`ConvertFrom-Json`/`ConvertTo-Json` ではなく `JsonNode` を使う（前者は日付に見える文字列を `[datetime]` に変換し、書き戻すと書式が変わる）
+- **`releaseNotes` は listing（言語）ごと。** 本製品は説明文を含め **10 言語すべてに翻訳済みの listing** があり、この欄も v4.1.1 までは言語ごとに訳していた。CHANGELOG が日本語のみのため、**全 listing に同じ日本語を入れる**方針を採っている（意図的）
+
+  > 日本語以外の利用者には、訳された説明文の下に日本語の更新履歴が並ぶ。手作業での 10 言語更新が続かず、v4.2.0 以降 4 リリース分この欄が v4.1.1 のまま止まっていたため、内容が最新であることを優先した。インストーラーの使用許諾（日本語は EULA、他 9 言語は英語 LICENSE）と同じく、日本語を正、他言語をベストエフォートとする扱い。言語別の文面に戻すなら、`Set "What's new in this version"` ステップの listing ループを言語で分岐させる
+- ステップ 2・3 が失敗すると Partner Center に**下書き提出が残る**。次のリリースは `msstore publish` がこれを引き継ぐが、内容が想定どおりか Partner Center で確認する
+
+ベータ版（`build-and-release-beta.yml`）は Store へ提出しないため、この手当ては正式版ワークフローにのみ入っている。
+
 ## CLA（コントリビューターライセンス同意書）
 
 署名は **CLA Assistant Lite**（`.github/workflows/cla.yml`。自己ホスト型の GitHub Action）で受け付ける。
