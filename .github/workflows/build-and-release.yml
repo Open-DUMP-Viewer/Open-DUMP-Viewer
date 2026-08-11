@@ -938,8 +938,13 @@ jobs:
             throw "提出に listing がありません。Partner Center で Store listing を作成してください。"
           }
 
-          # releaseNotes は listing (言語) ごとに持つ。CHANGELOG.md は日本語のみのため
-          # 全 listing に同じ本文を入れる。言語別の文面が必要になったらここを分ける。
+          # releaseNotes は listing (言語) ごとに持つ。この製品は 10 言語すべてに翻訳済みの
+          # listing があり (説明文も含む)、この欄も v4.1.1 までは言語ごとに訳していた。
+          # CHANGELOG.md は日本語のみのため、全 listing に同じ日本語を入れる方針を採る。
+          # 意図的な選択で、日本語以外の利用者には訳された説明文の下に日本語の更新履歴が並ぶ。
+          # 手作業での 10 言語更新が続かず、v4.2.0 以降 4 リリース分この欄が
+          # v4.1.1 のまま止まっていたため、内容が最新であることを優先した。
+          # 言語別の文面に戻すなら、このループを言語で分岐させる。
           $langs = @($listings.AsObject() | ForEach-Object { $_.Key })
           foreach ($lang in $langs) {
             $baseListing = $listings[$lang]['baseListing']
