@@ -224,11 +224,13 @@ git push origin main:release
 
 ### Microsoft Store の「このバージョンの新機能」
 
-Store のこの欄は **`CHANGELOG.md` から自動生成**する。文面を二重管理しない（インストーラーの使用許諾と同じ方針）。
+**現状は Partner Center で手入力する。** CHANGELOG からの自動生成を試みたが、`msstore` CLI 側の問題で公開そのものが通らなくなったため差し戻した（後述）。
 
-実体は提出 JSON の `listings.<言語>.baseListing.releaseNotes`。MSIX パッケージ側（`Package.appxmanifest`）には対応する要素が無く、提出メタデータを更新する以外に設定する方法はない。
+この欄の実体は提出 JSON の `listings.<言語>.baseListing.releaseNotes`。MSIX パッケージ側（`Package.appxmanifest`）には対応する要素が無く、**提出メタデータを更新する以外に設定する方法はない**。
 
-そのため `publish-store` ジョブは単発の `msstore publish` ではなく **3 段構え**で提出する（`build-and-release.yml`）。`msstore publish` は既定でコミットまで進み、コミット済みの提出はメタデータを差し替えられないため。
+#### 自動化を試みて差し戻した経緯（v4.5.1）
+
+`msstore publish` は既定でコミットまで進み、コミット済みの提出はメタデータを差し替えられない。そこで `publish-store` ジョブを **3 段構え**に組み替えた（745dcc9）:
 
 | # | ステップ | コマンド |
 |---|---|---|
@@ -236,18 +238,38 @@ Store のこの欄は **`CHANGELOG.md` から自動生成**する。文面を二
 | 2 | `releaseNotes` を差し替える | `msstore submission get` → 差し替え → `msstore submission updateMetadata` |
 | 3 | コミット（認定へ） | `msstore submission publish` |
 
-押さえる点:
+**ステップ 1 が必ず失敗する。** v4.5.1 のリリース（ラン #78）で 3 回試して 3 回とも同一:
 
-- **平文しか描画しない。** `installer/msix/scripts/Convert-ReleaseNotes.ps1` が Markdown を落とす（`### 見出し` → `■ 見出し`、`- ` → `・`）。生成物にマークアップが残っていたらスクリプトが停止する
-- **上限 1500 文字。** 超える場合は行の切れ目で打ち切り、末尾に GitHub Releases への案内を付ける。全 43 セクション中、超えるのは 1.0.0 と 4.0.0 の 2 件
+```
+✅ Zip Bundle is configured and ready to be uploaded!
+Uploading Bundle to Azure blob: 0%
+Error while uploading the application package.
+```
+
+切り分けで分かっていること:
+
+- **フラグ無しなら通る。** 同じ AppId・同じ資格情報・同種の msixbundle で、単発の `msstore publish`（v4.5.0 / ラン #77）は成功している
+- **`--noCommit` を付けると CLI の経路が変わる。** #77 のログにある `Deleting existing Submission` / `✅ Existing submission deleted!` が #78 には出ない。Store API はアプリごとに pending 提出を 1 つしか持てないため最初はこれを疑ったが、**Partner Center で pending 提出を削除してから再実行しても同じ場所で落ちた**ので、これは原因ではない
+- **パッケージサイズは無関係。** msixbundle は 112 MB で Store の上限に遠い
+- 残る容疑は `--noCommit` 自体、3 段構えで追加した `Checkout repository`（msstore は CWD からプロジェクト種別を判定する。#77 には checkout が無かった）、`setup-msstore-cli` が `version: latest` のため 8/10 と 8/30 で CLI 版が変わっている可能性、の 3 つ
+
+再挑戦する場合の順序:
+
+1. `msstore publish` に **`--verbose` を付けて実際のエラーを出す**。`Error while uploading the application package.` は汎用メッセージで、この下に本当の原因がある。ここを見ずに直そうとしないこと
+2. `setup-msstore-cli` の `version` を latest から固定版へ
+3. `Checkout repository` を外した状態（#77 と同じ CWD）で試す
+
+`installer/msix/scripts/Convert-ReleaseNotes.ps1` は**ワークフローから外したうえで残してある**。CHANGELOG → 平文の変換自体は動いており（v4.5.1 の節で 426/1500 文字、マークアップ残留なしを確認済み）、原因が判明したときにそのまま再接続できる。スクリプト側の仕様:
+
+- **平文しか描画しない。** Markdown を落とす（`### 見出し` → `■ 見出し`、`- ` → `・`）。生成物にマークアップが残っていたら停止する
+- **上限 1500 文字。** 超える場合は行の切れ目で打ち切り、末尾に GitHub Releases への案内を付ける。全 44 セクション中、超えるのは 1.0.0 と 4.0.0 の 2 件
 - **本文の生成は Store を触る前に行う。** CHANGELOG に当該バージョンの節が無ければそこで停止し、Partner Center に中途半端な下書きを残さない
 - **`updateMetadata` は差分マージではなく提出全体の置換。** `get` した JSON をそのまま返す必要があるため、`ConvertFrom-Json`/`ConvertTo-Json` ではなく `JsonNode` を使う（前者は日付に見える文字列を `[datetime]` に変換し、書き戻すと書式が変わる）
-- **`releaseNotes` は listing（言語）ごと。** 本製品は説明文を含め **10 言語すべてに翻訳済みの listing** があり、この欄も v4.1.1 までは言語ごとに訳していた。CHANGELOG が日本語のみのため、**全 listing に同じ日本語を入れる**方針を採っている（意図的）
+- **`releaseNotes` は listing（言語）ごと。** 本製品は説明文を含め **10 言語すべてに翻訳済みの listing** があり、この欄も v4.1.1 までは言語ごとに訳していた。CHANGELOG が日本語のみのため、**全 listing に同じ日本語を入れる**方針だった（意図的）
 
-  > 日本語以外の利用者には、訳された説明文の下に日本語の更新履歴が並ぶ。手作業での 10 言語更新が続かず、v4.2.0 以降 4 リリース分この欄が v4.1.1 のまま止まっていたため、内容が最新であることを優先した。インストーラーの使用許諾（日本語は EULA、他 9 言語は英語 LICENSE）と同じく、日本語を正、他言語をベストエフォートとする扱い。言語別の文面に戻すなら、`Set "What's new in this version"` ステップの listing ループを言語で分岐させる
-- ステップ 2・3 が失敗すると Partner Center に**下書き提出が残る**。次のリリースは `msstore publish` がこれを引き継ぐが、内容が想定どおりか Partner Center で確認する
+  > 日本語以外の利用者には、訳された説明文の下に日本語の更新履歴が並ぶ。手作業での 10 言語更新が続かず、v4.2.0 以降この欄が v4.1.1 のまま止まっていたため、内容が最新であることを優先した。インストーラーの使用許諾（日本語は EULA、他 9 言語は英語 LICENSE）と同じく、日本語を正、他言語をベストエフォートとする扱い
 
-ベータ版（`build-and-release-beta.yml`）は Store へ提出しないため、この手当ては正式版ワークフローにのみ入っている。
+ベータ版（`build-and-release-beta.yml`）は Store へ提出しないため、この件は正式版ワークフローにのみ関係する。
 
 ## CLA（コントリビューターライセンス同意書）
 

@@ -793,14 +793,19 @@ jobs:
   # Microsoft Store 公開ジョブ (並列)
   # vars.STORE_PRODUCT_ID 未設定時はスキップ
   #
-  # 提出は 3 段構えで行う (単発の `msstore publish` ではない):
-  #   1. --noCommit でパッケージだけ上げ、提出を下書きのまま止める
-  #   2. 下書きの「このバージョンの新機能」を CHANGELOG.md の本文で差し替える
-  #   3. コミットして認定へ回す
-  # `msstore publish` は既定でコミットまで進み、コミット済みの提出はメタデータを
-  # 差し替えられない。「新機能」欄を CHANGELOG に追随させるには下書きで止める必要がある。
-  # 2 か 3 で落ちた場合、Partner Center に下書き提出が残る。次のリリースの
-  # `msstore publish` がこれを引き継ぐが、内容が想定どおりか Partner Center で確認すること。
+  # 提出は単発の `msstore publish` で行う (アップロードからコミットまで一気に進む)。
+  #
+  # 「このバージョンの新機能」欄を CHANGELOG から入れるため、いちど
+  # `msstore publish --noCommit` を使う 3 段構え (アップロード → releaseNotes 差し替え →
+  # コミット) に組み替えたが (745dcc9)、`--noCommit` を付けた publish が
+  #
+  #   Uploading Bundle to Azure blob: 0%
+  #   Error while uploading the application package.
+  #
+  # で必ず失敗するため差し戻した。同じ msixbundle・同じ資格情報でも、フラグ無しの
+  # 本ジョブ (v4.5.0 / ラン #77) は成功する。再挑戦するなら、まず `--verbose` を付けて
+  # この汎用メッセージの下にある実際のエラーを掴むこと。経緯は
+  # AGENTS.md「Microsoft Store の『このバージョンの新機能』」に残した。
   #
   # ★ 初回提出は msstore CLI では実施できません ★
   #   初回のみ Partner Center で手動で:
@@ -822,28 +827,11 @@ jobs:
     continue-on-error: true
 
     steps:
-      # CHANGELOG.md と Convert-ReleaseNotes.ps1 を読むため checkout する
-      - name: Checkout repository
-        uses: actions/checkout@v7
-
       - name: Download .msixbundle
         uses: actions/download-artifact@v8
         with:
           name: msixbundle
           path: ./submit
-
-      # ─────────────────────────────────────
-      # 「このバージョンの新機能」欄の本文を CHANGELOG.md から生成する。
-      # Store を触る前に実行する: CHANGELOG に当該バージョンの節が無い等で失敗しても、
-      # Partner Center に中途半端な下書き提出を残さないため。
-      # 平文化と 1500 文字の打ち切りはスクリプト側 (変換規則もそちらのコメント参照)。
-      # ─────────────────────────────────────
-      - name: Generate "What's new" text from CHANGELOG.md
-        shell: pwsh
-        run: |
-          pwsh -File installer/msix/scripts/Convert-ReleaseNotes.ps1 `
-            -Version "${{ needs.release.outputs.VERSION }}" `
-            -OutputPath "${{ runner.temp }}/store-whats-new.txt"
 
       - name: Setup Microsoft Store CLI
         uses: microsoft/setup-msstore-cli@v1
@@ -864,10 +852,7 @@ jobs:
           $seller = $env:SELLER.Trim()
           msstore reconfigure --tenantId $tenant --sellerId $seller --clientId $client --clientSecret $secret
 
-      # ─────────────────────────────────────
-      # 1. パッケージのアップロード (コミットはしない)
-      # ─────────────────────────────────────
-      - name: Upload package to Microsoft Store (draft)
+      - name: Publish to Microsoft Store
         shell: pwsh
         run: |
           $bundle = Get-ChildItem ./submit/*.msixbundle | Select-Object -First 1
@@ -875,8 +860,7 @@ jobs:
           Write-Host "Submitting: $($bundle.Name)"
 
           # msstore publish の出力を捕捉して、初回提出エラー時は分かりやすいガイドを表示
-          # --noCommit: 提出を下書きのまま残す。次のステップで「新機能」欄を差し替える
-          $output = msstore publish $bundle.FullName -id ${{ vars.STORE_PRODUCT_ID }} --noCommit 2>&1 | Out-String
+          $output = msstore publish $bundle.FullName -id ${{ vars.STORE_PRODUCT_ID }} 2>&1 | Out-String
           Write-Host $output
 
           if ($LASTEXITCODE -ne 0) {
@@ -898,85 +882,3 @@ jobs:
             }
             exit $LASTEXITCODE
           }
-
-      # ─────────────────────────────────────
-      # 2. 「このバージョンの新機能」欄を CHANGELOG の本文で差し替える
-      #
-      # この欄の実体は提出 JSON の listings.<言語>.baseListing.releaseNotes。
-      # MSIX パッケージ側 (Package.appxmanifest) には対応する要素が無く、
-      # 提出メタデータを更新する以外に設定する方法はない。
-      # ─────────────────────────────────────
-      - name: Set "What's new in this version" from CHANGELOG.md
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          # native コマンドの非ゼロ終了は $LASTEXITCODE で自前に判定する
-          # (どのコマンドで落ちたかをメッセージに出すため)
-          $PSNativeCommandUseErrorActionPreference = $false
-          # 提出 JSON を丸ごと引数として渡すので、引用符のエスケープ規則を固定する
-          # (Windows の既定は一部の実行ファイルに Legacy 規則を使い、埋め込みの " が壊れうる)
-          $PSNativeCommandArgumentPassing = 'Standard'
-
-          $productId = '${{ vars.STORE_PRODUCT_ID }}'
-          $notes = Get-Content "${{ runner.temp }}/store-whats-new.txt" -Raw -Encoding UTF8
-
-          # 出力には進捗表示が混じるため、最初の '{' 以降を JSON として切り出す
-          $raw = (msstore submission get $productId | Out-String)
-          if ($LASTEXITCODE -ne 0) { throw "msstore submission get が失敗しました (exit $LASTEXITCODE)" }
-          $start = $raw.IndexOf('{')
-          if ($start -lt 0) { throw "msstore submission get の出力に JSON がありません:`n$raw" }
-
-          # ConvertFrom-Json / ConvertTo-Json ではなく JsonNode を使う。
-          # ConvertFrom-Json は日付に見える文字列を [datetime] に変換してしまい、
-          # 書き戻すと書式が変わる (mandatoryUpdateEffectiveDate の
-          # "1601-01-01T00:00:00.0000000Z" が "1601-01-01T00:00:00Z" になる)。
-          # updateMetadata は提出全体の置換なので、触っていない値は原文のまま返す必要がある。
-          $submission = [System.Text.Json.Nodes.JsonNode]::Parse($raw.Substring($start))
-
-          $listings = $submission['listings']
-          if ($null -eq $listings) {
-            throw "提出に listing がありません。Partner Center で Store listing を作成してください。"
-          }
-
-          # releaseNotes は listing (言語) ごとに持つ。この製品は 10 言語すべてに翻訳済みの
-          # listing があり (説明文も含む)、この欄も v4.1.1 までは言語ごとに訳していた。
-          # CHANGELOG.md は日本語のみのため、全 listing に同じ日本語を入れる方針を採る。
-          # 意図的な選択で、日本語以外の利用者には訳された説明文の下に日本語の更新履歴が並ぶ。
-          # 手作業での 10 言語更新が続かず、v4.2.0 以降 4 リリース分この欄が
-          # v4.1.1 のまま止まっていたため、内容が最新であることを優先した。
-          # 言語別の文面に戻すなら、このループを言語で分岐させる。
-          $langs = @($listings.AsObject() | ForEach-Object { $_.Key })
-          foreach ($lang in $langs) {
-            $baseListing = $listings[$lang]['baseListing']
-            if ($null -eq $baseListing) { throw "listing '$lang' に baseListing がありません" }
-            $baseListing['releaseNotes'] = [System.Text.Json.Nodes.JsonNode]::Parse(($notes | ConvertTo-Json))
-          }
-          Write-Host "Set releaseNotes ($($notes.Length) chars) for: $($langs -join ', ')"
-
-          # 既定のエンコーダーは非 ASCII を \uXXXX に展開し、日本語で JSON が 3 倍近くに
-          # 膨らむ。引数長に効くので、そのまま出す方の設定を使う (HTTP 送信のため
-          # HTML 用のエスケープは不要。" と \ と制御文字は従来どおりエスケープされる)。
-          $jsonOptions = [System.Text.Json.JsonSerializerOptions]::new()
-          $jsonOptions.Encoder = [System.Text.Encodings.Web.JavaScriptEncoder]::UnsafeRelaxedJsonEscaping
-          $json = $submission.ToJsonString($jsonOptions)
-
-          # JSON はコマンドライン引数として渡る。Windows の上限は 32767 文字
-          if ($json.Length -gt 30000) {
-            throw "提出 JSON が大きすぎてコマンドライン引数で渡せません ($($json.Length) 文字)"
-          }
-
-          msstore submission updateMetadata $productId $json
-          if ($LASTEXITCODE -ne 0) { throw "msstore submission updateMetadata が失敗しました (exit $LASTEXITCODE)" }
-
-      # ─────────────────────────────────────
-      # 3. 提出のコミット (ここから Microsoft の認定審査に入る)
-      # ─────────────────────────────────────
-      - name: Commit submission
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $false
-
-          msstore submission publish '${{ vars.STORE_PRODUCT_ID }}'
-          if ($LASTEXITCODE -ne 0) { throw "msstore submission publish が失敗しました (exit $LASTEXITCODE)" }
-          Write-Host "Submission committed. 認定審査の完了後に Store へ反映されます。"
