@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.5.1] - 2026-08-30
+
+### 依存関係
+- Microsoft.Web.WebView2 1.0.4129.50 → 1.0.4191.47
+- System.Data.Odbc / System.Data.OleDb 10.0.10 → 10.0.11
+  - 推移的依存の System.Configuration.ConfigurationManager / System.Diagnostics.EventLog / System.Diagnostics.PerformanceCounter / System.Security.Cryptography.ProtectedData も 10.0.10 → 10.0.11 になります
+  - 同梱コンポーネントの構成に変更はないため、`THIRD-PARTY-NOTICES.txt` の更新はありません
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.5.0 → 4.5.1 に同期
+
 ## [4.5.0] - 2026-08-10
 
 ### 機能変更
