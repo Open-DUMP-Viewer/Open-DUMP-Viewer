@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.6.1] - 2026-10-08
+
+### 依存関係
+- Microsoft.Data.SqlClient 7.0.2 → 7.1.1
+  - 推移的依存の Microsoft.Data.SqlClient.Extensions.Abstractions / Microsoft.Data.SqlClient.Internal.Logging も 7.1.1、Microsoft.Data.SqlClient.SNI.runtime は 6.0.2 → 7.1.0、Microsoft.Bcl.Cryptography / Microsoft.Extensions.Caching.Abstractions / Microsoft.Extensions.Caching.Memory / Microsoft.Extensions.Options / Microsoft.Extensions.Primitives は 9.0.13 → 9.0.18 になります
+  - 推移的依存として System.Threading.RateLimiting 9.0.18 (MIT) が新たに同梱されるため、`THIRD-PARTY-NOTICES.txt` に追記しました
+- Microsoft.Web.WebView2 1.0.4191.47 → 1.0.4258.31
+- System.Data.Odbc / System.Data.OleDb 10.0.11 → 10.0.12
+  - 推移的依存の System.Configuration.ConfigurationManager / System.Diagnostics.EventLog / System.Diagnostics.PerformanceCounter / System.Security.Cryptography.ProtectedData も 10.0.11 → 10.0.12 になります
+
+### 内部
+- DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.6.0 → 4.6.1 に同期
+
 ## [4.6.0] - 2026-09-11
 
 ### セキュリティ
