@@ -399,6 +399,12 @@ struct _odv_session {
     int             dump_type;       /* DUMP_EXPDP, DUMP_EXP etc. */
     int             dump_charset;
     int             out_charset;
+    int             expdp_xml_prefix; /* EXPDP: 2-byte prefix before "<?xml" in
+                                         a table-definition block (the DB charset
+                                         id). Captured from the first such block;
+                                         -1 until captured. Used to tell a real
+                                         table definition from a row value that
+                                         merely contains "<?xml" (H-23). */
 
     /* Current table being parsed */
     ODV_TABLE       table;

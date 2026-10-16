@@ -699,6 +699,94 @@ static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
       0xfe         = 2-byte chunk length follows
       0xff         = NULL LOB column
  ---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------
+    finish_fragment
+
+    Called from parse_expdp_records once every column stored in the current
+    record fragment (its CC columns) has been read.  Three outcomes:
+
+      * LOB record (0x08 / 0x09) that is not the last fragment: the non-LOB
+        columns are done and LOB chunk data follows, so hand off to the LOB
+        state machine (DS_LOB_MARKER).
+      * Not the last fragment of a >255-column row: keep the record and expect
+        a continuation fragment header back at step 1 (seg_remaining = -2).
+      * Last fragment (L bit set): any columns Oracle omitted as trailing NULLs
+        stay NULL (reset_record cleared the record at the start of the row), so
+        deliver the row and return to step 1 for the next record.
+
+    record_count is the caller's local row counter for this table.
+ ---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------
+    expdp_block_prefix_ok
+
+    A table-definition metadata block is "<?xml" at block offset 2, preceded
+    by a 2-byte prefix that is the dump's DB charset id (e.g. 0x0369 for
+    AL32UTF8, 0x00b2 for WE8MSWIN1252).  The value is constant within a dump
+    but differs between dumps, so it must not be hard-coded.  It is captured
+    from the first table-definition block encountered and required to match
+    thereafter.  A row value that merely contains "<?xml" at a 4KB boundary
+    carries a different leading pair (a column-length marker, not the charset
+    id) and is rejected, which is what keeps it from truncating the table and
+    dropping every table after it (H-23).
+
+    `pre` is the 2 bytes immediately before the '<'.  When the prefix has not
+    been captured yet, the first caller captures it and succeeds; later callers
+    must match.  During row parsing the prefix is always already set (the
+    table's own definition was read first), so an unset prefix there means the
+    bytes are not a genuine block boundary and the match fails.
+ ---------------------------------------------------------------------------*/
+static int expdp_block_prefix_ok(ODV_SESSION *s, const unsigned char *pre,
+                                 int capture)
+{
+    int prefix = ((int)pre[0] << 8) | (int)pre[1];
+    if (s->expdp_xml_prefix < 0) {
+        if (!capture) return 0;
+        s->expdp_xml_prefix = prefix;
+        return 1;
+    }
+    return prefix == s->expdp_xml_prefix;
+}
+
+static int finish_fragment(ODV_SESSION *s, FILE *fp, int list_only,
+                           int *record_count)
+{
+    ODV_PARSE_STATE *st = &s->state;
+    int rc;
+    int is_last = (st->record_header & 0x04) != 0;   /* L bit */
+
+    s->record.col_count = s->table.col_count;
+
+    /* 0x08 / 0x09: LOB chunk fragments follow the non-LOB columns. */
+    if (s->table.lob_col_count > 0 && st->is_lob_record && !is_last) {
+        st->data_step   = DS_LOB_MARKER;
+        st->lob_col_idx = 0;
+        st->is_end_lob  = 0;
+        st->lob_length  = 0;
+        return ODV_OK;
+    }
+
+    /* Not the last fragment of a wide (>255-column) row: the remaining
+     * columns arrive in a continuation fragment. */
+    if (!is_last && st->is_over255) {
+        st->step          = 1;
+        st->seg_remaining = -2;   /* expect a continuation fragment header */
+        return ODV_OK;
+    }
+
+    /* Last fragment: deliver the row (trailing unset columns stay NULL). */
+    if (!list_only) {
+        rc = deliver_row(s);
+        if (rc != ODV_OK) return rc;
+        odv_report_progress(s, fp);
+    }
+    (*record_count)++;
+    s->table.record_count++;
+    st->step          = 1;
+    st->data_step     = DS_COL_LENGTH;
+    st->seg_remaining = -1;
+    return ODV_OK;
+}
+
 static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                                int list_only)
 {
@@ -761,44 +849,37 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     }
 
     while (!s->cancelled) {
-        /* Segment boundary check: Oracle omits trailing NULL columns.
-         * When a 3c-segment is exhausted while we are still reading
-         * normal columns, treat unread columns as NULL and deliver. */
-        if (st->step == 2 && st->seg_remaining == 0
-            && st->data_step == DS_COL_LENGTH) {
-            while (st->col_idx < non_lob_cols) {
-                int ac = st->non_lob_map[st->col_idx];
-                if (ac < s->table.col_count)
-                    set_value_null(&s->record.values[ac]);
-                st->col_idx++;
-            }
-            s->record.col_count = s->table.col_count;
-            if (!list_only && !st->is_lob_record) {
-                rc = deliver_row(s);
-                if (rc != ODV_OK) return rc;
-                odv_report_progress(s, fp);
-                record_count++;
-                s->table.record_count++;
-            }
-            st->step = 1;
-            st->seg_remaining = -1;
-            continue;
-        }
-
         /* Read one byte */
         if (fread(&b, 1, 1, fp) != 1) break;
         (*address)++;
 
-        /* Safety check: detect XML DDL overrun */
+        /* Safety net: a table-definition block begins at a 4KB boundary with
+           the two constant bytes 0x03 0x69 followed by "<?xml" at offset 2.
+           If record parsing ever runs into such a block, stop so the caller
+           can re-sync.  The "03 69" prefix is required so that a column value
+           that merely contains "<?xml" at a block boundary (which lands at
+           offset 2 about once per 4096 values) is not mistaken for a new
+           table definition and does not truncate the table (see H-23). */
         if (b == '<' && (*address % ODV_DUMP_BLOCK_LEN) == 3) {
             unsigned char peek[4];
             if (fread(peek, 1, 4, fp) == 4) {
-                if (memcmp(peek, "?xml", 4) == 0) {
-                    odv_fseek(fp, *address - 3, SEEK_SET);
-                    *address -= 3;
-                    break;
+                int looks_xml = (memcmp(peek, "?xml", 4) == 0);
+                odv_fseek(fp, -4, SEEK_CUR);          /* back to just past '<' */
+                if (looks_xml) {
+                    unsigned char pre[2];
+                    int64_t here = *address;          /* file pos just past '<' */
+                    int is_block_prefix = 0;
+                    odv_fseek(fp, here - 3, SEEK_SET);
+                    if (fread(pre, 1, 2, fp) == 2 &&
+                        expdp_block_prefix_ok(s, pre, 0))
+                        is_block_prefix = 1;
+                    odv_fseek(fp, here, SEEK_SET);     /* restore */
+                    if (is_block_prefix) {
+                        odv_fseek(fp, here - 3, SEEK_SET);
+                        *address = here - 3;
+                        break;
+                    }
                 }
-                odv_fseek(fp, -4, SEEK_CUR);
             }
         }
 
@@ -808,102 +889,70 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             odv_report_progress(s, fp);
         }
 
-        /* Track bytes consumed inside a 3c segment */
-        if (st->step == 2 && st->seg_remaining > 0)
-            st->seg_remaining--;
-
-        /* ===== step 1: Expect record header byte ===== */
+        /* ===== step 1: Expect a record-fragment header ===== */
         if (st->step == 1) {
-            switch (b) {
-            case 0x00:
-                if (st->is_between_record)
+            /* A row is made of one or more fragments.  Each fragment header is
+             *     flag [HH LL] CC
+             * where HH LL (big-endian) is present only when (flag & 0x10) and
+             * is the fragment's total byte length, and CC is the number of
+             * columns stored in this fragment (Oracle omits trailing NULLs).
+             * Flag bits: 0x08=first(F) 0x04=last(L) 0x01=more(N) 0x10=has-len.
+             *   3c / 1c    : single length-prefixed fragment (F|L)
+             *   18/10/14   : >255-column row, split across fragments
+             *   0c         : single short fragment (F|L), no length
+             *   08 / 09    : LOB record (non-LOB columns here, LOB data after)
+             * seg_remaining == -2 marks "mid-row, expecting a continuation
+             * fragment" so the record is not reset between split fragments. */
+            int is_cont = (st->seg_remaining == -2);
+
+            if (b == 0x00) {
+                /* End-of-table padding between records, or leading padding. */
+                if (st->is_between_record && !is_cont)
                     return ODV_OK;
-                /* Padding before first record — skip */
-                break;
-
-            case 0x3c: {
-                /* DataPump segment wrapper: 3c 00 NN */
-                unsigned char nn;
-                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
-                (*address)++;
-                if (fread(&nn, 1, 1, fp) != 1) return ODV_OK;
-                (*address)++;
-                st->seg_remaining = (int)nn - 4;
-                if (st->seg_remaining < 0) st->seg_remaining = 0;
-                break;
-            }
-
-            case 0x08: case 0x09:
-                /* LOB record: only valid OUTSIDE 3c segments */
-                if (st->seg_remaining >= 0) goto normal_record;
-                st->is_between_record = 1;
-                st->record_header  = b;
-                st->is_lob_record  = 1;
-                st->is_over255     = 1;
-                st->filler_length  = 2;
-                st->is_last_chunk  = 0;
-                st->is_end_lob     = 0;
-                st->lob_length     = 0;
-                st->lob_col_idx    = 0;
-                st->step           = 2;
-                st->data_step      = DS_COL_LENGTH;
-                st->col_idx        = 0;
-                reset_record(&s->record);
-                /* Read non-LOB column count sub-byte */
-                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
-                (*address)++;
-                break;
-
-            case 0x0c:
-                /* Single-chunk LOB record: only valid OUTSIDE 3c segments */
-                if (st->seg_remaining >= 0) goto normal_record;
-                st->is_between_record = 1;
-                st->record_header  = b;
-                st->is_lob_record  = 1;
-                st->is_over255     = 0;
-                st->is_last_chunk  = 0;
-                st->is_end_lob     = 0;
-                st->lob_length     = 0;
-                st->lob_col_idx    = 0;
-                st->step           = 2;
-                st->data_step      = DS_COL_LENGTH;
-                st->col_idx        = 0;
-                reset_record(&s->record);
-                /* Read column count sub-byte */
-                if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
-                (*address)++;
-                break;
-
-            case 0x18: case 0x19: case 0x1c: case 0x2c:
-                /* Over-255 columns record */
-                if (st->seg_remaining >= 0) goto normal_record;
-                st->is_between_record = 1;
-                st->record_header  = b;
-                st->is_lob_record  = 0;
-                st->is_over255     = 1;
-                st->over255_count  = 0;
-                st->step           = 2;
-                st->data_step      = DS_COL_LENGTH;
-                st->col_idx        = 0;
-                reset_record(&s->record);
-                break;
-
-            case 0xff:
+                /* leading padding — skip and keep scanning */
+            } else if (b == 0xff) {
+                /* End of this table's row data. */
                 return ODV_OK;
+            } else {
+                /* b is a fragment-header flag byte. */
+                unsigned char cc;
 
-            default:
-                if (st->seg_remaining >= 0 || (b >= 0x01 && b <= 0x07)) {
-            normal_record:
-                    st->is_between_record = 1;
-                    st->record_header  = b;
-                    st->is_lob_record  = 0;
-                    st->is_over255     = 0;
-                    st->step           = 2;
-                    st->data_step      = DS_COL_LENGTH;
-                    st->col_idx        = 0;
-                    reset_record(&s->record);
+                st->record_header = (int)b;
+
+                /* Consume the 2-byte big-endian length when present.  Row
+                 * completion is driven by the column count CC, so the byte
+                 * length itself only needs to be skipped. */
+                if (b & 0x10) {
+                    unsigned char lenb[2];
+                    if (fread(lenb, 1, 2, fp) != 2) return ODV_OK;
+                    (*address) += 2;
+                    (void)lenb;
                 }
-                break;
+
+                /* Column count for this fragment. */
+                if (fread(&cc, 1, 1, fp) != 1) return ODV_OK;
+                (*address)++;
+                st->seg_remaining = (int)cc;
+
+                if (!is_cont) {
+                    /* Start of a new record. */
+                    reset_record(&s->record);
+                    st->col_idx       = 0;
+                    st->lob_col_idx   = 0;
+                    st->is_lob_record = (b == 0x08 || b == 0x09 || b == 0x0c);
+                    st->is_over255    = (b == 0x18 || b == 0x19);
+                    st->is_end_lob    = 0;
+                    st->lob_length    = 0;
+                    st->is_between_record = 1;
+                }
+                st->step      = 2;
+                st->data_step = DS_COL_LENGTH;
+
+                /* A fragment that stores zero columns completes at once. */
+                if (st->seg_remaining <= 0) {
+                    rc = finish_fragment(s, fp, list_only, &record_count);
+                    if (rc != ODV_OK) return rc;
+                }
             }
 
         /* ===== step 2: Reading record data ===== */
@@ -919,6 +968,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 int ac = (st->col_idx < st->non_lob_count)
                          ? st->non_lob_map[st->col_idx]
                          : st->col_idx;
+                int col_done = 0;
 
                 if (b == 0xff) {
                     /* NULL */
@@ -928,8 +978,9 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                             s->table.columns[ac].type;
                     }
                     st->col_idx++;
+                    col_done = 1;
                 } else if (b == 0xfe) {
-                    /* 2-byte length follows */
+                    /* 2-byte length follows (big-endian) */
                     st->data_step = DS_COL_LEN_HI;
                     st->col_len = 0;
                 } else if (b == 0x00) {
@@ -940,6 +991,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                             s->table.columns[ac].type;
                     }
                     st->col_idx++;
+                    col_done = 1;
                 } else {
                     /* Direct length (1-253) */
                     st->col_len = (int)b;
@@ -952,53 +1004,48 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     }
                 }
 
-                /* 255-column boundary filler */
-                if (st->is_over255 && st->col_idx > 0
-                    && (st->col_idx % 255) == 0
-                    && st->data_step == DS_COL_LENGTH) {
-                    st->over255_count++;
-                }
-
-                /* Check if all non-LOB columns are complete */
-                if (st->data_step == DS_COL_LENGTH
-                    && st->col_idx >= non_lob_cols) {
-                    s->record.col_count = s->table.col_count;
-
-                    /* LOB table? Transition to LOB state machine */
-                    if (s->table.lob_col_count > 0 && st->is_lob_record) {
-                        /* Do NOT deliver_row yet — LOB data follows.
-                         * Transition to LOB marker reading. */
-                        st->data_step   = DS_LOB_MARKER;
-                        st->lob_col_idx = 0;
-                        st->is_end_lob  = 0;
-                        st->lob_length  = 0;
-                    } else {
-                        /* Non-LOB table or normal record in LOB table:
-                         * deliver the row immediately. */
-                        if (!list_only) {
-                            rc = deliver_row(s);
-                            if (rc != ODV_OK) return rc;
-                            odv_report_progress(s, fp);
-                        }
-                        record_count++;
-                        s->table.record_count++;
-                        st->step = 1;
+                /* A NULL/empty column completes here; a fixed- or 2-byte
+                 * length column completes in DS_COL_DATA.  When this
+                 * fragment's CC columns are all read, close out the
+                 * fragment (deliver, continue to next fragment, or hand
+                 * off to the LOB state machine). */
+                if (col_done) {
+                    st->seg_remaining--;
+                    if (st->seg_remaining <= 0) {
+                        rc = finish_fragment(s, fp, list_only, &record_count);
+                        if (rc != ODV_OK) return rc;
                     }
                 }
                 break;
             }
 
-            case DS_COL_LEN_HI: /* 1: First byte of 2-byte length */
-                st->col_len = (int)b;
+            case DS_COL_LEN_HI: /* 1: High byte of 2-byte length (big-endian) */
+                st->col_len = (int)b << 8;
                 st->data_step = DS_COL_LEN_LO;
                 break;
 
-            case DS_COL_LEN_LO: /* 2: Second byte of 2-byte length (LE) */
+            case DS_COL_LEN_LO: /* 2: Low byte of 2-byte length (big-endian) */
             {
                 int ac = (st->col_idx < st->non_lob_count)
                          ? st->non_lob_map[st->col_idx]
                          : st->col_idx;
-                st->col_len |= ((int)b << 8);
+                st->col_len |= (int)b;
+                if (st->col_len <= 0) {
+                    /* Degenerate zero-length value — treat as empty. */
+                    if (ac < s->table.col_count) {
+                        set_value_string(&s->record.values[ac], "", 0);
+                        s->record.values[ac].type =
+                            s->table.columns[ac].type;
+                    }
+                    st->col_idx++;
+                    st->data_step = DS_COL_LENGTH;
+                    st->seg_remaining--;
+                    if (st->seg_remaining <= 0) {
+                        rc = finish_fragment(s, fp, list_only, &record_count);
+                        if (rc != ODV_OK) return rc;
+                    }
+                    break;
+                }
                 st->col_remaining = st->col_len;
                 st->data_step = DS_COL_DATA;
                 if (ac < s->table.col_count) {
@@ -1031,25 +1078,11 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     st->col_idx++;
                     st->data_step = DS_COL_LENGTH;
 
-                    /* Check record completion */
-                    if (st->col_idx >= non_lob_cols) {
-                        s->record.col_count = s->table.col_count;
-
-                        if (s->table.lob_col_count > 0 && st->is_lob_record) {
-                            st->data_step   = DS_LOB_MARKER;
-                            st->lob_col_idx = 0;
-                            st->is_end_lob  = 0;
-                            st->lob_length  = 0;
-                        } else {
-                            if (!list_only) {
-                                rc = deliver_row(s);
-                                if (rc != ODV_OK) return rc;
-                                odv_report_progress(s, fp);
-                            }
-                            record_count++;
-                            s->table.record_count++;
-                            st->step = 1;
-                        }
+                    /* Fragment column count reached? Close out the fragment. */
+                    st->seg_remaining--;
+                    if (st->seg_remaining <= 0) {
+                        rc = finish_fragment(s, fp, list_only, &record_count);
+                        if (rc != ODV_OK) return rc;
                     }
                 }
                 break;
@@ -1092,17 +1125,15 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     break;
 
                 case 0x08: case 0x09: case 0x0c:
-                    /* New LOB/record header encountered inside LOB stream.
-                     * End current LOB processing, deliver row, then
-                     * restart as a new record with this header. */
-
-                    /* Finalize LOB extraction for current record */
+                    /* A new record-fragment header appeared in the LOB marker
+                     * position: the current record's LOB data is finished.
+                     * Deliver the current row, then push the header byte back
+                     * so step 1 parses the next record uniformly (correct
+                     * column count and big-endian column lengths). */
                     if (s->lob_extract_mode && s->lob_column_index >= 0) {
                         rc = odv_lob_write_file(s);
                         if (rc != ODV_OK) return rc;
                     }
-
-                    /* Deliver the completed record */
                     if (!list_only) {
                         rc = deliver_row(s);
                         if (rc != ODV_OK) return rc;
@@ -1111,27 +1142,11 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     record_count++;
                     s->table.record_count++;
 
-                    /* Set up new record with this header */
-                    st->record_header  = b;
-                    st->is_lob_record  = 1;
-                    st->is_last_chunk  = 0;
-                    st->is_end_lob     = 0;
-                    st->lob_length     = 0;
-                    st->lob_col_idx    = 0;
-                    st->col_idx        = 0;
-                    st->data_step      = DS_COL_LENGTH;
-                    reset_record(&s->record);
-
-                    if (b == 0x0c) {
-                        st->is_over255 = 0;
-                    } else {
-                        st->is_over255    = 1;
-                        st->filler_length = 2;
-                    }
-
-                    /* Read column count sub-byte */
-                    if (fread(&b, 1, 1, fp) != 1) return ODV_OK;
-                    (*address)++;
+                    odv_fseek(fp, -1, SEEK_CUR);   /* unread the header byte */
+                    (*address)--;
+                    st->step          = 1;
+                    st->data_step     = DS_COL_LENGTH;
+                    st->seg_remaining = -1;
                     break;
 
                 case 0xfe:
@@ -1681,6 +1696,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 
     s->table_count = 0;
     s->total_rows = 0;
+    s->expdp_xml_prefix = -1;   /* captured from the first table-def block */
 
     /* Fast seek: if seek_offset is set (from previous list_tables),
        jump directly to the target DDL position instead of scanning from top.
@@ -1703,8 +1719,12 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 
         /* Check for XML DDL marker at block offset 2 (per EXPDP format).
            Offset 0 blocks contain statistics/metadata, not table DDL.
-           Table DDL blocks always start with 2-byte length prefix + "<?xml". */
-        int xml_pos = (n >= 7 && memcmp(block + 2, "<?xml", 5) == 0) ? 2 : -1;
+           A table DDL block begins with the dump's 2-byte charset-id prefix
+           then "<?xml" at offset 2.  Matching that prefix (captured from the
+           first such block) keeps a row value that merely contains "<?xml" at
+           a 4KB boundary from being mistaken for a table definition (H-23). */
+        int xml_pos = (n >= 7 && memcmp(block + 2, "<?xml", 5) == 0 &&
+                       expdp_block_prefix_ok(s, block, 1)) ? 2 : -1;
 
         if (xml_pos >= 0 && !in_ddl) {
             /* Start of XML DDL block - record file position for caching */
@@ -1857,11 +1877,14 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                     if (rem != 0)
                         odv_fseek(fp, cur + (ODV_DUMP_BLOCK_LEN - rem), SEEK_SET);
                 }
-                /* Then scan block-by-block until we find <?xml or EOF */
+                /* Then scan block-by-block until we find <?xml or EOF.
+                   Require the dump's charset-id block prefix so a "<?xml" that
+                   is really row-data text is not taken for a table (H-23). */
                 while (!s->cancelled) {
                     int nr = (int)fread(skip_blk, 1, ODV_DUMP_BLOCK_LEN, fp);
                     if (nr < 7) break;  /* EOF */
-                    if (memcmp(skip_blk + 2, "<?xml", 5) == 0) {
+                    if (memcmp(skip_blk + 2, "<?xml", 5) == 0 &&
+                        expdp_block_prefix_ok(s, skip_blk, 1)) {
                         /* Found next DDL block — seek back so main loop reads it */
                         odv_fseek(fp, odv_ftell(fp) - nr, SEEK_SET);
                         break;
