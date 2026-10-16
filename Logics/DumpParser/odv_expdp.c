@@ -45,6 +45,7 @@
 typedef struct {
     ODV_SESSION *session;
     int  in_col_list;       /* inside <COL_LIST_ITEM> */
+    int  col_item_depth;    /* XML depth of the current <COL_LIST_ITEM> */
     int  col_idx;           /* current column being defined */
     char cur_schema[ODV_OBJNAME_LEN + 1];
     char cur_table[ODV_OBJNAME_LEN + 1];
@@ -88,6 +89,23 @@ static int type_num_to_col_type(int type_num, int length, int flags)
 }
 
 /*---------------------------------------------------------------------------
+    Oracle system-generated column name?  These never appear as user columns:
+      - SYS_NC*****$     : object OID / ROWINFO, ADT attributes, nested-table
+                           SETID, function-based & DESC index hidden columns
+      - SYS_IME_*        : JSON binary storage (In-Memory Expression) columns
+    The ones that are actually stored in the row data (SEGCOL_NUM >= 1) are read
+    and discarded; the rest (SEGCOL_NUM == 0) are not in the data at all (H-18).
+ ---------------------------------------------------------------------------*/
+static int is_system_colname(const char *name)
+{
+    size_t n = strlen(name);
+    if (n == 0) return 0;
+    if (strncmp(name, "SYS_NC", 6) == 0 && name[n - 1] == '$') return 1;
+    if (strncmp(name, "SYS_IME_", 8) == 0) return 1;
+    return 0;
+}
+
+/*---------------------------------------------------------------------------
     XML callback: processes each tag from the EXPDP DDL
  ---------------------------------------------------------------------------*/
 static void ddl_xml_callback(const char *tag, const char *value,
@@ -95,7 +113,6 @@ static void ddl_xml_callback(const char *tag, const char *value,
 {
     DDL_CONTEXT *dc = (DDL_CONTEXT *)ctx;
     ODV_SESSION *s = dc->session;
-    (void)depth;
 
     if (!tag || !tag[0]) return;
 
@@ -109,6 +126,7 @@ static void ddl_xml_callback(const char *tag, const char *value,
             if (!dc->in_col_list) {
                 /* Opening: prepare next column slot */
                 dc->in_col_list = 1;
+                dc->col_item_depth = depth;
                 if (dc->col_idx < ODV_MAX_COLUMNS) {
                     memset(&s->table.columns[dc->col_idx], 0, sizeof(ODV_COLUMN));
                 }
@@ -125,34 +143,41 @@ static void ddl_xml_callback(const char *tag, const char *value,
     if (strcmp(tag, "NAME") == 0 && !dc->in_col_list) {
         odv_strcpy(dc->cur_table, value, ODV_OBJNAME_LEN);
     }
-    else if (strcmp(tag, "OWNER_NAME") == 0) {
+    else if (strcmp(tag, "OWNER_NAME") == 0 && !dc->in_col_list) {
+        /* Table-level OWNER_NAME only.  A column's type carries its own nested
+         * <TYPEMD><OWNER_NAME>…</OWNER_NAME> (SYS for XMLTYPE/ANYDATA, MDSYS for
+         * SDO_GEOMETRY, the ADT's schema for object columns); using it as the
+         * table schema made XMLTYPE/ANYDATA tables look SYS-owned (then dropped
+         * by is_system_table) and SDO_GEOMETRY tables appear under MDSYS (H-19). */
         odv_strcpy(dc->cur_schema, value, ODV_OBJNAME_LEN);
     }
     else if (strcmp(tag, "PROPERTY") == 0 && !dc->in_col_list) {
         dc->property = atoi(value);
     }
-    else if (dc->in_col_list && dc->col_idx < ODV_MAX_COLUMNS) {
+    else if (dc->in_col_list && depth == dc->col_item_depth + 1 &&
+             dc->col_idx < ODV_MAX_COLUMNS) {
+        /* Direct children of <COL_LIST_ITEM> only.  A column's type definition
+         * nests a <TYPEMD> whose own <NAME> is the type name (XMLTYPE,
+         * SDO_GEOMETRY, the ADT name); without the depth guard it overwrote the
+         * column name with the type name (H-19). */
         ODV_COLUMN *col = &s->table.columns[dc->col_idx];
 
         if (strcmp(tag, "COL_NAME") == 0 || strcmp(tag, "NAME") == 0) {
-            /* Skip Oracle system-generated internal columns:
-               - SYS_NC*****$ : In-Database Archiving / function-based index columns
-               - SYS_IME_*    : JSON binary storage (In-Memory Expression) columns */
-            if ((strncmp(value, "SYS_NC", 6) == 0 &&
-                 value[strlen(value) - 1] == '$') ||
-                strncmp(value, "SYS_IME_", 8) == 0) {
-                /* Mark to skip */
-                col->type = -1;
-            } else {
-                odv_strcpy(col->name, value, ODV_OBJNAME_LEN);
-            }
+            /* Store every column's name, including the Oracle system-generated
+             * ones (SYS_NC*****$, SYS_IME_*).  Whether a column is shown, read
+             * and discarded, or skipped entirely is decided at COL_LIST_ITEM
+             * close from its name, COL_NUM and SEGCOL_NUM (H-18). */
+            odv_strcpy(col->name, value, ODV_OBJNAME_LEN);
+        }
+        else if (strcmp(tag, "COL_NUM") == 0) {
+            col->col_num = atoi(value);
+        }
+        else if (strcmp(tag, "SEGCOL_NUM") == 0) {
+            col->seg_col = atoi(value);
         }
         else if (strcmp(tag, "TYPE_NUM") == 0) {
-            /* Don't overwrite -1 marker for system-generated columns */
-            if (col->type != -1) {
-                int tn = atoi(value);
-                col->type = type_num_to_col_type(tn, col->length, col->flags);
-            }
+            int tn = atoi(value);
+            col->type = type_num_to_col_type(tn, col->length, col->flags);
         }
         else if (strcmp(tag, "LENGTH") == 0) {
             col->length = atoi(value);
@@ -182,8 +207,26 @@ static void ddl_xml_callback(const char *tag, const char *value,
         dc->in_col_list = 0;
         if (dc->col_idx < ODV_MAX_COLUMNS) {
             ODV_COLUMN *col = &s->table.columns[dc->col_idx];
+            /* A column is in the row data when SEGCOL_NUM >= 1.  It is a shown
+             * (user) column only when it also has a user column id (COL_NUM>=1)
+             * and a non-system name; otherwise it is a hidden in-data column
+             * (object OID, ADT attribute, nested SETID, invisible column) whose
+             * bytes are read and discarded.  Virtual columns (SEGCOL_NUM==0) are
+             * neither shown nor in the data (H-18). */
+            int in_data    = (col->seg_col >= 1);
+            int is_display = in_data && col->col_num >= 1 &&
+                             col->name[0] != '\0' &&
+                             !is_system_colname(col->name);
+
+            if (in_data && s->table.data_count < ODV_MAX_COLUMNS) {
+                s->table.data_disp[s->table.data_count] =
+                    is_display ? dc->col_idx : -1;
+                s->table.data_type[s->table.data_count] = col->type;
+                s->table.data_count++;
+            }
+
             /* Only count non-system columns */
-            if (col->type != -1 && col->name[0] != '\0') {
+            if (is_display) {
                 /* CHARSETID 2000 = AL16UTF16 (national charset, UTF-16BE).
                  * Upgrade VARCHAR2→NVARCHAR2 and CHAR→NCHAR accordingly. */
                 if (col->charset == 2000) {
@@ -611,27 +654,19 @@ static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
                                    const unsigned char *data, int len)
 {
     ODV_PARSE_STATE *st = &s->state;
-    int abs_col;    /* Absolute column index in the table */
-    int i, lob_i;
+    int abs_col;    /* Absolute (display) column index in the table */
+    int pos;
     ODV_VALUE *v;
     int col_type;
 
     if (!data || len <= 0) return;
 
-    /* Find the absolute column index for this LOB column */
-    abs_col = -1;
-    lob_i = 0;
-    for (i = 0; i < s->table.col_count; i++) {
-        int t = s->table.columns[i].type;
-        if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB ||
-            t == COL_LONG || t == COL_LONG_RAW) {
-            if (lob_i == lob_col_idx) {
-                abs_col = i;
-                break;
-            }
-            lob_i++;
-        }
-    }
+    /* Resolve this LOB column's display index from the row-data map: the LOB-ish
+     * columns are the suffix of non_lob_map after the non-LOB prefix, in the
+     * same order the LOB chunk machine walks them.  A hidden in-data LOB maps to
+     * ODV_MAX_COLUMNS (>= col_count) and its preview is discarded (H-18). */
+    pos = st->non_lob_count + lob_col_idx;
+    abs_col = (pos >= 0 && pos < st->map_count) ? st->non_lob_map[pos] : -1;
     if (abs_col < 0 || abs_col >= s->table.col_count) return;
 
     col_type = s->table.columns[abs_col].type;
@@ -869,14 +904,10 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 {
     ODV_PARSE_STATE *st = &s->state;
     unsigned char b;
-    int non_lob_cols;
     int chunk_size = 0;
     int record_count = 0;
     int progress_counter = 0;
     int rc;
-
-    non_lob_cols = s->table.col_count - s->table.lob_col_count;
-    if (non_lob_cols <= 0) non_lob_cols = s->table.col_count;
 
     /* Initialize parse state */
     st->step             = 1;
@@ -900,30 +931,35 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     st->lob_pv_fresh     = 0;
     st->expdp_external   = 0;   /* per-table; set on an inline real-LOB (H-21) */
 
-    /* Build the row's column → absolute column index map.
-     * Non-LOB columns first (their order in the row), then the LOB-ish columns
-     * (BLOB/CLOB/NCLOB/LONG/LONG RAW) in table order.  In direct path only the
-     * non-LOB prefix is consumed inline and the real LOB data arrives as
-     * separate 08/09 chunk fragments; in the external-table format every
-     * column — LOBs included — is stored inline in exactly this order, so the
-     * appended suffix lets those rows be read as ordinary columns (H-21).  The
-     * prefix is identical to the old non-LOB-only mapping, so the direct-path
-     * path is unchanged.  For tables with no LOBs this is an identity map. */
+    /* Build the row's data-stream → display column map from the table's row-
+     * data layout (table.data_*, built in SEGCOL order at DDL parse): the
+     * non-LOB columns first (the inline prefix, in SEGCOL order), then the
+     * LOB-ish columns (BLOB/CLOB/NCLOB/LONG/LONG RAW) in SEGCOL order.  In
+     * direct path only the non-LOB prefix is read inline and the real LOB data
+     * arrives as separate 08/09 chunk fragments; in the external-table format
+     * every column — LOBs included — is inline in exactly this order (H-21).
+     * Each entry is the destination display column index, or ODV_MAX_COLUMNS
+     * (always >= col_count, so the read loop reads but stores nothing) for a
+     * hidden in-data column whose bytes are discarded — object OID, ADT
+     * attribute, nested-table SETID, invisible column (H-18).  For a table
+     * with no virtual/hidden columns this reproduces the old table-order map. */
     {
         int mi, mc = 0;
-        for (mi = 0; mi < s->table.col_count && mc < ODV_MAX_COLUMNS; mi++) {
-            int t = s->table.columns[mi].type;
+        for (mi = 0; mi < s->table.data_count && mc < ODV_MAX_COLUMNS; mi++) {
+            int t = s->table.data_type[mi];
             if (t != COL_BLOB && t != COL_CLOB && t != COL_NCLOB &&
                 t != COL_LONG && t != COL_LONG_RAW) {
-                st->non_lob_map[mc++] = mi;
+                int d = s->table.data_disp[mi];
+                st->non_lob_map[mc++] = (d >= 0) ? d : ODV_MAX_COLUMNS;
             }
         }
         st->non_lob_count = mc;
-        for (mi = 0; mi < s->table.col_count && mc < ODV_MAX_COLUMNS; mi++) {
-            int t = s->table.columns[mi].type;
+        for (mi = 0; mi < s->table.data_count && mc < ODV_MAX_COLUMNS; mi++) {
+            int t = s->table.data_type[mi];
             if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB ||
                 t == COL_LONG || t == COL_LONG_RAW) {
-                st->non_lob_map[mc++] = mi;
+                int d = s->table.data_disp[mi];
+                st->non_lob_map[mc++] = (d >= 0) ? d : ODV_MAX_COLUMNS;
             }
         }
         st->map_count = mc;
@@ -1254,10 +1290,13 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     break;
 
                 case 0xff:
-                    /* NULL LOB column */
-                    if (st->col_idx + st->lob_col_idx < s->table.col_count) {
-                        int abs_idx = non_lob_cols + st->lob_col_idx;
-                        if (abs_idx < s->table.col_count)
+                    /* NULL LOB column.  Resolve its display index from the
+                     * row-data map, as accumulate_lob_preview does (H-18). */
+                    {
+                        int pos = st->non_lob_count + st->lob_col_idx;
+                        int abs_idx = (pos < st->map_count)
+                                      ? st->non_lob_map[pos] : -1;
+                        if (abs_idx >= 0 && abs_idx < s->table.col_count)
                             set_value_null(&s->record.values[abs_idx]);
                     }
                     st->lob_col_idx++;
@@ -1527,11 +1566,22 @@ static const struct {
 };
 #define ODV_META_PATH_COUNT 3
 
-/* Shortest marker plus the trailing structure it needs to stay inside the
-   block (INDEX: 31 + 50). A block smaller than this cannot hold any marker,
-   so it is the cut-off for the final short block. Each marker still applies
-   its own tail requirement inside the loop. */
-#define ODV_META_SCAN_MIN_BLOCK  81
+/* One SCHEMA_EXPORT/TABLE/TABLE_DATA marker: the table it belongs to and the
+   partition name it carries (empty when none was extractable).  Markers are
+   collected across the whole master-table area first, then grouped by table so
+   a table's partition names can be assigned in the order expdp writes the data
+   rather than the scrambled order the markers appear in (H-15). */
+typedef struct {
+    char schema[260];   /* holds convert_name output (may expand past 128) */
+    char table[260];
+    char part[ODV_OBJNAME_LEN + 1];
+} ODV_PART_MARK;
+
+/* Bytes re-scanned at each block boundary so a marker (and the ~230-byte
+   structure it reads after itself) straddling an 8KB read is never skipped.
+   A dropped marker shifted every later partition name of its table by one
+   (cascading), which was the dominant cause of wrong partition names (H-15). */
+#define ODV_META_SCAN_OVERLAP  512
 
 static void scan_master_metadata(ODV_SESSION *s)
 {
@@ -1539,27 +1589,27 @@ static void scan_master_metadata(ODV_SESSION *s)
     static const int  path_len = 30;
 
     /* part_occ[i] = which occurrence (0-based) of this schema.table the
-       table_list entry i is (e.g. 4 partitions → occ 0,1,2,3). */
+       table_list entry i is (e.g. 4 partitions → occ 0,1,2,3).  Table_list
+       entries (one per partition that has data) are in the order expdp wrote
+       the data, which is the partitions sorted by name. */
     int *part_occ = NULL;
-    /* Per-table occurrence counter while scanning the master table. Each entry
-       holds a "schema.table" key built after charset conversion, which can
-       expand names, so the element size must match that buffer. */
-    char (*scan_keys)[260] = NULL;
-    int scan_count = 0;
 
     ODV_META_MATCH *matches = NULL;
     int match_count = 0, match_alloc = 0;
 
+    /* Collected partition-name markers (grouped and assigned after the scan). */
+    ODV_PART_MARK *pmarks = NULL;
+    int pmark_count = 0, pmark_alloc = 0;
+
     FILE *sfp = NULL;
     unsigned char blk[8192];
-    int blk_len;
+    int carry = 0;
     int ti, k, mi, pass;
 
     if (s->table_count <= 0) return;
 
-    part_occ  = (int *)malloc((size_t)s->table_count * sizeof(int));
-    scan_keys = (char (*)[260])malloc((size_t)ODV_MAX_TABLES * 260);
-    if (!part_occ || !scan_keys) goto scan_cleanup;
+    part_occ = (int *)malloc((size_t)s->table_count * sizeof(int));
+    if (!part_occ) goto scan_cleanup;
 
     for (ti = 0; ti < s->table_count; ti++) {
         part_occ[ti] = 0;
@@ -1575,18 +1625,23 @@ static void scan_master_metadata(ODV_SESSION *s)
     if (!sfp) goto scan_cleanup;
     setvbuf(sfp, NULL, _IOFBF, 65536);
 
-    while (!s->cancelled) {
+    for (;;) {
+        int got = (int)fread(blk + carry, 1, sizeof(blk) - carry, sfp);
+        int avail = carry + got;
+        int at_eof = (got < (int)sizeof(blk) - carry);
+        int scan_end = at_eof ? avail : (avail - ODV_META_SCAN_OVERLAP);
         int si;
 
-        blk_len = (int)fread(blk, 1, sizeof(blk), sfp);
-        if (blk_len < ODV_META_SCAN_MIN_BLOCK) break;   /* EOF / final short block */
+        if (s->cancelled || avail <= 0) break;
+        if (scan_end < 0) scan_end = 0;
 
-        /* Walk every offset; each marker applies its own tail requirement so
-           the scan range per marker matches what its dedicated pass used. */
-        for (si = 0; si < blk_len; si++) {
+        /* Scan every offset up to scan_end; a marker there can still read its
+           whole structure within [si, avail).  Markers past scan_end are
+           re-examined in the next window via the carried-over tail. */
+        for (si = 0; si < scan_end; si++) {
 
             /* ---- SCHEMA_EXPORT/TABLE/TABLE_DATA → partition name ---- */
-            if (si <= blk_len - path_len - 50 &&
+            if (si <= avail - path_len - 50 &&
                 memcmp(blk + si, path_marker, path_len) == 0) {
                 /* Structure after the path:
                  * [ff]...[len]TABLE[len]SCHEMA[ff][02]...[ff][len]PART[ff] */
@@ -1594,25 +1649,25 @@ static void scan_master_metadata(ODV_SESSION *s)
                 char tn[64] = {0}, sn[64] = {0}, pn[64] = {0};
                 int tl, sl;
 
-                while (p < blk_len && blk[p] == 0xff) p++;
-                if (p + 3 >= blk_len) continue;
+                while (p < avail && blk[p] == 0xff) p++;
+                if (p + 3 >= avail) continue;
 
                 tl = blk[p++];
-                if (tl <= 0 || tl > 60 || p + tl + 3 >= blk_len) continue;
+                if (tl <= 0 || tl > 60 || p + tl + 3 >= avail) continue;
                 memcpy(tn, blk + p, tl); p += tl;
 
                 sl = blk[p++];
-                if (sl <= 0 || sl > 60 || p + sl >= blk_len) continue;
+                if (sl <= 0 || sl > 60 || p + sl >= avail) continue;
                 memcpy(sn, blk + p, sl); p += sl;
 
                 /* After schema: skip binary pattern [ff][02][c1][02][ff][ff][ff]
                  * and find partition name [len]NAME (printable ASCII).
                  * Scan forward looking for a valid len+name pattern. */
                 {
-                    int limit = ODV_MIN(p + 20, blk_len - 2);
+                    int limit = ODV_MIN(p + 20, avail - 2);
                     while (p < limit && !pn[0]) {
                         int pl = blk[p];
-                        if (pl >= 4 && pl <= 60 && p + 1 + pl <= blk_len) {
+                        if (pl >= 4 && pl <= 60 && p + 1 + pl <= avail) {
                             /* Check if next pl bytes are all printable ASCII */
                             int ok = 1, q;
                             for (q = 0; q < pl; q++) {
@@ -1627,31 +1682,27 @@ static void scan_master_metadata(ODV_SESSION *s)
                     }
                 }
 
+                /* Collect the marker (table/schema converted; the partition name
+                 * is printable ASCII and needs no conversion).  Names are matched
+                 * to entries only after every marker is in, so the scrambled
+                 * marker order no longer matters (H-15). */
                 {
-                    char ct[260], cs2[260], key[260];
-                    int occ = 0, pi;
-
+                    char ct[260], cs2[260];
                     convert_name(tn, s->dump_charset, s->out_charset, ct, sizeof(ct));
                     convert_name(sn, s->dump_charset, s->out_charset, cs2, sizeof(cs2));
 
-                    snprintf(key, sizeof(key), "%s.%s", cs2, ct);
-                    for (pi = 0; pi < scan_count; pi++) {
-                        if (strcmp(scan_keys[pi], key) == 0) occ++;
+                    if (pmark_count >= pmark_alloc) {
+                        int new_alloc = pmark_alloc ? pmark_alloc * 2 : 256;
+                        ODV_PART_MARK *np = (ODV_PART_MARK *)realloc(
+                            pmarks, (size_t)new_alloc * sizeof(ODV_PART_MARK));
+                        if (!np) goto scan_apply;   /* keep what we have */
+                        pmarks = np;
+                        pmark_alloc = new_alloc;
                     }
-                    if (scan_count < ODV_MAX_TABLES)
-                        odv_strcpy(scan_keys[scan_count++], key, 259);
-
-                    if (pn[0]) {
-                        for (ti = 0; ti < s->table_count; ti++) {
-                            if (strcmp(s->table_list[ti].schema, cs2) == 0 &&
-                                strcmp(s->table_list[ti].name,   ct)  == 0 &&
-                                part_occ[ti] == occ) {
-                                odv_strcpy(s->table_list[ti].partition, pn,
-                                           ODV_OBJNAME_LEN);
-                                break;
-                            }
-                        }
-                    }
+                    odv_strcpy(pmarks[pmark_count].schema, cs2, 259);
+                    odv_strcpy(pmarks[pmark_count].table,  ct,  259);
+                    odv_strcpy(pmarks[pmark_count].part,   pn,  ODV_OBJNAME_LEN);
+                    pmark_count++;
                 }
                 continue;   /* markers cannot overlap */
             }
@@ -1662,26 +1713,26 @@ static void scan_master_metadata(ODV_SESSION *s)
                 int p, tl, sl, cl;
                 char tn[64] = {0}, sn[64] = {0}, cn[64] = {0};
 
-                if (si > blk_len - mlen - 30) continue;
+                if (si > avail - mlen - 30) continue;
                 if (memcmp(blk + si, odv_meta_paths[mi].path, mlen) != 0) continue;
 
                 p = si + mlen;
-                while (p < blk_len && blk[p] == 0xff) p++;
-                if (p + 4 >= blk_len) break;
+                while (p < avail && blk[p] == 0xff) p++;
+                if (p + 4 >= avail) break;
 
                 /* [len]TABLE_NAME */
                 tl = blk[p++];
-                if (tl <= 0 || tl > 60 || p + tl + 3 >= blk_len) break;
+                if (tl <= 0 || tl > 60 || p + tl + 3 >= avail) break;
                 memcpy(tn, blk + p, tl); p += tl;
 
                 /* [len]SCHEMA */
                 sl = blk[p++];
-                if (sl <= 0 || sl > 60 || p + sl + 2 >= blk_len) break;
+                if (sl <= 0 || sl > 60 || p + sl + 2 >= avail) break;
                 memcpy(sn, blk + p, sl); p += sl;
 
                 /* [len]CONSTRAINT/INDEX_NAME */
                 cl = blk[p++];
-                if (cl <= 0 || cl > 60 || p + cl > blk_len) break;
+                if (cl <= 0 || cl > 60 || p + cl > avail) break;
                 memcpy(cn, blk + p, cl); p += cl;
 
                 /* Validate: all printable */
@@ -1726,8 +1777,12 @@ static void scan_master_metadata(ODV_SESSION *s)
             }
         }
 
-        /* No seek-back: 8KB blocks are large enough that boundary
-         * splits of ~80-byte structures are extremely rare. */
+        if (at_eof) break;
+        /* Carry the tail forward so a marker straddling this read boundary is
+         * seen whole next window; scan_end excluded it here, so nothing is
+         * scanned twice. */
+        memmove(blk, blk + avail - ODV_META_SCAN_OVERLAP, ODV_META_SCAN_OVERLAP);
+        carry = ODV_META_SCAN_OVERLAP;
     }
 
 scan_apply:
@@ -1750,10 +1805,76 @@ scan_apply:
         }
     }
 
+    /* Assign partition names.  A table's markers are matched to its data
+     * entries only when it is safe: every marker carries a name, the names are
+     * distinct (a composite table repeats the parent name once per subpartition,
+     * and the subpartition name is not in the marker — left empty), and the
+     * marker count equals the entry count (a 0-row partition has a marker but no
+     * entry — left empty).  When safe, the names are sorted and handed out in
+     * that order, because expdp writes a table's partition data sorted by
+     * partition name, i.e. in part_occ order.  Leaving a name empty (L-01) is
+     * deliberately preferred over a wrong name, which would misattribute the
+     * entry's rows to another partition (H-15). */
+    {
+        int *idx = (int *)malloc((size_t)(pmark_count > 0 ? pmark_count : 1) *
+                                 sizeof(int));
+        if (idx) {
+            for (k = 0; k < pmark_count; k++) {
+                int cnt = 0, entry_cnt = 0, i, a, b, ok = 1, seen = 0;
+
+                for (i = 0; i < k; i++)
+                    if (strcmp(pmarks[i].schema, pmarks[k].schema) == 0 &&
+                        strcmp(pmarks[i].table,  pmarks[k].table)  == 0) { seen = 1; break; }
+                if (seen) continue;   /* table already handled */
+
+                for (i = 0; i < pmark_count; i++)
+                    if (strcmp(pmarks[i].schema, pmarks[k].schema) == 0 &&
+                        strcmp(pmarks[i].table,  pmarks[k].table)  == 0) {
+                        if (pmarks[i].part[0] == '\0') ok = 0;
+                        idx[cnt++] = i;
+                    }
+                for (ti = 0; ti < s->table_count; ti++)
+                    if (strcmp(s->table_list[ti].schema, pmarks[k].schema) == 0 &&
+                        strcmp(s->table_list[ti].name,   pmarks[k].table)  == 0)
+                        entry_cnt++;
+
+                if (!ok || entry_cnt < 2 || cnt != entry_cnt) continue;
+
+                /* insertion-sort idx[] by partition name */
+                for (a = 1; a < cnt; a++) {
+                    int t = idx[a];
+                    b = a - 1;
+                    while (b >= 0 &&
+                           strcmp(pmarks[idx[b]].part, pmarks[t].part) > 0) {
+                        idx[b + 1] = idx[b]; b--;
+                    }
+                    idx[b + 1] = t;
+                }
+                for (a = 1; a < cnt && ok; a++)
+                    if (strcmp(pmarks[idx[a - 1]].part, pmarks[idx[a]].part) == 0)
+                        ok = 0;   /* duplicate name → composite → leave empty */
+                if (!ok) continue;
+
+                /* entry with part_occ==i is the i-th partition in data order
+                 * (= sorted by name), so it gets the i-th sorted name. */
+                for (i = 0; i < cnt; i++)
+                    for (ti = 0; ti < s->table_count; ti++)
+                        if (part_occ[ti] == i &&
+                            strcmp(s->table_list[ti].schema, pmarks[k].schema) == 0 &&
+                            strcmp(s->table_list[ti].name,   pmarks[k].table)  == 0) {
+                            odv_strcpy(s->table_list[ti].partition,
+                                       pmarks[idx[i]].part, ODV_OBJNAME_LEN);
+                            break;
+                        }
+            }
+            free(idx);
+        }
+    }
+
 scan_cleanup:
     if (sfp) fclose(sfp);
     free(matches);
-    free(scan_keys);
+    free(pmarks);
     free(part_occ);
 }
 

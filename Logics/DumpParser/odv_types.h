@@ -175,6 +175,8 @@ typedef struct {
     int    charset;              /* For NCHAR/NVARCHAR */
     int    flags;
     int    property;
+    int    col_num;              /* EXPDP COL_NUM (user column id; 0 = hidden) */
+    int    seg_col;              /* EXPDP SEGCOL_NUM (storage slot; 0 = not stored) */
     char   type_str[64];         /* "VARCHAR2(100)" etc. */
     int    not_null;             /* 1=NOT NULL constraint */
     char   default_val[256];     /* DEFAULT value expression */
@@ -206,6 +208,16 @@ typedef struct {
     ODV_COLUMN  columns[ODV_MAX_COLUMNS];
     int         col_count;
     int         lob_col_count;
+    /* Row-data column layout (H-18): one entry per column actually present in
+     * the row data (SEGCOL_NUM >= 1), in SEGCOL order.  data_disp[i] indexes
+     * columns[] for a displayed column, or is -1 to read and discard a hidden
+     * in-data column (object table OID, ADT attribute, nested-table SETID,
+     * invisible column).  data_type[i] is that column's COL_* type, used to
+     * split the stream into the non-LOB inline prefix and the LOB-ish suffix.
+     * Virtual / not-stored columns (SEGCOL_NUM == 0) are absent here. */
+    int         data_disp[ODV_MAX_COLUMNS];
+    int         data_type[ODV_MAX_COLUMNS];
+    int         data_count;
     int         dump_charset;
     int         os_charset;
     int         nls_charset;
