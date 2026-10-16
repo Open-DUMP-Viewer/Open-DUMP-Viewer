@@ -319,7 +319,18 @@ typedef struct {
      * non_lob_map[i] gives the absolute column index for the i-th
      * non-LOB column in the binary stream. */
     int     non_lob_map[ODV_MAX_COLUMNS];
-    int     non_lob_count;       /* Number of entries in non_lob_map */
+    int     non_lob_count;       /* Number of genuine non-LOB columns (prefix) */
+    int     map_count;           /* Full map length (non-LOB prefix + LOB-ish
+                                    columns appended in table order), used for
+                                    the external-table inline format (H-21) */
+    int     frag_lob_count;      /* Number of columns the direct-path LOB chunk
+                                    machine processes = BLOB/CLOB/NCLOB/LONG/
+                                    LONG RAW (= map_count - non_lob_count).
+                                    Unlike table.lob_col_count it counts plain
+                                    LONG (a fragment when the table also has a
+                                    real LOB) and excludes BFILE/object types
+                                    (which are inline), so the "all LOBs read"
+                                    test fires at the right column (H-06). */
 
     /* Record header */
     int     record_header;       /* Last record header byte (0x01/0x04/0x08/0x09/0x0c) */
@@ -331,6 +342,14 @@ typedef struct {
     int     is_end_lob;          /* 1=all LOB columns processed */
     int     lob_length;          /* Cumulative LOB chunk bytes for current column */
     int     lob_preview_len;     /* Bytes accumulated in LOB preview */
+    /* CLOB/NCLOB preview conversion carries the trailing incomplete UTF-16BE
+     * unit (odd byte) or an unpaired high surrogate from one 4KB read block to
+     * the next, so a character split across the block boundary is not lost or
+     * turned into U+FFFD.  lob_pv_fresh marks the first block of a LOB column's
+     * preview so the (reused) value buffer is cleared before appending. */
+    unsigned char lob_pv_carry[4];
+    int     lob_pv_carry_len;
+    int     lob_pv_fresh;
     unsigned char *lob_buf;
     int     lob_buf_len;
     int     lob_buf_alloc;
@@ -342,6 +361,16 @@ typedef struct {
 
     /* Segment (3c wrapper) tracking */
     int     seg_remaining;       /* Bytes left in current 3c segment (-1=no limit) */
+
+    /* External-table format: set within the parse of ONE table once a real LOB
+     * column (CLOB/NCLOB/BLOB/LONG RAW) has been read inline, which only
+     * happens in the external-table / QUERY= format (direct path sends real
+     * LOBs as 08/09 chunk fragments, never inline).  It is PER-TABLE — reset at
+     * the start of every table — so a direct-path table that stores a small LOB
+     * inline (ENABLE STORAGE IN ROW, or the 23ai inline form) does not cause a
+     * later plain-LONG table in the same pass to be misread.  Used to decode an
+     * inline LONG as UTF-16BE instead of the DB charset (H-21). */
+    int     expdp_external;
 
     /* 2-byte length buffer (reused for column and LOB lengths) */
     unsigned char len_buf[2];

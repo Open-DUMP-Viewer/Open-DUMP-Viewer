@@ -521,10 +521,18 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         break;
 
     case COL_RAW:
-    case COL_ROWID: {
+    case COL_ROWID:
+    case COL_BLOB:
+    case COL_LONG_RAW: {
+        /* BLOB / LONG RAW only reach decode_column_value when read inline,
+         * which happens only in the external-table format (direct path sends
+         * them as chunk fragments to accumulate_lob_preview).  Latch that so an
+         * inline LONG later in the pass is decoded as UTF-16BE (H-21). */
         int hi;
         char hex_buf[ODV_VARCHAR_LEN];
         int hlen = 0;
+        if (col->type == COL_BLOB || col->type == COL_LONG_RAW)
+            s->state.expdp_external = 1;
         for (hi = 0; hi < v->data_len && hlen < (int)sizeof(hex_buf) - 3; hi++) {
             snprintf(hex_buf + hlen, 3, "%02X", v->data[hi]);
             hlen += 2;
@@ -536,9 +544,16 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
     }
 
     case COL_NCHAR:
-    case COL_NVARCHAR: {
+    case COL_NVARCHAR:
+    case COL_CLOB:
+    case COL_NCLOB: {
+        /* NCHAR/NVARCHAR are always UTF-16BE; CLOB/NCLOB are UTF-16BE too but
+         * only ever arrive here inline in the external-table format, so latch
+         * external for a later inline LONG (H-21). */
         char conv_buf[ODV_VARCHAR_LEN];
         int conv_len = 0;
+        if (col->type == COL_CLOB || col->type == COL_NCLOB)
+            s->state.expdp_external = 1;
         if (v->data && v->data_len > 0 &&
             convert_charset((const char *)v->data, v->data_len,
                             CHARSET_UTF16BE,
@@ -554,9 +569,22 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
 
     case COL_CHAR:
     case COL_VARCHAR:
+    case COL_LONG:
     default:
         if (v->data && v->data_len < v->buf_size) v->data[v->data_len] = '\0';
-        if (s->dump_charset != s->out_charset &&
+        if (col->type == COL_LONG && s->state.expdp_external) {
+            /* External-table LONG is stored as UTF-16BE (direct-path LONG is
+             * the DB charset, handled by the else branch) (H-21). */
+            char conv_buf[ODV_VARCHAR_LEN];
+            int conv_len = 0;
+            if (v->data && v->data_len > 0 &&
+                convert_charset((const char *)v->data, v->data_len,
+                                CHARSET_UTF16BE,
+                                conv_buf, sizeof(conv_buf),
+                                CHARSET_UTF8, &conv_len) == ODV_OK) {
+                set_value_string(v, conv_buf, conv_len);
+            }
+        } else if (s->dump_charset != s->out_charset &&
             s->dump_charset != CHARSET_UNKNOWN) {
             char conv_buf[ODV_VARCHAR_LEN];
             int conv_len = 0;
@@ -582,16 +610,13 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
 static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
                                    const unsigned char *data, int len)
 {
+    ODV_PARSE_STATE *st = &s->state;
     int abs_col;    /* Absolute column index in the table */
-    int non_lob_cols;
     int i, lob_i;
     ODV_VALUE *v;
     int col_type;
 
     if (!data || len <= 0) return;
-
-    non_lob_cols = s->table.col_count - s->table.lob_col_count;
-    if (non_lob_cols < 0) non_lob_cols = 0;
 
     /* Find the absolute column index for this LOB column */
     abs_col = -1;
@@ -612,10 +637,26 @@ static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
     col_type = s->table.columns[abs_col].type;
     v = &s->record.values[abs_col];
     v->type = col_type;
+
+    /* First chunk of this LOB column: reset the UTF-16 carry.  Clear the reused
+     * value buffer too, but only when nothing has been written to this column
+     * yet in the current row (data_len == 0): otherwise a column whose
+     * conversion yields nothing would deliver the previous row's bytes (H-05).
+     * When data_len > 0 the bytes are this row's own inline value (a multi-
+     * piece 0x09 LONG whose head was read inline and whose tail now arrives as
+     * a 0x06 continuation chunk), so the chunk is appended, not discarded. */
+    if (st->lob_pv_fresh) {
+        if (v->data_len == 0) {
+            if (ensure_value_buf(v, 1) == ODV_OK) v->data[0] = '\0';
+            v->data_len = 0;
+        }
+        st->lob_pv_carry_len = 0;
+        st->lob_pv_fresh = 0;
+    }
     v->is_null = 0;
 
     if (col_type == COL_BLOB || col_type == COL_LONG_RAW) {
-        /* BLOB: hex-encode (each source byte → 2 hex chars) */
+        /* BLOB / LONG RAW: hex-encode (each source byte → 2 hex chars) */
         int max_src = ODV_LOB_PREVIEW_LEN / 2;  /* max source bytes */
         int already = v->data_len / 2;           /* source bytes already encoded */
         int avail = max_src - already;
@@ -623,8 +664,8 @@ static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
         int hi;
 
         if (to_encode <= 0) return;
-        ensure_value_buf(v, v->data_len + to_encode * 2 + 1);
-        if (!v->data) return;
+        if (ensure_value_buf(v, v->data_len + to_encode * 2 + 1) != ODV_OK ||
+            !v->data) return;
 
         for (hi = 0; hi < to_encode; hi++) {
             snprintf((char *)v->data + v->data_len, 3, "%02X", data[hi]);
@@ -633,39 +674,75 @@ static void accumulate_lob_preview(ODV_SESSION *s, int lob_col_idx,
         v->data[v->data_len] = '\0';
     } else if (col_type == COL_CLOB || col_type == COL_NCLOB) {
         /* CLOB/NCLOB: Oracle EXPDP stores LOB data in AL16UTF16 (UTF-16BE).
-         * Convert to UTF-8 for display. */
-        int max_bytes = ODV_LOB_PREVIEW_LEN;
-        int avail = max_bytes - v->data_len;
-        char conv_buf[ODV_LOB_PREVIEW_LEN + 4];
-        int conv_len = 0;
-        int src_len = (len < avail * 2) ? len : avail * 2; /* UTF-16 is ~2x */
+         * Convert to UTF-8, carrying any trailing incomplete UTF-16 unit or
+         * unpaired high surrogate across the 4KB read-block boundary so a
+         * character split by the boundary converts intact instead of being
+         * dropped or turned into U+FFFD.  The conversion buffer is sized for a
+         * whole block's worst-case expansion (3 bytes/unit) so a block that is
+         * mostly multi-byte characters is no longer rejected wholesale.  The
+         * visible preview is the first ODV_LOB_PREVIEW_LEN UTF-8 bytes, cut on
+         * a character boundary (H-05). */
+        unsigned char src[ODV_DUMP_BLOCK_LEN + 8];
+        char conv_buf[ODV_DUMP_BLOCK_LEN * 2 + 16];
+        int src_len = 0, usable, conv_len = 0;
+        int avail = ODV_LOB_PREVIEW_LEN - v->data_len;
 
-        if (avail <= 0 || src_len <= 0) return;
+        if (avail <= 0) return;   /* preview already full for this column */
 
-        /* Ensure even byte count for UTF-16 */
-        src_len &= ~1;
-        if (src_len <= 0) return;
+        /* Carry bytes from the previous block, then this block (clamped). */
+        if (st->lob_pv_carry_len > 0 &&
+            st->lob_pv_carry_len <= (int)sizeof(st->lob_pv_carry)) {
+            memcpy(src, st->lob_pv_carry, st->lob_pv_carry_len);
+            src_len = st->lob_pv_carry_len;
+        }
+        if (len > (int)sizeof(src) - src_len) len = (int)sizeof(src) - src_len;
+        memcpy(src + src_len, data, len);
+        src_len += len;
 
-        if (convert_charset((const char *)data, src_len,
-                            CHARSET_UTF16BE,
+        /* Usable = whole UTF-16 units, excluding a trailing lone high
+         * surrogate; carry the remainder (≤3 bytes) to the next block. */
+        usable = src_len & ~1;
+        if (usable >= 2) {
+            unsigned int last = ((unsigned int)src[usable - 2] << 8) |
+                                 (unsigned int)src[usable - 1];
+            if (last >= 0xD800 && last <= 0xDBFF) usable -= 2;
+        }
+        st->lob_pv_carry_len = src_len - usable;
+        if (st->lob_pv_carry_len < 0 ||
+            st->lob_pv_carry_len > (int)sizeof(st->lob_pv_carry))
+            st->lob_pv_carry_len = 0;   /* paranoia */
+        else if (st->lob_pv_carry_len > 0)
+            memcpy(st->lob_pv_carry, src + usable, st->lob_pv_carry_len);
+
+        if (usable <= 0) return;
+
+        if (convert_charset((const char *)src, usable, CHARSET_UTF16BE,
                             conv_buf, sizeof(conv_buf),
                             CHARSET_UTF8, &conv_len) == ODV_OK && conv_len > 0) {
             int to_copy = (conv_len < avail) ? conv_len : avail;
-            ensure_value_buf(v, v->data_len + to_copy + 1);
-            if (!v->data) return;
-            memcpy(v->data + v->data_len, conv_buf, to_copy);
-            v->data_len += to_copy;
-            v->data[v->data_len] = '\0';
+            /* Never cut inside a UTF-8 sequence: if the cut lands on a
+             * continuation byte (10xxxxxx) back up to the lead byte. */
+            if (to_copy < conv_len) {
+                while (to_copy > 0 &&
+                       ((unsigned char)conv_buf[to_copy] & 0xC0) == 0x80)
+                    to_copy--;
+            }
+            if (to_copy > 0) {
+                if (ensure_value_buf(v, v->data_len + to_copy + 1) != ODV_OK ||
+                    !v->data) return;
+                memcpy(v->data + v->data_len, conv_buf, to_copy);
+                v->data_len += to_copy;
+                v->data[v->data_len] = '\0';
+            }
         }
     } else {
-        /* LONG: copy text directly (stored in DB charset) */
-        int max_bytes = ODV_LOB_PREVIEW_LEN;
-        int avail = max_bytes - v->data_len;
+        /* LONG (direct path): copy text directly (stored in DB charset) */
+        int avail = ODV_LOB_PREVIEW_LEN - v->data_len;
         int to_copy = (len < avail) ? len : avail;
 
         if (to_copy <= 0) return;
-        ensure_value_buf(v, v->data_len + to_copy + 1);
-        if (!v->data) return;
+        if (ensure_value_buf(v, v->data_len + to_copy + 1) != ODV_OK ||
+            !v->data) return;
 
         memcpy(v->data + v->data_len, data, to_copy);
         v->data_len += to_copy;
@@ -756,8 +833,8 @@ static int finish_fragment(ODV_SESSION *s, FILE *fp, int list_only,
 
     s->record.col_count = s->table.col_count;
 
-    /* 0x08 / 0x09: LOB chunk fragments follow the non-LOB columns. */
-    if (s->table.lob_col_count > 0 && st->is_lob_record && !is_last) {
+    /* 0x08 / 0x09: real LOB chunk fragments follow the non-LOB columns. */
+    if (st->frag_lob_count > 0 && st->is_lob_record && !is_last) {
         st->data_step   = DS_LOB_MARKER;
         st->lob_col_idx = 0;
         st->is_end_lob  = 0;
@@ -819,10 +896,19 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
     st->over255_count    = 0;
     st->filler_length    = 2;
     st->seg_remaining    = -1;
+    st->lob_pv_carry_len = 0;
+    st->lob_pv_fresh     = 0;
+    st->expdp_external   = 0;   /* per-table; set on an inline real-LOB (H-21) */
 
-    /* Build non-LOB column → absolute column index mapping.
-     * In EXPDP LOB records, column data is packed without LOB columns.
-     * For tables with no LOBs, this is a trivial identity mapping. */
+    /* Build the row's column → absolute column index map.
+     * Non-LOB columns first (their order in the row), then the LOB-ish columns
+     * (BLOB/CLOB/NCLOB/LONG/LONG RAW) in table order.  In direct path only the
+     * non-LOB prefix is consumed inline and the real LOB data arrives as
+     * separate 08/09 chunk fragments; in the external-table format every
+     * column — LOBs included — is stored inline in exactly this order, so the
+     * appended suffix lets those rows be read as ordinary columns (H-21).  The
+     * prefix is identical to the old non-LOB-only mapping, so the direct-path
+     * path is unchanged.  For tables with no LOBs this is an identity map. */
     {
         int mi, mc = 0;
         for (mi = 0; mi < s->table.col_count && mc < ODV_MAX_COLUMNS; mi++) {
@@ -833,6 +919,19 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             }
         }
         st->non_lob_count = mc;
+        for (mi = 0; mi < s->table.col_count && mc < ODV_MAX_COLUMNS; mi++) {
+            int t = s->table.columns[mi].type;
+            if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB ||
+                t == COL_LONG || t == COL_LONG_RAW) {
+                st->non_lob_map[mc++] = mi;
+            }
+        }
+        st->map_count = mc;
+        /* Columns the direct-path LOB chunk machine walks (the appended
+         * suffix): BLOB/CLOB/NCLOB/LONG/LONG RAW.  table.lob_col_count is not
+         * usable here because it omits plain LONG and includes inline
+         * BFILE/object columns (H-06). */
+        st->frag_lob_count = st->map_count - st->non_lob_count;
     }
 
     /* In LOB extraction mode, validate the target column exists */
@@ -965,7 +1064,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
             case DS_COL_LENGTH: /* 0: Column length marker */
             {
                 /* Map non-LOB sequential index to absolute column index */
-                int ac = (st->col_idx < st->non_lob_count)
+                int ac = (st->col_idx < st->map_count)
                          ? st->non_lob_map[st->col_idx]
                          : st->col_idx;
                 int col_done = 0;
@@ -1026,7 +1125,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
             case DS_COL_LEN_LO: /* 2: Low byte of 2-byte length (big-endian) */
             {
-                int ac = (st->col_idx < st->non_lob_count)
+                int ac = (st->col_idx < st->map_count)
                          ? st->non_lob_map[st->col_idx]
                          : st->col_idx;
                 st->col_len |= (int)b;
@@ -1058,7 +1157,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
             case DS_COL_DATA: /* 3: Reading column data bytes */
             {
-                int ac = (st->col_idx < st->non_lob_count)
+                int ac = (st->col_idx < st->map_count)
                          ? st->non_lob_map[st->col_idx]
                          : st->col_idx;
                 if (ac < s->table.col_count) {
@@ -1102,7 +1201,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                         st->lob_col_idx++;
                         st->lob_length = 0;
 
-                        if (st->lob_col_idx >= s->table.lob_col_count) {
+                        if (st->lob_col_idx >= st->frag_lob_count) {
                             /* All LOB columns processed — deliver row */
                             if (s->lob_extract_mode &&
                                 s->lob_column_index >= 0) {
@@ -1165,7 +1264,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     st->lob_length = 0;
 
                     /* Check if all LOB columns are done */
-                    if (st->lob_col_idx >= s->table.lob_col_count) {
+                    if (st->lob_col_idx >= st->frag_lob_count) {
                         /* All LOBs processed — deliver row */
                         if (s->lob_extract_mode && s->lob_column_index >= 0) {
                             rc = odv_lob_write_file(s);
@@ -1194,7 +1293,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                         st->lob_length = 0;
                         st->is_last_chunk = 0;
 
-                        if (st->lob_col_idx >= s->table.lob_col_count) {
+                        if (st->lob_col_idx >= st->frag_lob_count) {
                             if (s->lob_extract_mode &&
                                 s->lob_column_index >= 0) {
                                 rc = odv_lob_write_file(s);
@@ -1257,7 +1356,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     st->lob_col_idx++;
                     st->lob_length = 0;
 
-                    if (st->lob_col_idx >= s->table.lob_col_count) {
+                    if (st->lob_col_idx >= st->frag_lob_count) {
                         /* All LOBs done */
                         if (s->lob_extract_mode && s->lob_column_index >= 0) {
                             rc = odv_lob_write_file(s);
@@ -1306,6 +1405,11 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 int lob_read = 0;
                 unsigned char next_buf[2];
 
+                /* First chunk of this LOB column (lob_length still 0): tell the
+                 * preview accumulator to clear the reused value buffer and the
+                 * UTF-16 carry before appending (H-05). */
+                if (st->lob_length == 0) st->lob_pv_fresh = 1;
+
                 /* Bulk-read chunk_size bytes */
                 while (lob_read < chunk_size && !s->cancelled) {
                     int need = chunk_size - lob_read;
@@ -1342,10 +1446,17 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     case 0xfe: case 0xff:
                         st->is_last_chunk = 1;
                         break;
-                    case 0x01: case 0x08: case 0x09: case 0x0c:
+                    case 0x01: case 0x04: case 0x08: case 0x09: case 0x0c:
+                        /* 0x04 is the flag byte (L bit) that opens the row's
+                         * LAST LOB-column fragment, so the chunk just read is
+                         * the final chunk of the CURRENT column.  Treating it
+                         * as a continuation merged the last LOB column's data
+                         * onto the previous LOB column and left the real column
+                         * empty when a row had two or more LOBs, or a LOB plus
+                         * a LONG RAW (H-06). */
                         st->is_last_chunk = 1;
                         break;
-                    case 0x02: case 0x03: case 0x04:
+                    case 0x02: case 0x03:
                     case 0x05: case 0x06:
                         st->is_last_chunk = 0;
                         break;
