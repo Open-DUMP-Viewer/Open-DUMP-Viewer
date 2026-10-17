@@ -395,6 +395,9 @@ typedef struct {
     int     header_size;
     int     oracle_version;
     int     exp_mode;            /* EXP_MODE_TABLE etc. */
+    int     db_charset;          /* Header record 7 DB charset (row-value decode).
+                                    s->dump_charset holds the client charset used
+                                    for DDL text (names/comments/CHECK/DEFAULT). */
     char    export_user[ODV_OBJNAME_LEN + 1]; /* Header record 1: export user/schema */
 } ODV_EXP_STATE;
 

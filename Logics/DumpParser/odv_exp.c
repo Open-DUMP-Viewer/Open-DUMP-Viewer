@@ -22,6 +22,7 @@
  ---------------------------------------------------------------------------*/
 #define EXP_HEADER_SIZE     0x100
 #define EXP_DDL_BUF_SIZE    262144   /* 256KB for single DDL statement */
+#define EXP_DEF_CONV_LEN    1024     /* per-column DEFAULT, client→UTF-8 (256*~3) */
 
 /*---------------------------------------------------------------------------
     Forward declarations
@@ -104,6 +105,84 @@ static int byte_to_charset(unsigned char b)
 }
 
 /*---------------------------------------------------------------------------
+    id_to_charset
+
+    Maps a full 16-bit Oracle NLS_CHARACTERSET id to an internal constant.
+    byte_to_charset() above looks only at the low 8 bits, which collides for
+    several ids that matter here: JA16EUCTILDE=837=0x345 would look like SJIS,
+    and US7ASCII=1 / WE8ISO8859P1=31=0x01f / WE8ISO8859P15=46=0x02e /
+    WE8MSWIN1252=178=0x0b2 all fall into the low-byte "other" (US7) bucket.
+    The EXP header carries the real 2-byte id (header record 7), so resolve the
+    known ones exactly and fall back to the low-byte heuristic for the rest.
+
+    UTF8 (id 871, CESU-8) and AL32UTF8 (id 873) both map to CHARSET_UTF8; the
+    CESU-8 vs UTF-8 difference (supplementary-plane characters) is handled where
+    names are stored, by content, not by id.
+ ---------------------------------------------------------------------------*/
+static int id_to_charset(int id)
+{
+    switch (id) {
+    case 1:    return CHARSET_US7;         /* US7ASCII */
+    case 31:   return CHARSET_US8;         /* WE8ISO8859P1 */
+    case 46:   return CHARSET_ISO8859P15;  /* WE8ISO8859P15 */
+    case 178:  return CHARSET_WIN1252;     /* WE8MSWIN1252 */
+    case 830:                              /* JA16EUC */
+    case 831:                              /* JA16EUCYEN */
+    case 837:  return CHARSET_EUC;         /* JA16EUCTILDE */
+    case 832:                              /* JA16SJIS */
+    case 834:                              /* JA16SJISYEN */
+    case 838:  return CHARSET_SJIS;        /* JA16SJISTILDE */
+    case 852:                              /* ZHS16GBK */
+    case 854:  return CHARSET_GBK;         /* ZHS32GB18030 (treated as GBK) */
+    case 871:                              /* UTF8 (CESU-8) */
+    case 873:  return CHARSET_UTF8;        /* AL32UTF8 */
+    case 2000: return CHARSET_UTF16LE;     /* AL16UTF16 */
+    default:   return byte_to_charset((unsigned char)(id & 0xFF));
+    }
+}
+
+/*---------------------------------------------------------------------------
+    normalize_cesu8
+
+    Collapses CESU-8 surrogate pairs into 4-byte UTF-8, in place. The Oracle
+    charset "UTF8" (id 871) is CESU-8: it encodes a supplementary-plane
+    character (U+10000..U+10FFFF) as two 3-byte surrogate halves
+    (ED A0-AF 80-BF  ED B0-BF 80-BF) instead of one 4-byte sequence like
+    AL32UTF8 (id 873). The engine otherwise treats both as CHARSET_UTF8 and
+    would hand the raw CESU-8 bytes to the product, which are not valid UTF-8,
+    so a name such as "絵文字😀" round-trips to U+FFFD and its table can no
+    longer be opened (H-09).
+
+    A valid UTF-8 string never contains the surrogate byte range (ED A0..ED BF),
+    so this rewrites only genuine CESU-8 pairs and is a no-op on canonical
+    UTF-8 (AL32UTF8). It is therefore safe to run on any UTF8-family name, with
+    no dependence on the exact charset id. The result is never longer than the
+    input (6 bytes -> 4), so it stays within the buffer. The short-circuited
+    checks never read past the terminating NUL. */
+static void normalize_cesu8(char *str)
+{
+    unsigned char *s = (unsigned char *)str;
+    unsigned char *d = s;
+    while (*s) {
+        if (s[0] == 0xED && (s[1] & 0xF0) == 0xA0 && (s[2] & 0xC0) == 0x80 &&
+            s[3] == 0xED && (s[4] & 0xF0) == 0xB0 && (s[5] & 0xC0) == 0x80) {
+            unsigned int hi = (unsigned int)((s[1] & 0x0F) << 6) | (s[2] & 0x3F);
+            unsigned int lo = (unsigned int)((s[4] & 0x0F) << 6) | (s[5] & 0x3F);
+            unsigned int cp = 0x10000u + ((hi << 10) | lo);
+            d[0] = (unsigned char)(0xF0 | (cp >> 18));
+            d[1] = (unsigned char)(0x80 | ((cp >> 12) & 0x3F));
+            d[2] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
+            d[3] = (unsigned char)(0x80 | (cp & 0x3F));
+            s += 6;
+            d += 4;
+        } else {
+            *d++ = *s++;
+        }
+    }
+    *d = '\0';
+}
+
+/*---------------------------------------------------------------------------
     parse_exp_header
 
     Reads the 256-byte EXP header and extracts:
@@ -122,7 +201,7 @@ static int parse_exp_header(ODV_SESSION *s, FILE *fp)
 {
     unsigned char hdr[EXP_HEADER_SIZE];
     unsigned char word[256];
-    int i, ct, step;
+    int i, ct, step, cs_start;
 
     odv_fseek(fp, 0, SEEK_SET);
     if (fread(hdr, 1, EXP_HEADER_SIZE, fp) != EXP_HEADER_SIZE) {
@@ -130,10 +209,20 @@ static int parse_exp_header(ODV_SESSION *s, FILE *fp)
         return ODV_ERROR_FREAD;
     }
 
-    /* Check for direct export mode: look for "D\n" in first 32 bytes */
-    for (i = 0; i < 31; i++) {
-        if (hdr[i] == 'D' && hdr[i + 1] == 0x0A) {
-            s->dump_type = DUMP_EXP_DIRECT;
+    /* Detect direct-path export. It inserts "D\n" immediately after the 3-byte
+       charset prefix and in front of the "EXPORT" signature, shifting the rest
+       of the header two bytes:
+         conventional: 03 <cs hi> <cs lo> 'E' 'X' 'P' 'O' 'R' 'T' ...
+         direct:       03 <cs hi> <cs lo> 'D' 0x0A 'E' 'X' 'P' 'O' 'R' 'T' ...
+       The marker sits at a fixed position, so key off "D\n" directly in front
+       of "EXPORT". The previous scan for any "D\n" in the first 32 bytes also
+       matched the 'D'+newline ending an export-user name of <=10 chars that
+       ends in 'D' (e.g. ODV_C_NUMD), wrongly flagging a conventional dump as
+       direct and corrupting its LOB tables (H-12/H-19). */
+    for (i = 0; i <= 8 && i + 6 <= EXP_HEADER_SIZE; i++) {
+        if (memcmp(hdr + i, "EXPORT", 6) == 0) {
+            if (i >= 2 && hdr[i - 2] == 'D' && hdr[i - 1] == 0x0A)
+                s->dump_type = DUMP_EXP_DIRECT;
             break;
         }
     }
@@ -141,6 +230,7 @@ static int parse_exp_header(ODV_SESSION *s, FILE *fp)
     /* Parse header records separated by 0x00 or 0x0A */
     ct = 0;
     step = 0;
+    cs_start = -1;
     s->exp_state.exp_mode = EXP_MODE_TABLE;
 
     for (i = 6; i < 0x100; i++) {
@@ -178,27 +268,18 @@ static int parse_exp_header(ODV_SESSION *s, FILE *fp)
                 else if (memcmp(word, "RENTIRE", 7) == 0)
                     s->exp_state.exp_mode = EXP_MODE_DATABASE;
                 break;
-            case 7: {
-                /* Record 7: Character set info */
-                /* word[1]=env charset, word[3]=tbl charset, word[5]=nls charset */
-                int tbl_cs;
-                if (ct >= 2 || strlen((char*)word) >= 2) {
-                    /* env charset = word[1] (informational, not used directly) */
-                }
-                if (ct >= 4 || strlen((char*)word) >= 4) {
-                    /* tbl charset = word[3]: this is the database charset */
-                    tbl_cs = byte_to_charset(word[3]);
-                    s->dump_charset = tbl_cs;
-                } else if (ct >= 2 || strlen((char*)word) >= 2) {
-                    /* Fallback: use env charset */
-                    s->dump_charset = byte_to_charset(word[1]);
-                }
-                break;
-            }
             default:
+                /* Record 7 (charset region) is handled via cs_start below:
+                   it is raw binary, not a 0x00/0x0A-delimited text record. */
                 break;
             }
             step++;
+            /* Record 7 is the binary charset region; it can legitimately begin
+               with a 0x00 byte (the high byte of a sub-256 charset id such as
+               US7ASCII=1 or WE8MSWIN1252=178), which would otherwise be read as
+               a record separator and leave the real charset unread (H-10). Note
+               its start and read it directly. */
+            if (step == 7) cs_start = i + 1;
             break;
 
         default:
@@ -211,6 +292,28 @@ static int parse_exp_header(ODV_SESSION *s, FILE *fp)
 
         /* Stop after charset record */
         if (step > 7) break;
+    }
+
+    /* Charset region layout: <client CS 2B BE><DB CS 2B BE><NCHAR CS 2B BE>.
+       DDL text (names, comments, CHECK, DEFAULT) is written in the client
+       charset; row data is written in the DB charset. Keep them separate so
+       names are converted from the client charset while values are decoded
+       from the DB charset (H-09).
+         s->dump_charset       = client charset (used for every name/DDL-text
+                                 conversion, incl. the shared meta cache and the
+                                 reverse filter-name match)
+         s->exp_state.db_charset = DB charset (copied to table.dump_charset for
+                                 row-value decoding) */
+    if (cs_start >= 0 && cs_start + 4 <= EXP_HEADER_SIZE) {
+        int client_id = ((int)hdr[cs_start]     << 8) | (int)hdr[cs_start + 1];
+        int db_id     = ((int)hdr[cs_start + 2] << 8) | (int)hdr[cs_start + 3];
+        s->dump_charset         = id_to_charset(client_id);
+        s->exp_state.db_charset = id_to_charset(db_id);
+    } else {
+        /* Malformed header: fall back to a safe default rather than the
+           tentative guess detect_dump_kind() made from the "EXPORT" bytes. */
+        s->dump_charset         = CHARSET_UTF8;
+        s->exp_state.db_charset = CHARSET_UTF8;
     }
 
     s->exp_state.header_size = EXP_HEADER_SIZE;
@@ -420,6 +523,27 @@ static void jbuf_put_json_string(ODV_JBUF *b, const char *str)
     jbuf_putc(b, '"');
 }
 
+/* Like jbuf_put_json_string, but first converts DDL text (constraint names,
+   CHECK conditions, comments, ...) from the client charset to the output
+   charset. EXP writes all DDL text in the client charset (H-09); converting it
+   here keeps the JSON valid UTF-8 and consistent with the names emitted via
+   conv_name(). The source is read-only, so this is safe to call repeatedly —
+   a partitioned table serializes the same constraints once per partition. */
+static void jbuf_put_json_string_cs(ODV_JBUF *b, const char *str,
+                                    int src_cs, int dst_cs)
+{
+    char tmp[4096];   /* fits condition/index_expr (1024) expanded to UTF-8 */
+    int out_len = 0;
+    if (str && str[0] && src_cs != dst_cs && src_cs != CHARSET_UNKNOWN &&
+        convert_charset(str, (int)strlen(str), src_cs,
+                        tmp, (int)sizeof(tmp), dst_cs, &out_len) == ODV_OK) {
+        tmp[out_len] = '\0';
+        jbuf_put_json_string(b, tmp);
+    } else {
+        jbuf_put_json_string(b, str);
+    }
+}
+
 /*---------------------------------------------------------------------------
     serialize_constraints_json
 
@@ -445,28 +569,28 @@ static char *serialize_constraints_json(ODV_SESSION *s)
 
         if (i > 0) jbuf_putc(&b, ',');
 
-        /* type, name */
+        /* type, name (DDL text → client charset, H-09) */
         jbuf_printf(&b, "{\"type\":%d,\"name\":", c->type);
-        jbuf_put_json_string(&b, c->name);
+        jbuf_put_json_string_cs(&b, c->name, s->dump_charset, s->out_charset);
 
         /* columns */
         jbuf_puts(&b, ",\"columns\":[");
         for (j = 0; j < c->col_count; j++) {
             if (j > 0) jbuf_putc(&b, ',');
-            jbuf_put_json_string(&b, c->columns[j]);
+            jbuf_put_json_string_cs(&b, c->columns[j], s->dump_charset, s->out_charset);
         }
         jbuf_putc(&b, ']');
 
         /* FK ref */
         if (c->type == CONSTRAINT_FK) {
             jbuf_puts(&b, ",\"ref_schema\":");
-            jbuf_put_json_string(&b, c->ref_schema);
+            jbuf_put_json_string_cs(&b, c->ref_schema, s->dump_charset, s->out_charset);
             jbuf_puts(&b, ",\"ref_table\":");
-            jbuf_put_json_string(&b, c->ref_table);
+            jbuf_put_json_string_cs(&b, c->ref_table, s->dump_charset, s->out_charset);
             jbuf_puts(&b, ",\"ref_columns\":[");
             for (j = 0; j < c->ref_col_count; j++) {
                 if (j > 0) jbuf_putc(&b, ',');
-                jbuf_put_json_string(&b, c->ref_columns[j]);
+                jbuf_put_json_string_cs(&b, c->ref_columns[j], s->dump_charset, s->out_charset);
             }
             jbuf_putc(&b, ']');
         }
@@ -474,13 +598,13 @@ static char *serialize_constraints_json(ODV_SESSION *s)
         /* CHECK condition */
         if (c->type == CONSTRAINT_CHECK && c->condition[0]) {
             jbuf_puts(&b, ",\"condition\":");
-            jbuf_put_json_string(&b, c->condition);
+            jbuf_put_json_string_cs(&b, c->condition, s->dump_charset, s->out_charset);
         }
 
         /* INDEX expression */
         if (c->type == CONSTRAINT_INDEX && c->index_expr[0]) {
             jbuf_puts(&b, ",\"index_expr\":");
-            jbuf_put_json_string(&b, c->index_expr);
+            jbuf_put_json_string_cs(&b, c->index_expr, s->dump_charset, s->out_charset);
         }
 
         jbuf_putc(&b, '}');
@@ -498,18 +622,18 @@ static char *serialize_constraints_json(ODV_SESSION *s)
         /* Only separate from a preceding constraint object, not from '[' */
         if (s->table.constraint_count > 0) jbuf_putc(&b, ',');
 
-        /* table_comment */
+        /* table_comment (DDL text → client charset, H-09) */
         jbuf_puts(&b, "{\"type\":5,\"table_comment\":");
-        jbuf_put_json_string(&b, s->table.comment);
+        jbuf_put_json_string_cs(&b, s->table.comment, s->dump_charset, s->out_charset);
 
         /* col_comments */
         jbuf_puts(&b, ",\"col_comments\":{");
         for (i = 0; i < s->table.col_count; i++) {
             if (!s->table.columns[i].comment[0]) continue;
             if (!first_col) jbuf_putc(&b, ',');
-            jbuf_put_json_string(&b, s->table.columns[i].name);
+            jbuf_put_json_string_cs(&b, s->table.columns[i].name, s->dump_charset, s->out_charset);
             jbuf_putc(&b, ':');
-            jbuf_put_json_string(&b, s->table.columns[i].comment);
+            jbuf_put_json_string_cs(&b, s->table.columns[i].comment, s->dump_charset, s->out_charset);
             first_col = 0;
         }
         jbuf_puts(&b, "}}");
@@ -569,7 +693,17 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
     memset(&s->table, 0, sizeof(ODV_TABLE));
     odv_strcpy(s->table.schema, schema, ODV_OBJNAME_LEN);
     odv_strcpy(s->table.name, table_name, ODV_OBJNAME_LEN);
-    s->table.dump_charset = s->dump_charset;
+    /* CESU-8 client (Oracle "UTF8"): fold surrogate pairs in the stored names to
+       canonical UTF-8 so the list, the shared meta cache and the reverse filter
+       match all agree, and a supplementary-plane name can be opened (H-09).
+       No-op for AL32UTF8. */
+    if (s->dump_charset == CHARSET_UTF8) {
+        normalize_cesu8(s->table.schema);
+        normalize_cesu8(s->table.name);
+    }
+    /* Row values are written in the DB charset, not the client charset that
+       s->dump_charset now holds for names/DDL text (H-09). */
+    s->table.dump_charset = s->exp_state.db_charset;
     s->table.col_count = 0;
     s->table.lob_col_count = 0;
 
@@ -702,6 +836,10 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
             ODV_COLUMN *col = &s->table.columns[col_count];
             memset(col, 0, sizeof(ODV_COLUMN));
             odv_strcpy(col->name, col_name, ODV_OBJNAME_LEN);
+            /* CESU-8 client: fold surrogate pairs so a supplementary-plane
+               column name matches on open and displays correctly (H-09). */
+            if (s->dump_charset == CHARSET_UTF8)
+                normalize_cesu8(col->name);
             parse_column_type(type_str, col);
             col->not_null = not_null_flag;
             odv_strcpy(col->default_val, default_str, 255);
@@ -922,13 +1060,30 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
 
     if (s->table_cb) {
         char *cjson;
-        for (i = 0; i < s->table.col_count && i < ODV_MAX_COLUMNS; i++) {
+        /* DEFAULT expressions are DDL text in the client charset (H-09). Convert
+           them into a heap block (the per-column converted form can be ~3x the
+           256-byte stored form; a parallel stack array would overflow the 1 MB
+           Windows stack on top of notify_exp_table's existing ~0.5 MB of locals).
+           Read-only on s->table, so partition re-notify stays correct. */
+        char *def_conv = NULL;
+        int ncols = (s->table.col_count < ODV_MAX_COLUMNS)
+                    ? s->table.col_count : ODV_MAX_COLUMNS;
+        if (ncols > 0)
+            def_conv = (char *)malloc((size_t)ncols * EXP_DEF_CONV_LEN);
+        for (i = 0; i < ncols; i++) {
             conv_name(s->table.columns[i].name, s->dump_charset, s->out_charset,
                       conv_col_names[i], sizeof(conv_col_names[i]));
             col_names[i] = conv_col_names[i];
             col_types[i] = s->table.columns[i].type_str;
             col_not_nulls[i] = s->table.columns[i].not_null;
-            col_defaults[i] = s->table.columns[i].default_val;
+            if (def_conv) {
+                char *slot = def_conv + (size_t)i * EXP_DEF_CONV_LEN;
+                conv_name(s->table.columns[i].default_val, s->dump_charset,
+                          s->out_charset, slot, EXP_DEF_CONV_LEN);
+                col_defaults[i] = slot;
+            } else {
+                col_defaults[i] = s->table.columns[i].default_val;
+            }
         }
         cjson = serialize_constraints_json(s);
         s->table_cb(
@@ -946,6 +1101,7 @@ static void notify_exp_table(ODV_SESSION *s, int64_t row_count)
             s->table_ud
         );
         if (cjson) free(cjson);
+        if (def_conv) free(def_conv);
     }
 }
 
@@ -1478,8 +1634,16 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 set_value_null(&s->record.values[col_idx]);
             }
             col_idx++;
-            /* DIRECT=Y: check row completion after NULL column too */
-            if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count) {
+            /* DIRECT=Y: rows have no 00 00 terminator, so a row whose last
+               column is NULL is completed here. Only when the table has no LOB
+               columns, though: a LOB table (written conventionally even inside a
+               direct dump) always has a LOB section (non-NULL LOB count, or
+               00 00 when all are NULL) after the regular columns, so completing
+               it here would read that section as the next row and swallow the
+               rest of the table (H-12). Mirror the lob_col_count==0 guard the
+               non-NULL completion below already uses. */
+            if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count
+                && s->table.lob_col_count == 0) {
                 s->record.col_count = col_idx;
                 if (!list_only) {
                     deliver_row(s);
@@ -2206,6 +2370,8 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                 }
                                 if (acol[0] && adef[0]) {
                                     int ci;
+                                    if (s->dump_charset == CHARSET_UTF8)
+                                        normalize_cesu8(acol);  /* match folded stored name (H-09) */
                                     for (ci = 0; ci < s->table.col_count; ci++) {
                                         if (strcmp(s->table.columns[ci].name, acol) == 0) {
                                             odv_strcpy(s->table.columns[ci].default_val, adef, 255);
@@ -2283,6 +2449,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                             extract_identifier(ip, ins_table, ODV_OBJNAME_LEN);
                         }
                     }
+                    /* The INSERT INTO name is the raw client-charset name from the
+                       dump; fold it the same way the stored name was so a CESU-8
+                       (Oracle "UTF8") supplementary-plane table name still matches
+                       and its rows are parsed (H-09). No-op for AL32UTF8. */
+                    if (s->dump_charset == CHARSET_UTF8)
+                        normalize_cesu8(ins_table);
 
                     if (s->table.name[0] != '\0' &&
                         strcmp(s->table.name, ins_table) == 0) {
@@ -2350,6 +2522,8 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         /* Last identifier is column name */
                         char col_name[ODV_OBJNAME_LEN + 1] = {0};
                         if (id_count > 0) odv_strcpy(col_name, ids[id_count - 1], ODV_OBJNAME_LEN);
+                        if (s->dump_charset == CHARSET_UTF8)
+                            normalize_cesu8(col_name);  /* match folded stored name (H-09) */
 
                         cp = skip_ws(cp);
                         if (starts_with_ci(cp, "IS") && col_name[0]) {
