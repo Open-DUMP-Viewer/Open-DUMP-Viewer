@@ -1679,22 +1679,30 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     }
 
     case COL_LONG_RAW: {
-        /* LONG RAW is inline length-prefixed (NOT a LOB section column).
-           Existing LOB-extract accumulation behavior is preserved. */
-        if (s->lob_extract_mode && s->lob_column_index >= 0) {
-            int li, lob_idx = 0;
-            for (li = 0; li < col_idx; li++) {
-                int ct = s->table.columns[li].type;
-                if (ct == COL_BLOB || ct == COL_CLOB || ct == COL_NCLOB)
-                    lob_idx++;
-            }
-            if (lob_idx < s->table.lob_col_count)
-                odv_lob_accumulate(s, lob_idx, data, data_len);
+        /* LONG RAW is inline (length-prefixed, or in parts that
+           parse_exp_records has already joined), so its bytes are here. Show
+           them as upper-case hex without a prefix, as the expdp path does and
+           as the product's BLOB / LONG RAW cells read them; the SQL writer
+           turns that into HEXTORAW('..') / '\x..' / X'..' / 0x... The value
+           used to be the constant %BLOB%, so a LONG RAW never reached the
+           preview, CSV or SQL (M-40).
+           It is not a LOB-section column: odv_lob_check_column() never makes
+           it an extraction target, and feeding it to odv_lob_accumulate()
+           only prepended it to the next LOB column's file (M-39). */
+        static const char hex[] = "0123456789ABCDEF";
+        int j, pos = 0;
+        if (data_len <= 0 ||
+            ensure_value_buf(val, data_len * 2 + 1) != ODV_OK) {
+            set_value_null(val);
+            break;
         }
-        {
-            const char *ph = "%BLOB%";
-            set_value_string(val, ph, (int)strlen(ph));
+        for (j = 0; j < data_len; j++) {
+            val->data[pos++] = hex[(data[j] >> 4) & 0x0F];
+            val->data[pos++] = hex[data[j] & 0x0F];
         }
+        val->data[pos] = '\0';
+        val->data_len = pos;
+        val->is_null = 0;
         break;
     }
 
@@ -1706,17 +1714,9 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     }
 
     case COL_LONG: {
-        /* LONG is inline length-prefixed (NOT a LOB section column). */
-        if (s->lob_extract_mode && s->lob_column_index >= 0) {
-            int li, lob_idx = 0;
-            for (li = 0; li < col_idx; li++) {
-                int ct = s->table.columns[li].type;
-                if (ct == COL_BLOB || ct == COL_CLOB || ct == COL_NCLOB)
-                    lob_idx++;
-            }
-            if (lob_idx < s->table.lob_col_count)
-                odv_lob_accumulate(s, lob_idx, data, data_len);
-        }
+        /* LONG is inline (NOT a LOB-section column) and is never a LOB
+           extraction target, so it is not accumulated: doing so prepended it
+           to the next LOB column's extracted file (M-39). */
         if (s->table.dump_charset != s->out_charset &&
             s->table.dump_charset != CHARSET_UNKNOWN) {
             int out_len = 0;
@@ -1756,7 +1756,9 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     case COL_NCHAR:
     case COL_NVARCHAR: {
         /* EXP stores NCHAR/NVARCHAR2 data in national charset (AL16UTF16 = UTF-16BE).
-           Convert UTF-16BE → UTF-8 for display. */
+           Convert UTF-16BE → UTF-8 for display. An NCHAR value keeps its
+           blank padding, as Oracle returns it and the expdp path shows it:
+           trimming it made an all-blank value empty, i.e. NULL (M-10). */
         char conv_buf[ODV_VARCHAR_LEN];
         int conv_len = 0;
         if (data_len > 0 &&
@@ -1765,13 +1767,6 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
                             conv_buf, sizeof(conv_buf),
                             CHARSET_UTF8, &conv_len) == ODV_OK) {
             set_value_string(val, conv_buf, conv_len);
-            /* Trim trailing spaces for NCHAR */
-            if (col->type == COL_NCHAR && val->data && val->data_len > 0) {
-                while (val->data_len > 0 && val->data[val->data_len - 1] == ' ') {
-                    val->data_len--;
-                }
-                val->data[val->data_len] = '\0';
-            }
         } else {
             /* Fallback: copy raw */
             set_value_string(val, (const char *)data, data_len);
@@ -1801,15 +1796,10 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
         } else {
             set_value_string(val, (const char *)data, data_len);
         }
-
-        /* Trim trailing spaces for CHAR types */
-        if ((col->type == COL_CHAR || col->type == COL_NCHAR) &&
-            val->data && val->data_len > 0) {
-            while (val->data_len > 0 && val->data[val->data_len - 1] == ' ') {
-                val->data_len--;
-            }
-            val->data[val->data_len] = '\0';
-        }
+        /* A CHAR value is kept as stored, blank padding included (Oracle
+           returns CHAR padded, and the expdp path shows it so). The trailing
+           blanks used to be trimmed to length 0, so ' ' / '     ' became an
+           empty value, which the row callback cannot tell from NULL (M-10). */
         break;
     }
 
@@ -1949,6 +1939,146 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
 }
 
 /*---------------------------------------------------------------------------
+    exp_skip_to_table_end (M-43)
+
+    Moves fp just past the next FF FF (the table-data end marker) at or after
+    the current position: the resynchronisation used when a table's row data
+    cannot be read (and to step over a table that a filter leaves out). It
+    used to read two bytes and seek one back for every byte. The MSVC CRT
+    discards its read buffer on every fseek, so each byte re-read the 64 KB
+    buffer: a long stretch without FF FF (a corrupt or crafted dump, or a
+    misread big LONG) took tens of seconds with the UI frozen and no progress
+    shown. The bytes are now read forward in blocks, carrying the last byte
+    of a block into the next, with one repositioning when the marker is found
+    — the same position the byte-wise scan stopped at. Progress is reported
+    (and cancellation honoured) once per block.
+    Returns 1 (found), 0 (end of file first) or -1 (cancelled).
+ ---------------------------------------------------------------------------*/
+#define EXP_SCAN_BLOCK 8192
+
+static int exp_skip_to_table_end(ODV_SESSION *s, ODV_VFILE *fp)
+{
+    unsigned char blk[EXP_SCAN_BLOCK];
+    int prev_ff = 0;
+
+    for (;;) {
+        int64_t base;
+        size_t n, i;
+
+        if (s->cancelled) return -1;
+        base = odv_vtell(fp);
+        n = odv_vread(blk, 1, sizeof(blk), fp);
+        if (n == 0) return 0;
+        for (i = 0; i < n; i++) {
+            if (blk[i] != 0xFF) {
+                prev_ff = 0;
+            } else if (prev_ff) {
+                odv_vseek(fp, base + (int64_t)i + 1, SEEK_SET);
+                return 1;
+            } else {
+                prev_ff = 1;
+            }
+        }
+        odv_report_progress(s, fp);
+    }
+}
+
+/*---------------------------------------------------------------------------
+    LONG / LONG RAW values in parts (H-22 / M-41)
+
+    exp writes a LONG / LONG RAW value of up to 65,532 bytes with a plain
+    2-byte length (65,280 bytes is 00 FF; it is not a marker) and a longer
+    one in parts:
+      conventional rows  FD FF, then (<len16><bytes>)* closed by 00 00
+                         (4000-byte chunks in 11g / 21c / 23ai)
+      DIRECT=Y rows      pieces of about one block, each <len16> whose bit 15
+                         says that another piece follows (the low 15 bits are
+                         the piece's length)
+    Reading 00 FF as "a 4-byte length follows" and FD FF as a 65,533-byte
+    value dropped the row and the rest of the table (M-41). A value is kept
+    up to ODV_EXP_RECORD_LEN bytes, the exp limit for one column (the expdp
+    path keeps the same); past that its bytes are read and dropped, so the
+    row and the rest of the table stay in step.
+ ---------------------------------------------------------------------------*/
+
+/* Reads n bytes of a value, appending to *buf at *kept what fits under
+   ODV_EXP_RECORD_LEN when `keep` is set (nothing otherwise, as when only
+   rows are counted). Bytes that were wanted but not kept set *dropped.
+   Returns 1, 0 at end of file, -1 when out of memory. */
+static int exp_read_part(ODV_VFILE *fp, int n, int keep, unsigned char **buf,
+                         int *buf_size, int *kept, int *dropped)
+{
+    int take = 0;
+
+    if (keep) {
+        take = ODV_EXP_RECORD_LEN - *kept;
+        if (take > n) take = n;
+        if (take < 0) take = 0;
+    }
+    if (take > 0) {
+        if (*kept + take + 1 > *buf_size) {
+            /* Grow by doubling (up to the cap) so that a value of many
+               chunks is not copied again for every chunk. */
+            int want = *kept + take + 1;
+            int ns = (*buf_size < 4096) ? 4096 : *buf_size;
+            unsigned char *nb;
+            while (ns < want)
+                ns = (ns > (ODV_EXP_RECORD_LEN + 1) / 2) ? ODV_EXP_RECORD_LEN + 1 : ns * 2;
+            nb = (unsigned char *)realloc(*buf, (size_t)ns);
+            if (!nb) return -1;
+            *buf = nb;
+            *buf_size = ns;
+        }
+        if ((int)odv_vread(*buf + *kept, 1, (size_t)take, fp) != take) return 0;
+        *kept += take;
+        n -= take;
+    }
+    if (n > 0) {
+        unsigned char tmp[4096];
+        if (keep) *dropped = 1;
+        while (n > 0) {
+            int k = (n < (int)sizeof(tmp)) ? n : (int)sizeof(tmp);
+            if ((int)odv_vread(tmp, 1, (size_t)k, fp) != k) return 0;
+            n -= k;
+        }
+    }
+    return 1;
+}
+
+/* Reads the parts of a LONG / LONG RAW value whose first 2-byte length
+   `first` has been consumed (FD FF for conventional chunks; the first
+   piece's length in a direct-path row) into *buf. Returns the number of
+   bytes kept, -1 if the value is cut short or malformed, -2 when out of
+   memory. */
+static int exp_read_long_parts(ODV_VFILE *fp, int first, int direct, int keep,
+                               unsigned char **buf, int *buf_size, int *dropped)
+{
+    unsigned char lb[2];
+    int kept = 0;
+    int cur = first;
+
+    for (;;) {
+        int n, rc;
+        if (direct) {
+            n = cur & 0x7FFF;
+        } else {
+            if (odv_vread(lb, 1, 2, fp) != 2) return -1;
+            n = (int)lb[0] | ((int)lb[1] << 8);
+            if (n == 0) break;                  /* 00 00 closes the chunks */
+            if (n >= 0xFFFD) return -1;         /* a marker, not a chunk */
+        }
+        rc = exp_read_part(fp, n, keep, buf, buf_size, &kept, dropped);
+        if (rc <= 0) return (rc < 0) ? -2 : -1;
+        if (direct) {
+            if (!(cur & 0x8000)) break;         /* the last piece */
+            if (odv_vread(lb, 1, 2, fp) != 2) return -1;
+            cur = (int)lb[0] | ((int)lb[1] << 8);
+        }
+    }
+    return kept;
+}
+
+/*---------------------------------------------------------------------------
     parse_exp_records
 
     Reads binary records from EXP dump.
@@ -1956,6 +2086,10 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
     Record end: 0x0000
     Table end: 0xFFFF
     NULL: 0xFFFE
+
+    The values of a row come in the order of the INSERT INTO column list,
+    which is not always the CREATE TABLE order: wire_col[i] is the table
+    column of the i-th value (NULL = the same order; see exp_insert_columns).
 
     For tables with LOB columns:
       After all regular columns of a row are read, a LOB section follows:
@@ -1965,7 +2099,7 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
             chunk stream — see read_one_lob_column().
  ---------------------------------------------------------------------------*/
 static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
-                             int list_only)
+                             int list_only, const int *wire_col)
 {
     unsigned char len_buf[2];
     unsigned char *col_buf = NULL;
@@ -1978,6 +2112,13 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
     int col_len;
     int rc = ODV_OK;
     int64_t row_count = 0;
+    int long_cut = 0;       /* 1 = a LONG of this table was kept only in part */
+    /* A DIRECT=Y dump writes a table without LOB columns in the direct
+       layout (no 00 00 after a row; LONG / LONG RAW in pieces). A table with
+       LOB columns is exported conventionally even then (H-12), as its INSERT
+       column list in CREATE TABLE order also shows. */
+    int direct_rows = (s->dump_type == DUMP_EXP_DIRECT &&
+                       s->table.lob_col_count == 0);
 
     /* Seek to data start */
     odv_vseek(fp, data_start, SEEK_SET);
@@ -2021,6 +2162,10 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
 
 
     while (!s->cancelled) {
+        int cix;            /* table column of this value (-1: past the table) */
+        int ctype;          /* its type (-1: none) */
+        int long_done = 0;  /* 1 = value already read (LONG in parts) */
+
         /* Read 2-byte length prefix */
         if (odv_vread(len_buf, 1, 2, fp) != 2) {
             break; /* EOF */
@@ -2085,13 +2230,8 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             }
 
             if (lob_rc != ODV_OK) {
-                /* Corrupt LOB section — try to recover to next 0xFFFF */
-                while (!s->cancelled) {
-                    unsigned char scan[2];
-                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
-                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_vseek(fp, -1, SEEK_CUR);
-                }
+                /* Corrupt LOB section — recover to the next 0xFFFF */
+                exp_skip_to_table_end(s, fp);
                 break;
             }
 
@@ -2113,10 +2253,16 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             continue;
         }
 
+        /* The table column this value belongs to (M-01). */
+        cix = -1;
+        if (col_idx < s->table.col_count)
+            cix = wire_col ? wire_col[col_idx] : col_idx;
+        ctype = (cix >= 0) ? s->table.columns[cix].type : -1;
+
         if (col_len == 0xFFFE) {
             /* NULL column */
-            if (col_idx < s->table.col_count) {
-                set_value_null(&s->record.values[col_idx]);
+            if (cix >= 0) {
+                set_value_null(&s->record.values[cix]);
             }
             col_idx++;
             /* DIRECT=Y: rows have no 00 00 terminator, so a row whose last
@@ -2125,10 +2271,9 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
                direct dump) always has a LOB section (non-NULL LOB count, or
                00 00 when all are NULL) after the regular columns, so completing
                it here would read that section as the next row and swallow the
-               rest of the table (H-12). Mirror the lob_col_count==0 guard the
-               non-NULL completion below already uses. */
-            if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count
-                && s->table.lob_col_count == 0) {
+               rest of the table (H-12). direct_rows carries that guard, as for
+               the non-NULL completion below. */
+            if (direct_rows && col_idx == s->table.col_count) {
                 s->record.col_count = col_idx;
                 if (!list_only) {
                     deliver_row(s);
@@ -2147,8 +2292,38 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             continue;
         }
 
-            /* Handle large data: 0xFF00 means 4-byte length follows */
-        if (col_len == 0xFF00) {
+        /* A LONG / LONG RAW in parts: DIRECT=Y pieces (a length with bit 15
+           set, H-22) or a conventional chunk list (FD FF, M-41). Read as a
+           plain 16-bit count, 0x8001 was taken as 32769 bytes and FD FF as
+           65533, and the following rows and tables were swallowed. Other
+           types never come in parts, and a conventional row uses bit 15 for a
+           genuine 32 KB - 64 KB single length. */
+        if ((ctype == COL_LONG || ctype == COL_LONG_RAW) &&
+            (direct_rows ? (col_len & 0x8000) != 0 : col_len == 0xFFFD)) {
+            int dropped = 0;
+            int n = exp_read_long_parts(fp, col_len, direct_rows, !list_only,
+                                        &col_buf, &col_buf_size, &dropped);
+            if (n == -2) { rc = ODV_ERROR_MALLOC; break; }
+            if (n < 0) {
+                /* Truncated / corrupt parts — recover to the next 0xFFFF. */
+                exp_skip_to_table_end(s, fp);
+                break;
+            }
+            if (dropped && !long_cut) {
+                long_cut = 1;
+                snprintf(s->last_error, sizeof(s->last_error),
+                         "A LONG value in %s.%s is longer than %d bytes; "
+                         "only its first %d bytes are shown",
+                         s->table.schema, s->table.name,
+                         ODV_EXP_RECORD_LEN, ODV_EXP_RECORD_LEN);
+            }
+            col_len = n;
+            long_done = 1;
+        } else if (col_len == 0xFF00 &&
+                   ctype != COL_LONG && ctype != COL_LONG_RAW) {
+            /* 0xFF00 followed by a 4-byte length (kept for other types).
+               A LONG / LONG RAW of exactly 65,280 bytes is written with the
+               plain length 00 FF, and its bytes follow at once (M-41). */
             unsigned char big_len[4];
             unsigned int ulen;
             if (odv_vread(big_len, 1, 4, fp) != 4) break;
@@ -2162,61 +2337,8 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             col_len = (int)ulen;
         }
 
-        /* DIRECT=Y splits a LONG / LONG RAW value that spans more than one
-           ~8 KB block into pieces: a 2-byte length whose bit 15 is set means
-           "this piece is (low 15 bits) bytes and another piece follows"; bit 15
-           clear marks the last piece. Read as a plain 16-bit count, 0x8001 was
-           taken as 32769 bytes and the next rows and table were swallowed
-           (H-22). Assemble the pieces into col_buf. Restricted to LONG/LONG RAW
-           in a direct dump: other types never split, and a conventional dump
-           uses the high bit for a genuine 32 KB–64 KB single length. */
-        int long_split_done = 0;
-        if (s->dump_type == DUMP_EXP_DIRECT
-            && (col_len & 0x8000)
-            && col_idx < s->table.col_count
-            && (s->table.columns[col_idx].type == COL_LONG ||
-                s->table.columns[col_idx].type == COL_LONG_RAW)) {
-            int assembled = 0;
-            int cur = col_len;
-            int ok = 1;             /* 1=ok, 0=truncated/corrupt, -1=malloc */
-            for (;;) {
-                int piece_len = cur & 0x7FFF;
-                int last = !(cur & 0x8000);
-                if (assembled > ODV_EXP_RECORD_LEN - piece_len) { ok = 0; break; }
-                if (assembled + piece_len + 1 > col_buf_size) {
-                    unsigned char *nb = (unsigned char *)realloc(
-                        col_buf, (size_t)assembled + (size_t)piece_len + 1);
-                    if (!nb) { ok = -1; break; }
-                    col_buf = nb;
-                    col_buf_size = assembled + piece_len + 1;
-                }
-                if (piece_len > 0 &&
-                    (int)odv_vread(col_buf + assembled, 1, (size_t)piece_len, fp) != piece_len) {
-                    ok = 0; break;
-                }
-                assembled += piece_len;
-                if (last) break;
-                if (odv_vread(len_buf, 1, 2, fp) != 2) { ok = 0; break; }
-                cur = (int)((unsigned int)len_buf[0] | ((unsigned int)len_buf[1] << 8));
-            }
-            if (ok == -1) { rc = ODV_ERROR_MALLOC; break; }
-            if (!ok) {
-                /* Truncated/corrupt split — recover to the next 0xFFFF. */
-                while (!s->cancelled) {
-                    unsigned char scan[2];
-                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
-                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_vseek(fp, -1, SEEK_CUR);
-                }
-                break;
-            }
-            col_len = assembled;
-            long_split_done = 1;
-        }
-
         /* Type-specific length validation (ref: check_column_length) */
-        if (col_idx < s->table.col_count) {
-            int ctype = s->table.columns[col_idx].type;
+        if (cix >= 0) {
             int bad = 0;
             switch (ctype) {
             case COL_NUMBER: case COL_FLOAT:
@@ -2249,12 +2371,7 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             }
             if (bad) {
                 /* Corrupt data — skip to next table */
-                while (!s->cancelled) {
-                    unsigned char scan[2];
-                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
-                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_vseek(fp, -1, SEEK_CUR);
-                }
+                exp_skip_to_table_end(s, fp);
                 break;
             }
         }
@@ -2262,27 +2379,21 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
         /* Sanity check: reject absurdly large column lengths */
         if (col_len < 0 || col_len > ODV_EXP_RECORD_LEN) {
             /* Corrupt data — try to find 0xFFFF end marker */
-            while (!s->cancelled) {
-                unsigned char scan[2];
-                if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
-                if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                /* Seek back 1 byte (sliding window) */
-                odv_vseek(fp, -1, SEEK_CUR);
-            }
+            exp_skip_to_table_end(s, fp);
             break;
         }
 
-        /* Ensure buffer is large enough */
-        if (col_len > col_buf_size) {
-            unsigned char *new_buf = (unsigned char *)realloc(col_buf, col_len + 1);
-            if (!new_buf) { rc = ODV_ERROR_MALLOC; break; }
-            col_buf = new_buf;
-            col_buf_size = col_len + 1;
-        }
-
-        /* Read column data (already assembled above for a split LONG). */
-        if (col_len > 0 && !long_split_done) {
-            if ((int)odv_vread(col_buf, 1, col_len, fp) != col_len) {
+        /* Read column data (already read above for a LONG in parts). */
+        if (!long_done) {
+            /* Ensure buffer is large enough */
+            if (col_len > col_buf_size) {
+                unsigned char *new_buf = (unsigned char *)realloc(col_buf, col_len + 1);
+                if (!new_buf) { rc = ODV_ERROR_MALLOC; break; }
+                col_buf = new_buf;
+                col_buf_size = col_len + 1;
+            }
+            if (col_len > 0 &&
+                (int)odv_vread(col_buf, 1, col_len, fp) != col_len) {
                 break; /* Truncated */
             }
         }
@@ -2290,26 +2401,25 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
         /* Track non-NULL LOB locators so the LOB section reader can match
            them up with the chunk streams. The locator data is consumed
            here but the actual LOB content is delivered later. */
-        if (col_idx < s->table.col_count
+        if (cix >= 0
             && non_null_lob_cols
-            && is_lob_type(s->table.columns[col_idx].type)
+            && is_lob_type(ctype)
             && non_null_lob_count < s->table.lob_col_count) {
-            non_null_lob_cols[non_null_lob_count++] = col_idx;
+            non_null_lob_cols[non_null_lob_count++] = cix;
         }
 
         /* Decode and store.
            In list_only the decoded value is never delivered to the caller, so
            skip the NUMBER/DATE/charset conversion work: listing a large dump
            only needs the row count. */
-        if (!list_only && col_idx < s->table.col_count) {
-            decode_exp_column(s, col_idx, col_buf, col_len);
+        if (!list_only && cix >= 0) {
+            decode_exp_column(s, cix, col_buf, col_len);
         }
         col_idx++;
 
         /* DIRECT=Y: rows are concatenated without 00 00 end-of-row separator.
            Deliver the row as soon as all columns have been read. */
-        if (s->dump_type == DUMP_EXP_DIRECT && col_idx == s->table.col_count
-            && s->table.lob_col_count == 0) {
+        if (direct_rows && col_idx == s->table.col_count) {
             s->record.col_count = col_idx;
             if (!list_only) {
                 deliver_row(s);
@@ -2330,12 +2440,7 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
         /* Safety check — too many columns means record structure is corrupt. */
         if (col_idx > s->table.col_count) {
             /* Scan forward to find 0xFFFF table end marker */
-            while (!s->cancelled) {
-                unsigned char scan[2];
-                if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
-                if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                odv_vseek(fp, -1, SEEK_CUR);
-            }
+            exp_skip_to_table_end(s, fp);
             break;
         }
     }
@@ -3245,12 +3350,7 @@ static int parse_exp_object_rows(ODV_SESSION *s, ODV_VFILE *fp,
         }
         if (phys > 1 || n > (unsigned int)ODV_EXP_RECORD_LEN) {
             /* Not the two-column layout: skip to the table end marker. */
-            while (!s->cancelled) {
-                unsigned char sc[2];
-                if (odv_vread(sc, 1, 2, fp) != 2) goto obj_done;
-                if (sc[0] == 0xFF && sc[1] == 0xFF) break;
-                odv_vseek(fp, -1, SEEK_CUR);
-            }
+            exp_skip_to_table_end(s, fp);
             break;
         }
         if ((int)n > cap) {
@@ -3265,10 +3365,92 @@ static int parse_exp_object_rows(ODV_SESSION *s, ODV_VFILE *fp,
         phys++;
     }
 
-obj_done:
     free(buf);
     if (s->cancelled) return ODV_ERROR_CANCELLED;
     return rc;
+}
+
+/*---------------------------------------------------------------------------
+    exp_insert_columns (M-01)
+
+    Reads the column list of the INSERT INTO "T" ("A", "B", ...) statement in
+    front of a table's rows: the values of a row come in that order. A
+    conventional export lists the columns in CREATE TABLE order, but DIRECT=Y
+    moves LONG / LONG RAW to the end — ("ID", "V", "L") for a table created
+    as ("ID" NUMBER, "L" LONG, "V" VARCHAR2) — and writes the values so.
+    Reading them in CREATE TABLE order put every value of such a table in
+    another column and decoded it as another type. wire_col[i] receives the
+    table column of the i-th value. A list that is missing, unreadable or not
+    a permutation of the table's columns leaves the identity (the order the
+    rows were always read in).
+ ---------------------------------------------------------------------------*/
+
+/* Reads a double-quoted name after blanks at p into out (keeping at most
+   ODV_OBJNAME_LEN - 1 bytes, as extract_identifier does for the CREATE
+   TABLE names). Returns the position after the closing quote, or NULL. */
+static const char *exp_quoted_name(const char *p, char *out)
+{
+    int len = 0;
+    p = skip_ws(p);
+    if (*p != '"') return NULL;
+    p++;
+    while (*p && *p != '"') {
+        if (len < ODV_OBJNAME_LEN - 1) out[len++] = *p;
+        p++;
+    }
+    out[len] = '\0';
+    return (*p == '"') ? p + 1 : NULL;
+}
+
+static void exp_insert_columns(ODV_SESSION *s, const char *stmt, int *wire_col)
+{
+    char name[ODV_OBJNAME_LEN + 1];
+    unsigned char used[ODV_MAX_COLUMNS];
+    int n = s->table.col_count;
+    int i, k = 0;
+    const char *p;
+
+    for (i = 0; i < n; i++) wire_col[i] = i;
+    if (n <= 0 || n > ODV_MAX_COLUMNS) return;
+
+    /* INSERT INTO ["schema".]"table" ( */
+    p = exp_quoted_name(stmt + 12, name);
+    if (!p) return;
+    p = skip_ws(p);
+    if (*p == '.') {
+        p = exp_quoted_name(p + 1, name);
+        if (!p) return;
+        p = skip_ws(p);
+    }
+    if (*p != '(') return;
+    p++;
+
+    memset(used, 0, (size_t)n);
+    for (;;) {
+        int j;
+        p = exp_quoted_name(p, name);
+        if (!p || k >= n) goto identity;
+        /* Fold the client-charset name as the stored names were (H-09). */
+        if (s->dump_charset == CHARSET_UTF8)
+            normalize_cesu8(name);
+        j = k;                                  /* usually the same place */
+        if (used[j] || strcmp(s->table.columns[j].name, name) != 0) {
+            for (j = 0; j < n; j++)
+                if (!used[j] && strcmp(s->table.columns[j].name, name) == 0)
+                    break;
+            if (j == n) goto identity;
+        }
+        used[j] = 1;
+        wire_col[k++] = j;
+        p = skip_ws(p);
+        if (*p == ',') { p++; continue; }
+        if (*p == ')') break;
+        goto identity;
+    }
+    if (k == n) return;
+
+identity:
+    for (i = 0; i < n; i++) wire_col[i] = i;
 }
 
 /* CREATE TABLE "T" OF "TYPE" ...: the columns are the type's attributes. */
@@ -3349,9 +3531,14 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
     int obj_table = 0;      /* 1 = pending table is CREATE TABLE ... OF type */
     int64_t pending_row_count = 0; /* row count to pass when notifying */
     int filter_found = 0;   /* 1=filter target table already processed */
+    int wire_col[ODV_MAX_COLUMNS]; /* table column of each row value (M-01) */
 
     memset(&defer, 0, sizeof(defer));
     memset(&otypes, 0, sizeof(otypes));
+    {
+        int i;
+        for (i = 0; i < ODV_MAX_COLUMNS; i++) wire_col[i] = i;
+    }
     defer.cur = -1;
     defer.active = list_only;
     ddlx.s = s;
@@ -3756,7 +3943,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                         obj_table = 0;
                     } else if (s->table.name[0] != '\0' &&
                         strcmp(s->table.name, ins_table) == 0) {
-                        /* Table name matches — transition to binary metadata */
+                        /* Table name matches — transition to binary metadata.
+                           The rows follow the INSERT's column order (M-01). */
+                        exp_insert_columns(s, word, wire_col);
                         step = 3;
                         data_step = 0;
                         meta_col_count = 0;
@@ -4097,37 +4286,18 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                         if (list_only && s->filter_active && s->pass_flg) {
                             /* Filtered out in list_only: skip records entirely */
                             /* Scan forward to find 0xFFFF end marker */
-                            {
-                                int skip_ct = 0;
-                                while (!s->cancelled) {
-                                    unsigned char scan[2];
-                                    if (odv_vread(scan, 1, 2, fp) != 2) goto done;
-                                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                                    odv_vseek(fp, -1, SEEK_CUR);
-                                    if ((++skip_ct & 0x7FFF) == 0)
-                                        odv_report_progress(s, fp);
-                                }
-                            }
+                            if (exp_skip_to_table_end(s, fp) == 0) goto done;
                             pending_row_count = 0;
                         } else if (!s->filter_active || !s->pass_flg) {
                             /* Parse records (list_only=count only, full=deliver) */
                             rc = obj_table
                                 ? parse_exp_object_rows(s, fp, rec_start, list_only)
-                                : parse_exp_records(s, fp, rec_start, list_only);
+                                : parse_exp_records(s, fp, rec_start, list_only,
+                                                    wire_col);
                             pending_row_count = s->table.record_count;
                         } else {
                             /* Filtered out in full parse: skip */
-                            {
-                                int skip_ct = 0;
-                                while (!s->cancelled) {
-                                    unsigned char scan[2];
-                                    if (odv_vread(scan, 1, 2, fp) != 2) goto done;
-                                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                                    odv_vseek(fp, -1, SEEK_CUR);
-                                    if ((++skip_ct & 0x7FFF) == 0)
-                                        odv_report_progress(s, fp);
-                                }
-                            }
+                            if (exp_skip_to_table_end(s, fp) == 0) goto done;
                             pending_row_count = 0;
                         }
                         /* Update address to match new file position */
