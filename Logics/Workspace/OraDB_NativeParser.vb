@@ -204,6 +204,10 @@ Public Class Open_NativeParser
     Private Shared Function odv_get_lob_files_written(session As IntPtr) As Long
     End Function
 
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_get_lob_files_failed(session As IntPtr) As Long
+    End Function
+
     ' ユーティリティ
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
     Private Shared Function odv_get_version() As IntPtr
@@ -698,7 +702,8 @@ Public Class Open_NativeParser
                                        Optional filenameCol As String = Nothing,
                                        Optional extension As String = Nothing,
                                        Optional dataOffset As Long = 0,
-                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing) As Long
+                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
+                                       Optional ByRef filesFailed As Long = 0) As Long
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ParseContext()
         ctx.ProgressAction = progressAction
@@ -726,6 +731,8 @@ Public Class Open_NativeParser
                 Return -1
             End If
 
+            ' 書き出せなかった行数 (ファイル名が安全化できない・fopen 失敗など) を呼び出し側へ返す (H-07)
+            filesFailed = odv_get_lob_files_failed(session)
             Return odv_get_lob_files_written(session)
 
         Catch

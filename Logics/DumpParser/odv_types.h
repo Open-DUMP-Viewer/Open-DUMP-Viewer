@@ -514,6 +514,7 @@ struct _odv_session {
     char            lob_filename_col[ODV_OBJNAME_LEN + 1]; /* Column for filename (empty=sequential) */
     char            lob_extension[32];     /* File extension (default "lob") */
     int64_t         lob_files_written;     /* Count of files written */
+    int64_t         lob_files_failed;      /* Count of LOB rows that could not be written (H-07) */
 };
 
 /*---------------------------------------------------------------------------

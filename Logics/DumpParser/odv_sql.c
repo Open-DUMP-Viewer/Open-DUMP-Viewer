@@ -44,18 +44,25 @@ typedef struct {
     Helper: write SQL-escaped string value
     Escapes single quotes by doubling them.
  ---------------------------------------------------------------------------*/
-static void sql_write_string(FILE *fp, const char *val)
+static void sql_write_string(FILE *fp, const char *val, int dbms)
 {
     fputc('\'', fp);
     while (*val) {
         if (*val == '\'') {
             fputc('\'', fp);
             fputc('\'', fp);
-        } else if (*val == '\\' && 0) {
-            /* MySQL needs backslash escaping, but we use standard SQL mode */
-            fputc('\\', fp);
-            fputc('\\', fp);
+        } else if (dbms == DBMS_ORACLE && (*val == '\n' || *val == '\r')) {
+            /* SQL*Plus is line-oriented: a literal newline in a string breaks
+               the statement on a blank line, a lone '/' line, a line ending in
+               ';', a '#'-prefixed line, etc., and a bare CR is silently
+               dropped. Emit the control byte via CHR() concatenation so the
+               literal stays on a single physical line (H-20). In Oracle '' is
+               NULL and NULL || x = x, so a leading/trailing CHR fragment
+               concatenates correctly even at the ends of the value. */
+            fprintf(fp, "'||CHR(%d)||'", (unsigned char)*val);
         } else {
+            /* NOTE: MySQL backslash escaping (M-16) is intentionally out of
+               scope here; backslashes are written verbatim. */
             fputc(*val, fp);
         }
         val++;
@@ -88,18 +95,40 @@ static void sql_write_identifier(FILE *fp, const char *name, int dbms)
  ---------------------------------------------------------------------------*/
 static int is_numeric_value(const char *val)
 {
+    int digits = 0, dots = 0;
     if (!val || !*val) return 0;
     if (*val == '-' || *val == '+') val++;
     if (!*val) return 0;
 
     while (*val) {
-        if (*val == '.' || (*val >= '0' && *val <= '9')) {
-            val++;
+        if (*val == '.') {
+            if (++dots > 1) return 0;   /* reject "1.2.3" */
+        } else if (*val >= '0' && *val <= '9') {
+            digits++;
         } else {
             return 0;
         }
+        val++;
     }
-    return 1;
+    return digits > 0;   /* require a digit; reject "." "-." "+." */
+}
+
+/*---------------------------------------------------------------------------
+    Helper: is column i a numeric type (unquoted numeric literals allowed)?
+
+    Only genuine numeric columns (NUMBER/FLOAT/BINARY_FLOAT/BINARY_DOUBLE) may
+    emit unquoted values. String columns are always quoted so a stored value
+    that merely looks numeric (e.g. '007', '1.2.3', '.') is written verbatim as
+    a string literal and never reinterpreted as a number on reload (H-08).
+ ---------------------------------------------------------------------------*/
+static int sql_is_numeric_column(const SQL_CONTEXT *ctx, int i)
+{
+    int t;
+    if (!ctx->session || i < 0 || i >= ctx->session->table.col_count)
+        return 0;
+    t = ctx->session->table.columns[i].type;
+    return (t == COL_NUMBER || t == COL_FLOAT ||
+            t == COL_BIN_FLOAT || t == COL_BIN_DOUBLE);
 }
 
 /*---------------------------------------------------------------------------
@@ -572,13 +601,13 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
             if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
             sql_write_identifier(fp, table, dbms);
             fprintf(fp, " COMMENT = ");
-            sql_write_string(fp, ctx->session->table.comment);
+            sql_write_string(fp, ctx->session->table.comment, dbms);
             fprintf(fp, ";\n");
             break;
         case DBMS_SQLSERVER:
             /* SQL Server uses sp_addextendedproperty — output as comment */
             fprintf(fp, "-- COMMENT ON TABLE %s: ", table);
-            sql_write_string(fp, ctx->session->table.comment);
+            sql_write_string(fp, ctx->session->table.comment, dbms);
             fputc('\n', fp);
             break;
         default: /* Oracle, PostgreSQL */
@@ -586,7 +615,7 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
             if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
             sql_write_identifier(fp, table, dbms);
             fprintf(fp, " IS ");
-            sql_write_string(fp, ctx->session->table.comment);
+            sql_write_string(fp, ctx->session->table.comment, dbms);
             fprintf(fp, ";\n");
             break;
         }
@@ -602,13 +631,13 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
                This requires full column definition — too complex. Output as SQL comment. */
             fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
             fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
-            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
             fputc('\n', fp);
             break;
         case DBMS_SQLSERVER:
             fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
             fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
-            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
             fputc('\n', fp);
             break;
         default: /* Oracle, PostgreSQL */
@@ -618,7 +647,7 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
             fputc('.', fp);
             sql_write_identifier(fp, ctx->session->table.columns[i].name, dbms);
             fprintf(fp, " IS ");
-            sql_write_string(fp, ctx->session->table.columns[i].comment);
+            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
             fprintf(fp, ";\n");
             break;
         }
@@ -817,7 +846,7 @@ static void ODV_CALL sql_row_callback(
                 if (is_ts) {
                     /* TIMESTAMP: use TO_TIMESTAMP with fractional seconds */
                     fprintf(ctx->fp, "TO_TIMESTAMP(");
-                    sql_write_string(ctx->fp, col_values[i]);
+                    sql_write_string(ctx->fp, col_values[i], ctx->dbms_type);
                     fprintf(ctx->fp, ", 'YYYY/MM/DD HH24:MI:SS.FF')");
                 } else {
                     /* DATE: use TO_DATE */
@@ -828,13 +857,13 @@ static void ODV_CALL sql_row_callback(
                     default:               ora_fmt = "YYYY/MM/DD HH24:MI:SS"; break;
                     }
                     fprintf(ctx->fp, "TO_DATE(");
-                    sql_write_string(ctx->fp, col_values[i]);
+                    sql_write_string(ctx->fp, col_values[i], ctx->dbms_type);
                     fprintf(ctx->fp, ", '%s')", ora_fmt);
                 }
                 break;
             }
             default:
-                sql_write_string(ctx->fp, col_values[i]);
+                sql_write_string(ctx->fp, col_values[i], ctx->dbms_type);
                 break;
             }
         } else if (ctx->session && i < ctx->session->table.col_count &&
@@ -858,10 +887,10 @@ static void ODV_CALL sql_row_callback(
                 fprintf(ctx->fp, "0x%s", val);
                 break;
             }
-        } else if (is_numeric_value(col_values[i])) {
+        } else if (sql_is_numeric_column(ctx, i) && is_numeric_value(col_values[i])) {
             fputs(col_values[i], ctx->fp);
         } else {
-            sql_write_string(ctx->fp, col_values[i]);
+            sql_write_string(ctx->fp, col_values[i], ctx->dbms_type);
         }
     }
 
@@ -974,6 +1003,14 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
     ctx.all_tables = all_tables;
     ctx.last_schema[0] = '\0';
     ctx.last_table[0] = '\0';
+
+    /* Oracle output targets SQL*Plus (the DROP uses a PL/SQL block and a '/'
+       line). Disable '&' substitution variables and allow blank lines inside
+       statements so values are not mangled on load (H-20). */
+    if (dbms_type == DBMS_ORACLE) {
+        fputs("SET DEFINE OFF\n", ctx.fp);
+        fputs("SET SQLBLANKLINES ON\n\n", ctx.fp);
+    }
 
     /* Save and replace callbacks */
     saved_row_cb = s->row_cb;

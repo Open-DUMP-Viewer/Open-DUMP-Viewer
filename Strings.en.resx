@@ -415,6 +415,9 @@ Ensure Open_DumpParser.dll is in the same folder as the executable.</value></dat
   <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>Select output folder for LOB files</value></data>
   <data name="LobExtract_ExtractComplete" xml:space="preserve"><value>LOB file extraction completed.
 Output file count: {0}</value></data>
+  <data name="LobExtract_ExtractCompleteWithFailures" xml:space="preserve"><value>LOB file extraction completed.
+Output file count: {0}
+Rows that could not be written: {1} (unsafe file name or write failure)</value></data>
   <data name="LobExtract_ExtractError" xml:space="preserve"><value>An error occurred during LOB extraction</value></data>
   <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>Please select a LOB column.</value></data>
   <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>Please specify an output folder.</value></data>

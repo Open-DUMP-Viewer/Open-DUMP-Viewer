@@ -415,6 +415,9 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>LOBファイルの出力先を選択</value></data>
   <data name="LobExtract_ExtractComplete" xml:space="preserve"><value>LOBファイルの抽出が完了しました。
 出力ファイル数: {0}</value></data>
+  <data name="LobExtract_ExtractCompleteWithFailures" xml:space="preserve"><value>LOBファイルの抽出が完了しました。
+出力ファイル数: {0}
+書き出せなかった行数: {1} (ファイル名に使えない値や書き込み失敗のため)</value></data>
   <data name="LobExtract_ExtractError" xml:space="preserve"><value>LOB抽出処理でエラーが発生しました</value></data>
   <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>LOBカラムを選択してください。</value></data>
   <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>出力フォルダを指定してください。</value></data>

@@ -66,11 +66,33 @@ Public Module ExportHelper
     End Function
 
     ''' <summary>
-    ''' SQL 文字列リテラルをエスケープ
+    ''' SQL 文字列リテラルをエスケープ。
+    ''' Oracle (dbmsType=DBMS_ORACLE) では、改行 (LF) と復帰 (CR) を '…'||CHR(10)||'…'
+    ''' / CHR(13) の連結で書く (H-20)。Oracle 方言の出力は SQL*Plus 向け (DROP が '/' 行を
+    ''' 使う) で、文字列リテラル中の生の改行は空行・'/' だけの行・行末 ';' などで文を壊し、
+    ''' 生の CR は黙って落ちるため。'' は Oracle では NULL で NULL||x=x なので、値の先頭・末尾の
+    ''' CHR 断片も正しく連結される。他の方言 (既定) は従来どおり ' の二重化のみ。
     ''' </summary>
-    Public Function EscapeSqlString(value As String) As String
+    Public Function EscapeSqlString(value As String, Optional dbmsType As Integer = -1) As String
         If value Is Nothing Then Return "NULL"
-        Return "'" & value.Replace("'", "''") & "'"
+        If dbmsType <> DBMS_ORACLE Then
+            Return "'" & value.Replace("'", "''") & "'"
+        End If
+        Dim sb As New StringBuilder("'")
+        For Each ch In value
+            Select Case ch
+                Case "'"c
+                    sb.Append("''")
+                Case ChrW(10)
+                    sb.Append("'||CHR(10)||'")
+                Case ChrW(13)
+                    sb.Append("'||CHR(13)||'")
+                Case Else
+                    sb.Append(ch)
+            End Select
+        Next
+        sb.Append("'"c)
+        Return sb.ToString()
     End Function
 #End Region
 
@@ -314,12 +336,47 @@ Public Module ExportHelper
 
 #Region "数値判定"
     ''' <summary>
-    ''' 値が数値として扱えるかどうかを判定
+    ''' 値が「引用符なしで出せる単純な数値リテラル」かを判定する (H-08)。
+    ''' C 側 is_numeric_value と同じ: 先頭の + / - は任意、以降は数字と小数点のみ、
+    ''' 小数点は 1 個まで、数字が 1 文字以上。カルチャ非依存にするため Double.TryParse は
+    ''' 使わない (TryParse は '1,000'・' 12'・'1e5'・'NaN'・'∞' などを数値と見なしてしまう)。
     ''' </summary>
     Public Function IsNumericValue(value As String) As Boolean
         If String.IsNullOrEmpty(value) Then Return False
-        Dim dummy As Double
-        Return Double.TryParse(value, dummy)
+        Dim i As Integer = 0
+        If value(0) = "+"c OrElse value(0) = "-"c Then i = 1
+        Dim digits As Integer = 0
+        Dim dots As Integer = 0
+        While i < value.Length
+            Dim c = value(i)
+            If c = "."c Then
+                dots += 1
+                If dots > 1 Then Return False   ' "1.2.3" を弾く
+            ElseIf c >= "0"c AndAlso c <= "9"c Then
+                digits += 1
+            Else
+                Return False
+            End If
+            i += 1
+        End While
+        Return digits > 0   ' 数字が必要。"." "-." "+." は弾く
+    End Function
+
+    ''' <summary>
+    ''' 列の Oracle 型が数値型 (引用符なしで値を出してよい型) かを判定する (H-08)。
+    ''' 数値型だけを引用符なしにし、文字列型は値が数字に見えても常に引用符付きにする。
+    ''' </summary>
+    Public Function IsNumericColumnType(oracleType As String) As Boolean
+        If String.IsNullOrEmpty(oracleType) Then Return False
+        Dim b = oracleType.Trim().ToUpperInvariant()
+        Dim paren = b.IndexOf("("c)
+        If paren >= 0 Then b = b.Substring(0, paren).Trim()
+        Select Case b
+            Case "NUMBER", "FLOAT", "INTEGER", "BINARY_FLOAT", "BINARY_DOUBLE"
+                Return True
+            Case Else
+                Return False
+        End Select
     End Function
 #End Region
 

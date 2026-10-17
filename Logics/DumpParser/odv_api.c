@@ -456,12 +456,99 @@ int odv_lob_accumulate(ODV_SESSION *s, int lob_col_idx, const unsigned char *dat
     return ODV_OK;
 }
 
+/* True if the given base name (portion before the first '.') is a Windows
+   reserved device name (CON, PRN, AUX, NUL, COM1-9, LPT1-9), case-insensitive. */
+static int odv_is_reserved_devname(const char *name)
+{
+    static const char *dev3[] = { "CON", "PRN", "AUX", "NUL" };
+    size_t i;
+    for (i = 0; i < sizeof(dev3) / sizeof(dev3[0]); i++)
+        if (odv_stricmp(name, dev3[i]) == 0) return 1;
+    if ((odv_strnicmp(name, "COM", 3) == 0 || odv_strnicmp(name, "LPT", 3) == 0) &&
+        name[3] >= '1' && name[3] <= '9' && name[4] == '\0')
+        return 1;
+    return 0;
+}
+
+/* Sanitize an untrusted value (e.g. a column value from the dump) into a safe
+   single path component usable as a filename (H-07, path-traversal defense).
+
+   Replaces path separators ('/' '\\'), the drive/stream separator (':') and
+   Windows-reserved characters ('<' '>' '"' '|' '?' '*') with '_', drops NUL and
+   other control characters, trims leading/trailing spaces and trailing dots,
+   rejects names made only of dots ("." / ".."), and prefixes reserved device
+   names with '_'. Bytes >= 0x80 (UTF-8 continuation/lead bytes) are kept so
+   non-ASCII filenames survive; none of the dangerous path characters are
+   representable as UTF-8 continuation bytes, so this cannot reintroduce a
+   separator. Returns the length written (0 => no usable name; *out is "").  */
+static int odv_sanitize_filename(const unsigned char *in, int in_len,
+                                 char *out, int out_sz)
+{
+    int i, n = 0;
+    if (out_sz <= 0) return 0;
+    out[0] = '\0';
+    if (!in || in_len <= 0) return 0;
+
+    for (i = 0; i < in_len && n < out_sz - 1; i++) {
+        unsigned char c = in[i];
+        if (c < 0x20 || c == 0x7F) continue;    /* drop control characters */
+        switch (c) {
+        case '/': case '\\':                     /* path separators */
+        case ':':                                /* drive / alternate-stream */
+        case '<': case '>': case '"':            /* Windows reserved */
+        case '|': case '?': case '*':
+            out[n++] = '_';
+            break;
+        default:
+            out[n++] = (char)c;
+            break;
+        }
+    }
+    out[n] = '\0';
+
+    while (n > 0 && (out[n - 1] == '.' || out[n - 1] == ' '))
+        out[--n] = '\0';                          /* trim trailing dots/spaces */
+    {
+        int lead = 0;
+        while (out[lead] == ' ') lead++;
+        if (lead > 0) { memmove(out, out + lead, (size_t)(n - lead + 1)); n -= lead; }
+    }
+    {
+        int alldots = (n > 0);
+        for (i = 0; i < n; i++) if (out[i] != '.') { alldots = 0; break; }
+        if (alldots) { out[0] = '\0'; return 0; }  /* "." / ".." / ... */
+    }
+    if (n == 0) return 0;
+
+    {
+        char base[16];
+        int b = 0;
+        for (i = 0; i < n && out[i] != '.' && b < (int)sizeof(base) - 1; i++)
+            base[b++] = out[i];
+        base[b] = '\0';
+        if (odv_is_reserved_devname(base) && n < out_sz - 1) {
+            memmove(out + 1, out, (size_t)(n + 1));
+            out[0] = '_';
+            n++;
+        }
+    }
+    return n;
+}
+
 /* Write accumulated LOB buffer to a file and reset the buffer.
-   Filename is based on lob_filename_col or sequential number. */
+   Filename is based on lob_filename_col or sequential number.
+   The filename column value is untrusted dump data, so it is sanitized to a
+   safe single path component before being joined to the output directory, and
+   the result is confirmed to stay inside that directory (H-07). A write that
+   fails (unsafe/too-long path, fopen, fwrite) is counted in lob_files_failed
+   and reported via odv_get_lob_files_failed(); it does not abort extraction of
+   the remaining rows (the parser's error path discards this call's rc). */
 int odv_lob_write_file(ODV_SESSION *s)
 {
     char path[ODV_PATH_LEN * 2 + 1];
     char fname[256];
+    char base[300];
+    const char *ext;
     FILE *fpw;
 
     if (s->lob_column_index < 0)
@@ -471,38 +558,55 @@ int odv_lob_write_file(ODV_SESSION *s)
         return ODV_OK; /* NULL LOB — skip */
     }
 
-    /* Build output path */
+    /* Output directory (default: current directory). This is set by the
+       application, not by dump data, so it is trusted as the containment root. */
     if (s->lob_output_dir[0])
         snprintf(path, sizeof(path), "%s", s->lob_output_dir);
     else
         snprintf(path, sizeof(path), ".");
 
-    /* Determine filename */
+    /* Determine the file name. The filename-column value is untrusted dump
+       data, so it is sanitized to a safe single path component (H-07). */
     fname[0] = '\0';
     if (s->lob_filename_col[0] != '\0') {
-        /* Find the column value for filename */
         int i;
         for (i = 0; i < s->table.col_count; i++) {
             if (odv_stricmp(s->table.columns[i].name, s->lob_filename_col) == 0) {
                 if (i < s->record.col_count && !s->record.values[i].is_null &&
-                    s->record.values[i].data_len > 0 && s->record.values[i].data_len < (int)sizeof(fname) - 1) {
-                    memcpy(fname, s->record.values[i].data, s->record.values[i].data_len);
-                    fname[s->record.values[i].data_len] = '\0';
+                    s->record.values[i].data_len > 0) {
+                    odv_sanitize_filename((const unsigned char *)s->record.values[i].data,
+                                          s->record.values[i].data_len,
+                                          fname, (int)sizeof(fname));
                 }
                 break;
             }
         }
     }
     if (fname[0] == '\0') {
-        /* Sequential numbering */
+        /* No usable name (sequential mode, NULL/empty value, or a value that
+           sanitized away entirely): fall back to a sequential number. */
         snprintf(fname, sizeof(fname), "%lld", (long long)(s->lob_files_written + 1));
     }
 
-    /* Append path separator + filename + extension (safe construction) */
+    /* Extension is sanitized when stored (odv_extract_lob). */
+    ext = s->lob_extension[0] ? s->lob_extension : "lob";
+
+    /* Build the basename and confirm it is a single path component: after
+       sanitization it carries no separator and is not "."/"..", so joining it
+       to the output directory cannot escape that directory. */
+    snprintf(base, sizeof(base), "%s.%s", fname, ext);
+    if (strchr(base, '/') || strchr(base, '\\') ||
+        strcmp(base, ".") == 0 || strcmp(base, "..") == 0) {
+        s->lob_files_failed++;
+        set_error(s, "Unsafe LOB file name rejected");
+        odv_lob_reset_buffer(s);
+        return ODV_OK; /* skip this row, keep extracting the rest */
+    }
+
+    /* Join: <output dir> + separator + <basename>. */
     {
         int plen = (int)strlen(path);
         int remain = (int)sizeof(path) - plen;
-        const char *ext = s->lob_extension[0] ? s->lob_extension : "lob";
         const char *sep = "";
 
         if (plen > 0 && path[plen - 1] != '\\' && path[plen - 1] != '/')
@@ -512,26 +616,31 @@ int odv_lob_write_file(ODV_SESSION *s)
             sep = "/";
 #endif
 
-        if (remain < (int)(strlen(sep) + strlen(fname) + 1 + strlen(ext) + 1)) {
+        if (remain < (int)(strlen(sep) + strlen(base) + 1)) {
+            s->lob_files_failed++;
             set_error(s, "LOB output path too long");
             odv_lob_reset_buffer(s);
-            return ODV_ERROR_BUFFER_OVER;
+            return ODV_OK;
         }
-        snprintf(path + plen, remain, "%s%s.%s", sep, fname, ext);
+        snprintf(path + plen, remain, "%s%s", sep, base);
     }
 
-    /* Write binary */
+    /* Write binary. A failure here (fopen/fwrite) is counted in
+       lob_files_failed and surfaced via odv_get_lob_files_failed(); it is not
+       made fatal, so the remaining rows of the table are still extracted. */
     fpw = fopen(path, "wb");
     if (!fpw) {
+        s->lob_files_failed++;
         set_error(s, "Cannot create LOB output file");
         odv_lob_reset_buffer(s);
-        return ODV_ERROR_FOPEN;
+        return ODV_OK;
     }
     if ((int)fwrite(s->state.lob_buf, 1, s->state.lob_buf_len, fpw) != s->state.lob_buf_len) {
         fclose(fpw);
+        s->lob_files_failed++;
         set_error(s, "LOB file write error");
         odv_lob_reset_buffer(s);
-        return ODV_ERROR_FWRITE;
+        return ODV_OK;
     }
     fclose(fpw);
 
@@ -574,16 +683,24 @@ ODV_API int ODV_CALL odv_extract_lob(
     odv_strcpy(s->lob_output_dir, output_dir, ODV_PATH_LEN);
     s->lob_column_index = -1;
     s->lob_files_written = 0;
+    s->lob_files_failed = 0;
 
     if (filename_col && filename_col[0])
         odv_strcpy(s->lob_filename_col, filename_col, ODV_OBJNAME_LEN);
     else
         s->lob_filename_col[0] = '\0';
 
-    if (extension && extension[0])
-        odv_strcpy(s->lob_extension, extension, sizeof(s->lob_extension) - 1);
-    else
-        odv_strcpy(s->lob_extension, "lob", sizeof(s->lob_extension) - 1);
+    /* Sanitize the extension (H-07): it is joined into the output path just
+       like the filename, so a value such as "..\\x" or "a/b" must not survive. */
+    {
+        const char *e = (extension && extension[0]) ? extension : "lob";
+        char safe_ext[32];
+        while (*e == '.') e++;   /* a user-typed ".pdf" means extension "pdf" */
+        odv_sanitize_filename((const unsigned char *)e, (int)strlen(e),
+                              safe_ext, (int)sizeof(safe_ext));
+        odv_strcpy(s->lob_extension, safe_ext[0] ? safe_ext : "lob",
+                   sizeof(s->lob_extension) - 1);
+    }
 
     /* Auto-detect dump kind if not done */
     if (s->dump_type == DUMP_UNKNOWN) {
@@ -632,6 +749,12 @@ ODV_API int64_t ODV_CALL odv_get_lob_files_written(ODV_SESSION *s)
 {
     if (!s) return 0;
     return s->lob_files_written;
+}
+
+ODV_API int64_t ODV_CALL odv_get_lob_files_failed(ODV_SESSION *s)
+{
+    if (!s) return 0;
+    return s->lob_files_failed;
 }
 
 ODV_API int ODV_CALL odv_cancel(ODV_SESSION *s)

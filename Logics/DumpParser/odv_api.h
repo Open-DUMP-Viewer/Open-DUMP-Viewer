@@ -215,6 +215,11 @@ ODV_API int ODV_CALL odv_extract_lob(
 /* Get number of LOB files written by the last odv_extract_lob call */
 ODV_API int64_t ODV_CALL odv_get_lob_files_written(ODV_SESSION *s);
 
+/* Get number of LOB rows the last odv_extract_lob call could not write to a
+   file (e.g. fopen/fwrite failure, or a filename that could not be made safe).
+   Non-zero means the extraction was incomplete even if the call returned OK. */
+ODV_API int64_t ODV_CALL odv_get_lob_files_failed(ODV_SESSION *s);
+
 /* Request cancellation of a running operation */
 ODV_API int ODV_CALL odv_cancel(ODV_SESSION *s);
 
