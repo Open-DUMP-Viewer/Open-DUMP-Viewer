@@ -74,6 +74,16 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
 
     free_record(&session->record);
 
+    odv_table_free_text(&session->table);
+    free(session->table_list);
+    session->table_list = NULL;
+    free(session->tl_bucket);
+    session->tl_bucket = NULL;
+    free(session->tl_next);
+    session->tl_next = NULL;
+    free(session->partition_list);
+    session->partition_list = NULL;
+
     /* Free LOB buffer if allocated */
     if (session->state.lob_buf) {
         free(session->state.lob_buf);
@@ -82,6 +92,174 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
 
     free(session);
     return ODV_OK;
+}
+
+/*---------------------------------------------------------------------------
+    odv_table_list_reserve
+
+    table_list used to be a fixed array of 1000 entries shared by tables and
+    their partitions. Past it the parsers stopped adding entries but kept
+    calling table_cb, so the product (which pairs callback i with
+    odv_get_table_entry(i)) showed the overflow partitions as unnamed plain
+    tables and opened the wrong partition (M-29). It now grows on demand up
+    to ODV_MAX_TABLES. On reaching the cap, or if memory runs out, a warning
+    is left in last_error and 0 is returned; callers then skip that table
+    entirely (entry and callback) so the pairing stays intact.
+ ---------------------------------------------------------------------------*/
+int odv_table_list_reserve(ODV_SESSION *s)
+{
+    int new_cap;
+    ODV_TABLE_ENTRY *p;
+
+    if (!s) return 0;
+    if (s->table_count < s->table_cap) return 1;
+    if (s->table_cap >= ODV_MAX_TABLES) {
+        set_error(s, "Too many tables and partitions in the dump; "
+                     "the rest are not listed");
+        return 0;
+    }
+    new_cap = (s->table_cap > 0) ? s->table_cap * 2 : 256;
+    if (new_cap > ODV_MAX_TABLES) new_cap = ODV_MAX_TABLES;
+    p = (ODV_TABLE_ENTRY *)realloc(s->table_list,
+                                   (size_t)new_cap * sizeof(ODV_TABLE_ENTRY));
+    if (!p) {
+        set_error(s, "Out of memory while listing tables; "
+                     "the rest are not listed");
+        return 0;
+    }
+    memset(p + s->table_cap, 0,
+           (size_t)(new_cap - s->table_cap) * sizeof(ODV_TABLE_ENTRY));
+    s->table_list = p;
+    s->table_cap = new_cap;
+    return 1;
+}
+
+/*---------------------------------------------------------------------------
+    odv_table_list_find
+
+    Both parsers mark a table's partitions by finding the first entry with
+    the same schema and name. That was a scan of the whole list for every
+    new entry: harmless at the old 1000-entry cap, quadratic now that the
+    list grows (M-29). The index holds only the first entry of each name;
+    it is brought up to date with table_list[0, table_count) on each call
+    (rebuilt when the list was cleared or the bucket array grows), so it
+    needs no hook in the code that appends or resets entries.
+ ---------------------------------------------------------------------------*/
+static unsigned int tl_hash(const char *schema, const char *name)
+{
+    unsigned int h = 2166136261u;                 /* FNV-1a */
+    while (*schema) { h ^= (unsigned char)*schema++; h *= 16777619u; }
+    h ^= 0x01u;
+    h *= 16777619u;
+    while (*name) { h ^= (unsigned char)*name++; h *= 16777619u; }
+    return h;
+}
+
+static int tl_lookup(const ODV_SESSION *s, const char *schema, const char *name,
+                     unsigned int h)
+{
+    int k = s->tl_bucket[h & (unsigned int)(s->tl_nbucket - 1)];
+    while (k >= 0) {
+        if (strcmp(s->table_list[k].name, name) == 0 &&
+            strcmp(s->table_list[k].schema, schema) == 0)
+            return k;
+        k = s->tl_next[k];
+    }
+    return -1;
+}
+
+static int tl_sync(ODV_SESSION *s)
+{
+    int j;
+
+    if (s->table_count < s->tl_count) s->tl_count = 0;   /* list was cleared */
+    if (s->tl_next_cap < s->table_cap) {
+        int *nn = (int *)realloc(s->tl_next, (size_t)s->table_cap * sizeof(int));
+        if (!nn) return 0;
+        s->tl_next = nn;
+        s->tl_next_cap = s->table_cap;
+    }
+    if (!s->tl_bucket || s->tl_nbucket < s->table_count || s->tl_count == 0) {
+        int nb = (s->tl_nbucket > 0) ? s->tl_nbucket : 1024;
+        int *bk;
+        while (nb < s->table_count) nb *= 2;
+        bk = (s->tl_bucket && nb == s->tl_nbucket)
+             ? s->tl_bucket : (int *)malloc((size_t)nb * sizeof(int));
+        if (!bk) return 0;
+        if (bk != s->tl_bucket) free(s->tl_bucket);
+        for (j = 0; j < nb; j++) bk[j] = -1;
+        s->tl_bucket = bk;
+        s->tl_nbucket = nb;
+        s->tl_count = 0;                                  /* index again */
+    }
+    for (j = s->tl_count; j < s->table_count; j++) {
+        const ODV_TABLE_ENTRY *e = &s->table_list[j];
+        unsigned int h = tl_hash(e->schema, e->name);
+        if (tl_lookup(s, e->schema, e->name, h) < 0) {
+            int b = (int)(h & (unsigned int)(s->tl_nbucket - 1));
+            s->tl_next[j] = s->tl_bucket[b];
+            s->tl_bucket[b] = j;
+        }
+    }
+    s->tl_count = s->table_count;
+    return 1;
+}
+
+int odv_table_list_find(ODV_SESSION *s, const char *schema, const char *name)
+{
+    int k;
+    if (!s || !schema || !name) return -1;
+    if (tl_sync(s)) return tl_lookup(s, schema, name, tl_hash(schema, name));
+    /* no memory for the index: the plain scan gives the same answer */
+    for (k = 0; k < s->table_count; k++)
+        if (strcmp(s->table_list[k].schema, schema) == 0 &&
+            strcmp(s->table_list[k].name, name) == 0)
+            return k;
+    return -1;
+}
+
+/*---------------------------------------------------------------------------
+    DDL text fields of any length (see ODV_TEXT in odv_types.h)
+ ---------------------------------------------------------------------------*/
+int odv_text_set(char *fixed, size_t cap, char **longp, const char *src, size_t len)
+{
+    free(*longp);
+    *longp = NULL;
+    if (len < cap) {
+        memcpy(fixed, src, len);
+        fixed[len] = '\0';
+        return 1;
+    }
+    fixed[0] = '\0';
+    *longp = (char *)malloc(len + 1);
+    if (!*longp) return 0;
+    memcpy(*longp, src, len);
+    (*longp)[len] = '\0';
+    return 1;
+}
+
+void odv_table_free_text(ODV_TABLE *t)
+{
+    int i;
+    if (!t) return;
+    for (i = 0; i < t->col_count && i < ODV_MAX_COLUMNS; i++) {
+        free(t->columns[i].default_long);
+        t->columns[i].default_long = NULL;
+        free(t->columns[i].comment_long);
+        t->columns[i].comment_long = NULL;
+    }
+    for (i = 0; i < t->constraint_count; i++) {
+        free(t->constraints[i].condition_long);
+        free(t->constraints[i].index_expr_long);
+    }
+    free(t->constraints);
+    t->constraints = NULL;
+    t->constraint_count = 0;
+    t->constraint_cap = 0;
+    free(t->comment_long);
+    t->comment_long = NULL;
+    free(t->notes);
+    t->notes = NULL;
 }
 
 /*---------------------------------------------------------------------------

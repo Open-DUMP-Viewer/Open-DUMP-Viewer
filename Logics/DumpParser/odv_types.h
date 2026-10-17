@@ -126,10 +126,20 @@
 #define ODV_EXP_RECORD_LEN  6144000
 #define ODV_DDL_BUF_LEN    1048576   /* 1MB for DDL */
 #define ODV_LOB_CHUNK_LEN   131072   /* 128KB LOB chunk */
-#define ODV_MAX_TABLES        1000
+/* Hard cap on table_list entries (tables + partitions + subpartitions).
+   table_list grows on demand (odv_table_list_reserve); the cap only bounds a
+   pathological dump. It used to be a fixed 1000-entry array, so a dump whose
+   tables and partitions exceeded 1000 in total listed the rest as unnamed
+   plain tables (M-29). Oracle allows ~1M partitions per table. */
+#define ODV_MAX_TABLES     1048576
 #define ODV_MAX_COLUMNS       1000
-#define ODV_MAX_CONSTRAINTS     50
-#define ODV_MAX_CONSTRAINT_COLS 16
+/* ODV_TABLE.constraints grows on demand; this only bounds a pathological
+   dump. It was a fixed array of 50, and the 51st constraint or index of a
+   table was dropped without notice. */
+#define ODV_MAX_CONSTRAINTS  65536
+/* Key columns per constraint / index: Oracle's own limit is 32 (it was 16
+   here, so a wider key lost its trailing columns). */
+#define ODV_MAX_CONSTRAINT_COLS 32
 #define ODV_MAX_SPLIT         2048   /* Max files in a FILESIZE/%U split set */
 
 /* Table/Partition types (for ODV_TABLE_ENTRY.type) */
@@ -166,6 +176,22 @@
     Data Structures
  ---------------------------------------------------------------------------*/
 
+/* DDL text fields of any length.
+
+   A column's DEFAULT (DATA_DEFAULT is LONG) and comment (up to 4000 bytes), a
+   table's comment, a CHECK condition (SEARCH_CONDITION is LONG) and an index
+   expression are kept in a fixed array when they fit, and otherwise in full
+   in the paired heap pointer (<field>_long), with the fixed array left "".
+   The fixed sizes used to be hard limits: longer comments were cut at 511
+   bytes and longer CHECK conditions / DEFAULTs were dropped.
+
+   Read such a field only through ODV_TEXT(fixed, long). Code that reads the
+   fixed array alone still sees a valid (empty) string for a long value, never
+   a cut-off expression. Write through odv_text_set(). The heap copies of
+   s->table are released by odv_table_free_text(). */
+#define ODV_TEXT(fixed, longp) \
+    ((longp) ? (const char *)(longp) : (const char *)(fixed))
+
 /* Column definition */
 typedef struct {
     char   name[ODV_OBJNAME_LEN + 1];
@@ -180,8 +206,10 @@ typedef struct {
     int    seg_col;              /* EXPDP SEGCOL_NUM (storage slot; 0 = not stored) */
     char   type_str[64];         /* "VARCHAR2(100)" etc. */
     int    not_null;             /* 1=NOT NULL constraint */
-    char   default_val[256];     /* DEFAULT value expression */
-    char   comment[512];         /* Column comment (COMMENT ON COLUMN) */
+    char   default_val[256];     /* DEFAULT value expression (see ODV_TEXT) */
+    char   comment[512];         /* Column comment (COMMENT ON COLUMN) (see ODV_TEXT) */
+    char  *default_long;         /* full DEFAULT when longer than default_val[], else NULL */
+    char  *comment_long;         /* full comment when longer than comment[], else NULL */
 } ODV_COLUMN;
 
 /* Constraint definition */
@@ -196,9 +224,17 @@ typedef struct {
     char   ref_columns[ODV_MAX_CONSTRAINT_COLS][ODV_OBJNAME_LEN + 1];
     int    ref_col_count;
     /* CHECK only */
-    char   condition[1024];                                             /* CHECK condition expression */
+    char   condition[1024];                                             /* CHECK condition expression (see ODV_TEXT) */
     /* INDEX only */
-    char   index_expr[1024];                                            /* Function-based index expression (full column list text) */
+    char   index_expr[1024];                                            /* Function-based index expression (full column list text) (see ODV_TEXT) */
+    char  *condition_long;       /* full condition when longer than condition[], else NULL */
+    char  *index_expr_long;      /* full expression when longer than index_expr[], else NULL */
+    /* Constraint state from the EXP DDL (M-33). Zero / "" = the default
+       (NO ACTION, NOT DEFERRABLE, INITIALLY IMMEDIATE, ENABLED). */
+    char   delete_rule[16];      /* FK: "CASCADE" or "SET NULL" */
+    int    deferrable;           /* 1 = DEFERRABLE */
+    int    initially_deferred;   /* 1 = INITIALLY DEFERRED */
+    int    disabled;             /* 1 = created DISABLE */
 } ODV_CONSTRAINT;
 
 /* Table definition */
@@ -226,9 +262,16 @@ typedef struct {
     int64_t     record_count;
     int64_t     ddl_offset;      /* File position of CREATE TABLE DDL (for fast seek) */
     int         is_partition;
-    ODV_CONSTRAINT constraints[ODV_MAX_CONSTRAINTS];
+    ODV_CONSTRAINT *constraints; /* heap array of constraint_cap entries
+                                    (EXP; NULL for EXPDP), constraint_count used */
     int         constraint_count;
-    char        comment[512];    /* Table comment (COMMENT ON TABLE) */
+    int         constraint_cap;
+    char        comment[512];    /* Table comment (COMMENT ON TABLE) (see ODV_TEXT) */
+    char       *comment_long;    /* full table comment when longer than comment[] */
+    char       *notes;           /* DDL of this table that could not be kept whole,
+                                    one '\n'-terminated line each (DDL charset), or
+                                    NULL; reaches the caller as the type=6 entry of
+                                    constraints_json (EXP) */
 } ODV_TABLE;
 
 /* Partition list entry (built from EXPDP dictionary table) */
@@ -485,12 +528,23 @@ struct _odv_session {
     /* Current table being parsed */
     ODV_TABLE       table;
 
-    /* Table list */
-    ODV_TABLE_ENTRY table_list[ODV_MAX_TABLES];
+    /* Table list: heap array of table_cap entries, table_count in use.
+       Grown by odv_table_list_reserve(); freed by odv_destroy_session(). */
+    ODV_TABLE_ENTRY *table_list;
     int             table_count;
+    int             table_cap;
 
-    /* Partition list (built from EXPDP dictionary) */
-    ODV_PARTITION_ENTRY partition_list[ODV_MAX_TABLES];
+    /* Hash index over table_list by schema + name, holding the first entry
+       of each name (see odv_table_list_find); kept in step lazily. */
+    int            *tl_bucket;      /* chain heads, tl_nbucket (power of 2) */
+    int            *tl_next;        /* chain link per entry, tl_next_cap */
+    int             tl_nbucket;
+    int             tl_next_cap;
+    int             tl_count;       /* entries [0, tl_count) are indexed */
+
+    /* Partition list (EXPDP dictionary). Not populated by any parser at
+       present: partition_count stays 0 and partition_list NULL. */
+    ODV_PARTITION_ENTRY *partition_list;
     int             partition_count;
 
     /* Parse state */
@@ -604,6 +658,28 @@ int  deliver_row(ODV_SESSION *s);
 void odv_report_progress(ODV_SESSION *s, ODV_VFILE *fp);
 void invalidate_meta_cache(void);
 void update_meta_cache(ODV_SESSION *s);
+
+/* table_list growth (odv_api.c). Makes room for one more entry at
+ * s->table_list[s->table_count] (zero-filled when first allocated, but a slot
+ * reused after table_count was reset is not); the caller fills every field
+ * and increments table_count. Returns 0 when the cap is reached or memory runs
+ * out (a warning is left in last_error); the caller must then not report
+ * the table through table_cb either, so callback i and entry i stay paired. */
+int     odv_table_list_reserve(ODV_SESSION *s);
+
+/* The first entry k in [0, table_count) whose schema and name equal the given
+ * ones (as stored in the entry), or -1. Same result as scanning the list from
+ * the start, through a hash index (odv_api.c), so listing a dump with tens of
+ * thousands of tables and partitions stays linear. */
+int     odv_table_list_find(ODV_SESSION *s, const char *schema, const char *name);
+
+/* DDL text fields (odv_api.c; see ODV_TEXT). odv_text_set stores src[0..len)
+ * in fixed[cap] when it fits, else in full in *longp (fixed left ""); it
+ * returns 0 only when memory runs out (nothing is stored then).
+ * odv_table_free_text releases every *_long of a table and its constraint
+ * array (counts reset); call it before reusing or zeroing the table. */
+int     odv_text_set(char *fixed, size_t cap, char **longp, const char *src, size_t len);
+void    odv_table_free_text(ODV_TABLE *t);
 
 /* Virtual multi-file read stream (odv_api.c; see ODV_VFILE). For a single,
  * non-split dump these behave exactly like fopen/fread/fseek/ftell/fclose on

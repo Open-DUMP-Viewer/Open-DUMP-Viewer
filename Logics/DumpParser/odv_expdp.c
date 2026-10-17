@@ -485,6 +485,12 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
     convert_name(s->table.name, s->dump_charset, s->out_charset,
                  conv_name, sizeof(conv_name));
 
+    /* The product pairs the i-th table callback with odv_get_table_entry(i),
+       so report a table only when it also gets its table_list entry. The
+       list grows on demand; it used to stop at 1000 entries while the
+       callbacks went on, leaving later partitions unnamed (M-29). */
+    if (s->table.name[0] == '\0' || !odv_table_list_reserve(s)) return;
+
     if (s->table_cb && s->table.name[0] != '\0') {
         const char *col_names[ODV_MAX_COLUMNS];
         const char *col_types[ODV_MAX_COLUMNS];
@@ -498,7 +504,8 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
             col_names[i] = conv_col_names_buf[i];
             col_types[i] = s->table.columns[i].type_str;
             col_not_nulls[i] = s->table.columns[i].not_null;
-            col_defaults[i] = s->table.columns[i].default_val;
+            col_defaults[i] = ODV_TEXT(s->table.columns[i].default_val,
+                                       s->table.columns[i].default_long);
         }
 
         s->table_cb(conv_schema, conv_name,
@@ -509,7 +516,7 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
     }
 
     /* Add to internal table list (store converted names) */
-    if (s->table_count < ODV_MAX_TABLES && s->table.name[0] != '\0') {
+    {
         ODV_TABLE_ENTRY *e = &s->table_list[s->table_count];
         odv_strcpy(e->schema, conv_schema, ODV_OBJNAME_LEN);
         odv_strcpy(e->name, conv_name, ODV_OBJNAME_LEN);
@@ -523,21 +530,19 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
         /* Detect partitioned tables: if the same schema.table already appeared
            in the table list, this is another partition of that table.
            Mark duplicates as TABLE_TYPE_PARTITION and mark the first occurrence
-           retroactively as TABLE_TYPE_PARTITION_TABLE. */
+           retroactively as TABLE_TYPE_PARTITION_TABLE. The first occurrence
+           is looked up through an index: scanning the list for every entry
+           was quadratic once the list stopped being capped at 1000 (M-29). */
         {
-            int k;
-            for (k = 0; k < s->table_count; k++) {
-                if (strcmp(s->table_list[k].schema, e->schema) == 0 &&
-                    strcmp(s->table_list[k].name, e->name) == 0) {
-                    /* Found a previous occurrence — this table is partitioned */
-                    e->type = TABLE_TYPE_PARTITION;
+            int k = odv_table_list_find(s, e->schema, e->name);
+            if (k >= 0) {
+                /* Found a previous occurrence — this table is partitioned */
+                e->type = TABLE_TYPE_PARTITION;
 
-                    /* Retroactively mark the first occurrence as PARTITION_TABLE
-                       (only if it hasn't been marked yet) */
-                    if (s->table_list[k].type == TABLE_TYPE_TABLE) {
-                        s->table_list[k].type = TABLE_TYPE_PARTITION_TABLE;
-                    }
-                    break;
+                /* Retroactively mark the first occurrence as PARTITION_TABLE
+                   (only if it hasn't been marked yet) */
+                if (s->table_list[k].type == TABLE_TYPE_TABLE) {
+                    s->table_list[k].type = TABLE_TYPE_PARTITION_TABLE;
                 }
             }
         }

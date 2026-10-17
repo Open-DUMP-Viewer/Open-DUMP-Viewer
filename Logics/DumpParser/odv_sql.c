@@ -36,6 +36,7 @@ typedef struct {
     int         all_tables;           /* 1=export all tables (no filter) */
     int         indexes_written;      /* 1=CREATE INDEX already output for current table */
     int         comments_written;     /* 1=COMMENT ON already output for current table */
+    int         notes_written;        /* 1=parser notes already output for current table */
     char        last_schema[129];     /* Schema name from last row (for post-parse index output) */
     char        last_table[129];      /* Table name from last row */
 } SQL_CONTEXT;
@@ -71,6 +72,34 @@ static void sql_write_string(FILE *fp, const char *val, int dbms)
 }
 
 /*---------------------------------------------------------------------------
+    Helper: write a comment's text inside a "-- ..." SQL comment line
+
+    MySQL column comments and SQL Server comments are emitted as SQL comment
+    lines. A line break inside the text (exp keeps them since comments are
+    read as length-framed records, M-08) would end the "--" comment and turn
+    the rest into SQL, so every following line gets its own "-- " prefix.
+ ---------------------------------------------------------------------------*/
+static void sql_write_comment_text(FILE *fp, const char *val)
+{
+    fputc('\'', fp);
+    while (*val) {
+        if (*val == '\r' && val[1] == '\n') {
+            val++;
+            continue;
+        }
+        if (*val == '\n' || *val == '\r') {
+            fputs("\n-- ", fp);
+        } else if (*val == '\'') {
+            fputs("''", fp);
+        } else {
+            fputc(*val, fp);
+        }
+        val++;
+    }
+    fputc('\'', fp);
+}
+
+/*---------------------------------------------------------------------------
     Helper: quote an identifier for the target DBMS
  ---------------------------------------------------------------------------*/
 static void sql_write_identifier(FILE *fp, const char *name, int dbms)
@@ -88,6 +117,60 @@ static void sql_write_identifier(FILE *fp, const char *name, int dbms)
         fprintf(fp, "\"%s\"", name);
         break;
     }
+}
+
+/*---------------------------------------------------------------------------
+    Helper: Oracle COMMENT ON TABLE / COLUMN
+
+    COMMENT ON ... IS takes a string literal only, so the '...'||CHR(10)||'...'
+    form sql_write_string uses for a line break (H-20) is rejected there with
+    ORA-00933. Comments keep their line breaks now that exp comments are read
+    as length-framed records (M-08), so a comment that contains one is issued
+    through EXECUTE IMMEDIATE, with the literal built by CHR() in PL/SQL and
+    every piece kept on one physical line for SQL*Plus.
+ ---------------------------------------------------------------------------*/
+static void sql_write_plsql_ident(FILE *fp, const char *name)
+{
+    /* "name" inside a PL/SQL string literal: a single quote is doubled */
+    fputc('"', fp);
+    for (; *name; name++) {
+        if (*name == '\'') fputc('\'', fp);
+        fputc(*name, fp);
+    }
+    fputc('"', fp);
+}
+
+static void sql_write_oracle_comment(FILE *fp, const char *schema,
+                                     const char *table, const char *column,
+                                     const char *text)
+{
+    const char *p;
+
+    if (!strpbrk(text, "\r\n")) {
+        fputs(column ? "COMMENT ON COLUMN " : "COMMENT ON TABLE ", fp);
+        if (schema && schema[0]) { sql_write_identifier(fp, schema, DBMS_ORACLE); fputc('.', fp); }
+        sql_write_identifier(fp, table, DBMS_ORACLE);
+        if (column) { fputc('.', fp); sql_write_identifier(fp, column, DBMS_ORACLE); }
+        fputs(" IS ", fp);
+        sql_write_string(fp, text, DBMS_ORACLE);
+        fputs(";\n", fp);
+        return;
+    }
+    fputs("BEGIN\n    EXECUTE IMMEDIATE '", fp);
+    fputs(column ? "COMMENT ON COLUMN " : "COMMENT ON TABLE ", fp);
+    if (schema && schema[0]) { sql_write_plsql_ident(fp, schema); fputc('.', fp); }
+    sql_write_plsql_ident(fp, table);
+    if (column) { fputc('.', fp); sql_write_plsql_ident(fp, column); }
+    fputs(" IS ''", fp);
+    for (p = text; *p; p++) {
+        if (*p == '\'')
+            fputs("''''", fp);          /* '' in the statement, doubled again */
+        else if (*p == '\n' || *p == '\r')
+            fprintf(fp, "' || CHR(%d) || '", (unsigned char)*p);
+        else
+            fputc(*p, fp);
+    }
+    fputs("''';\nEND;\n/\n", fp);
 }
 
 /*---------------------------------------------------------------------------
@@ -407,12 +490,23 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
 
     Check if any column has a comment.
  ---------------------------------------------------------------------------*/
+/* Table / column comment of any length (see ODV_TEXT). */
+static const char *tbl_comment(const ODV_SESSION *s)
+{
+    return ODV_TEXT(s->table.comment, s->table.comment_long);
+}
+
+static const char *col_comment(const ODV_SESSION *s, int i)
+{
+    return ODV_TEXT(s->table.columns[i].comment, s->table.columns[i].comment_long);
+}
+
 static int has_column_comments(ODV_SESSION *s)
 {
     int i;
     if (!s) return 0;
     for (i = 0; i < s->table.col_count; i++) {
-        if (s->table.columns[i].comment[0]) return 1;
+        if (col_comment(s, i)[0]) return 1;
     }
     return 0;
 }
@@ -530,9 +624,9 @@ static void write_indexes(SQL_CONTEXT *ctx, const char *schema,
 
         /* Use index_expr if available (preserves function-based expressions),
            otherwise build from columns[] */
-        if (c->index_expr[0] && dbms == DBMS_ORACLE) {
+        if (ODV_TEXT(c->index_expr, c->index_expr_long)[0] && dbms == DBMS_ORACLE) {
             /* Oracle: use raw expression as-is (preserves function-based indexes) */
-            fputs(c->index_expr, fp);
+            fputs(ODV_TEXT(c->index_expr, c->index_expr_long), fp);
         } else if (c->col_count > 0) {
             fputc('(', fp);
             for (j = 0; j < c->col_count; j++) {
@@ -561,6 +655,23 @@ static void write_indexes(SQL_CONTEXT *ctx, const char *schema,
     }
 }
 
+/* DDL of the table the dump does not hold whole (ODV_TABLE.notes), as
+   "-- NOTE:" lines so the loss shows in the exported file. */
+static void write_notes(SQL_CONTEXT *ctx)
+{
+    const char *p = ctx->session ? ctx->session->table.notes : NULL;
+    if (!p) return;
+    while (*p) {
+        const char *e = strchr(p, '\n');
+        size_t n = e ? (size_t)(e - p) : strlen(p);
+        fputs("-- NOTE: ", ctx->fp);
+        fwrite(p, 1, n, ctx->fp);
+        fputc('\n', ctx->fp);
+        p += n + (e ? 1 : 0);
+    }
+    fputc('\n', ctx->fp);
+}
+
 /*---------------------------------------------------------------------------
     write_comments
 
@@ -580,37 +691,41 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
     if (!ctx->session) return;
 
     /* Check if any comments exist */
-    if (ctx->session->table.comment[0]) has_any = 1;
+    if (tbl_comment(ctx->session)[0]) has_any = 1;
     if (!has_any) {
         for (i = 0; i < ctx->session->table.col_count; i++) {
-            if (ctx->session->table.columns[i].comment[0]) { has_any = 1; break; }
+            if (col_comment(ctx->session, i)[0]) { has_any = 1; break; }
         }
     }
     if (!has_any) return;
 
     /* Table comment */
-    if (ctx->session->table.comment[0]) {
+    if (tbl_comment(ctx->session)[0]) {
         switch (dbms) {
         case DBMS_MYSQL:
             fprintf(fp, "ALTER TABLE ");
             if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
             sql_write_identifier(fp, table, dbms);
             fprintf(fp, " COMMENT = ");
-            sql_write_string(fp, ctx->session->table.comment, dbms);
+            sql_write_string(fp, tbl_comment(ctx->session), dbms);
             fprintf(fp, ";\n");
             break;
         case DBMS_SQLSERVER:
             /* SQL Server uses sp_addextendedproperty — output as comment */
             fprintf(fp, "-- COMMENT ON TABLE %s: ", table);
-            sql_write_string(fp, ctx->session->table.comment, dbms);
+            sql_write_comment_text(fp, tbl_comment(ctx->session));
             fputc('\n', fp);
             break;
-        default: /* Oracle, PostgreSQL */
+        case DBMS_ORACLE:
+            sql_write_oracle_comment(fp, schema, table, NULL,
+                                     tbl_comment(ctx->session));
+            break;
+        default: /* PostgreSQL */
             fprintf(fp, "COMMENT ON TABLE ");
             if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
             sql_write_identifier(fp, table, dbms);
             fprintf(fp, " IS ");
-            sql_write_string(fp, ctx->session->table.comment, dbms);
+            sql_write_string(fp, tbl_comment(ctx->session), dbms);
             fprintf(fp, ";\n");
             break;
         }
@@ -618,7 +733,7 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
 
     /* Column comments */
     for (i = 0; i < ctx->session->table.col_count; i++) {
-        if (!ctx->session->table.columns[i].comment[0]) continue;
+        if (!col_comment(ctx->session, i)[0]) continue;
 
         switch (dbms) {
         case DBMS_MYSQL:
@@ -626,23 +741,28 @@ static void write_comments(SQL_CONTEXT *ctx, const char *schema,
                This requires full column definition — too complex. Output as SQL comment. */
             fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
             fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
-            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
+            sql_write_comment_text(fp, col_comment(ctx->session, i));
             fputc('\n', fp);
             break;
         case DBMS_SQLSERVER:
             fprintf(fp, "-- COMMENT ON COLUMN %s.", table);
             fprintf(fp, "%s: ", ctx->session->table.columns[i].name);
-            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
+            sql_write_comment_text(fp, col_comment(ctx->session, i));
             fputc('\n', fp);
             break;
-        default: /* Oracle, PostgreSQL */
+        case DBMS_ORACLE:
+            sql_write_oracle_comment(fp, schema, table,
+                                     ctx->session->table.columns[i].name,
+                                     col_comment(ctx->session, i));
+            break;
+        default: /* PostgreSQL */
             fprintf(fp, "COMMENT ON COLUMN ");
             if (schema && schema[0]) { sql_write_identifier(fp, schema, dbms); fputc('.', fp); }
             sql_write_identifier(fp, table, dbms);
             fputc('.', fp);
             sql_write_identifier(fp, ctx->session->table.columns[i].name, dbms);
             fprintf(fp, " IS ");
-            sql_write_string(fp, ctx->session->table.columns[i].comment, dbms);
+            sql_write_string(fp, col_comment(ctx->session, i), dbms);
             fprintf(fp, ";\n");
             break;
         }
@@ -689,11 +809,12 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
        For EXP, constraints arrive after data records — handled by table_cb. */
     ctx->indexes_written = 0;
     ctx->comments_written = 0;
+    ctx->notes_written = 0;
     if (ctx->create_index && ctx->session->table.constraint_count > 0) {
         write_indexes(ctx, schema, table, dbms);
         ctx->indexes_written = 1;
     }
-    if (ctx->write_comments && (ctx->session->table.comment[0] ||
+    if (ctx->write_comments && (tbl_comment(ctx->session)[0] ||
         has_column_comments(ctx->session))) {
         write_comments(ctx, schema, table, dbms);
         ctx->comments_written = 1;
@@ -947,9 +1068,13 @@ static void ODV_CALL sql_table_callback(
             ctx->indexes_written = 1;
         }
         if (ctx->write_comments && !ctx->comments_written &&
-            (ctx->session->table.comment[0] || has_column_comments(ctx->session))) {
+            (tbl_comment(ctx->session)[0] || has_column_comments(ctx->session))) {
             write_comments(ctx, schema, table, ctx->dbms_type);
             ctx->comments_written = 1;
+        }
+        if (!ctx->notes_written && ctx->session->table.notes) {
+            write_notes(ctx);
+            ctx->notes_written = 1;
         }
     }
 
@@ -998,6 +1123,9 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
     ctx.all_tables = all_tables;
     ctx.last_schema[0] = '\0';
     ctx.last_table[0] = '\0';
+    ctx.indexes_written = 0;
+    ctx.comments_written = 0;
+    ctx.notes_written = 0;
 
     /* Oracle output targets SQL*Plus (the DROP uses a PL/SQL block and a '/'
        line). Disable '&' substitution variables and allow blank lines inside
