@@ -720,17 +720,26 @@ static int parse_create_table(ODV_SESSION *s, const char *ddl)
         p = skip_ws(p);
         if (*p == ')') break;
 
-        /* Extract column name */
+        /* Extract column name.
+           EXP always double-quotes column names ("CHECK_DATE" DATE, ...) and
+           writes table-level constraints unquoted (CONSTRAINT "PK" PRIMARY KEY,
+           PRIMARY KEY (...), CHECK (...), the unquoted CONSTRAINT "PK" PRIMARY
+           KEY of an IOT, ...). Only a BARE keyword here is a table constraint;
+           a quoted identifier is a real column even when it begins with one of
+           those words, so treating "CHECK_DATE"/"PRIMARY_FLAG"/"CHECKSUM"/... as
+           a constraint drops the column and corrupts the row layout (H-17). */
+        int name_quoted = (*p == '"');
         col_name[0] = '\0';
         p = extract_identifier(p, col_name, ODV_OBJNAME_LEN);
         if (col_name[0] == '\0') break;
 
-        /* Skip constraint keywords that aren't column definitions */
-        if (starts_with_ci(col_name, "CONSTRAINT") ||
+        /* Skip table-level constraint clauses (bare keywords only) */
+        if (!name_quoted &&
+            (starts_with_ci(col_name, "CONSTRAINT") ||
             starts_with_ci(col_name, "PRIMARY") ||
             starts_with_ci(col_name, "UNIQUE") ||
             starts_with_ci(col_name, "FOREIGN") ||
-            starts_with_ci(col_name, "CHECK")) {
+            starts_with_ci(col_name, "CHECK"))) {
             /* Skip to next comma at same depth or closing paren */
             paren_depth = 0;
             while (*p) {
@@ -1404,6 +1413,26 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
     int total_len = 0;
     int multi_chunk = 0;
     int accumulated = 0;
+    int accum_lob_idx = lob_idx;
+
+    /* odv_lob_accumulate() matches against s->lob_column_index, which
+       odv_lob_check_column() set to the target's index among ALL LOB columns
+       (BLOB/CLOB/NCLOB). The caller's lob_idx is only the position among THIS
+       row's NON-NULL LOBs, so when an earlier LOB column is NULL in a row the
+       two disagree and a different column's bytes get written to the target's
+       file while the target's own bytes are dropped (H-27). col_idx is the real
+       table column for this LOB, so derive the all-LOB index from it. (col_idx
+       is -1 only when the row claims more LOBs than were tracked; keep lob_idx
+       as the fallback there.) */
+    if (col_idx >= 0 && col_idx <= s->table.col_count) {
+        int k;
+        accum_lob_idx = 0;
+        for (k = 0; k < col_idx; k++) {
+            int t = s->table.columns[k].type;
+            if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB)
+                accum_lob_idx++;
+        }
+    }
 
     if (fread(hdr, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
     first_val = (int)hdr[0] | ((int)hdr[1] << 8);
@@ -1414,7 +1443,18 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
         if (fread(ext, 1, 8, fp) != 8) return ODV_ERROR_FREAD;
         total_len = (int)ext[0] | ((int)ext[1] << 8)
                   | ((int)ext[2] << 16) | ((int)ext[3] << 24);
-        if (total_len < 0 || total_len > ODV_EXP_RECORD_LEN) {
+        /* total_len is the whole LOB value, not a single read. ODV_EXP_RECORD_LEN
+           is an engine-chosen cap, not a format boundary, and rejecting a LOB
+           above it made that row and the rest of its table vanish (rc stayed OK)
+           for any BLOB/CLOB/NCLOB over ~6 MB (H-26). The payload arrives as a
+           stream of small chunks (each bounded below by ODV_EXP_RECORD_LEN), so
+           the only state that scales with the value is the extract buffer in
+           odv_lob_accumulate(), which is wanted when a large LOB is being
+           extracted and is bounded by the bytes actually present in the file
+           (a truncated/garbage length hits EOF and errors out). List/analyze
+           never accumulates — it just streams past. So only reject a negative
+           length (a >2 GB value, or a corrupt sign bit). */
+        if (total_len < 0) {
             return ODV_ERROR_FORMAT;
         }
         multi_chunk = 1;
@@ -1451,7 +1491,7 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
         }
 
         if (s->lob_extract_mode && s->lob_column_index >= 0) {
-            odv_lob_accumulate(s, lob_idx, *chunk_buf_ptr, chunk_size);
+            odv_lob_accumulate(s, accum_lob_idx, *chunk_buf_ptr, chunk_size);
         }
 
         accumulated += chunk_size;
@@ -1459,7 +1499,6 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
 
     /* Display placeholder is already set when the locator was decoded
        in the regular column phase; nothing more to do here for display. */
-    (void)col_idx;
     return ODV_OK;
 }
 
@@ -1677,6 +1716,58 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             col_len = (int)ulen;
         }
 
+        /* DIRECT=Y splits a LONG / LONG RAW value that spans more than one
+           ~8 KB block into pieces: a 2-byte length whose bit 15 is set means
+           "this piece is (low 15 bits) bytes and another piece follows"; bit 15
+           clear marks the last piece. Read as a plain 16-bit count, 0x8001 was
+           taken as 32769 bytes and the next rows and table were swallowed
+           (H-22). Assemble the pieces into col_buf. Restricted to LONG/LONG RAW
+           in a direct dump: other types never split, and a conventional dump
+           uses the high bit for a genuine 32 KB–64 KB single length. */
+        int long_split_done = 0;
+        if (s->dump_type == DUMP_EXP_DIRECT
+            && (col_len & 0x8000)
+            && col_idx < s->table.col_count
+            && (s->table.columns[col_idx].type == COL_LONG ||
+                s->table.columns[col_idx].type == COL_LONG_RAW)) {
+            int assembled = 0;
+            int cur = col_len;
+            int ok = 1;             /* 1=ok, 0=truncated/corrupt, -1=malloc */
+            for (;;) {
+                int piece_len = cur & 0x7FFF;
+                int last = !(cur & 0x8000);
+                if (assembled > ODV_EXP_RECORD_LEN - piece_len) { ok = 0; break; }
+                if (assembled + piece_len + 1 > col_buf_size) {
+                    unsigned char *nb = (unsigned char *)realloc(
+                        col_buf, (size_t)assembled + (size_t)piece_len + 1);
+                    if (!nb) { ok = -1; break; }
+                    col_buf = nb;
+                    col_buf_size = assembled + piece_len + 1;
+                }
+                if (piece_len > 0 &&
+                    (int)fread(col_buf + assembled, 1, (size_t)piece_len, fp) != piece_len) {
+                    ok = 0; break;
+                }
+                assembled += piece_len;
+                if (last) break;
+                if (fread(len_buf, 1, 2, fp) != 2) { ok = 0; break; }
+                cur = (int)((unsigned int)len_buf[0] | ((unsigned int)len_buf[1] << 8));
+            }
+            if (ok == -1) { rc = ODV_ERROR_MALLOC; break; }
+            if (!ok) {
+                /* Truncated/corrupt split — recover to the next 0xFFFF. */
+                while (!s->cancelled) {
+                    unsigned char scan[2];
+                    if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                    if (scan[0] == 0xFF && scan[1] == 0xFF) break;
+                    odv_fseek(fp, -1, SEEK_CUR);
+                }
+                break;
+            }
+            col_len = assembled;
+            long_split_done = 1;
+        }
+
         /* Type-specific length validation (ref: check_column_length) */
         if (col_idx < s->table.col_count) {
             int ctype = s->table.columns[col_idx].type;
@@ -1739,8 +1830,8 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             col_buf_size = col_len + 1;
         }
 
-        /* Read column data */
-        if (col_len > 0) {
+        /* Read column data (already assembled above for a split LONG). */
+        if (col_len > 0 && !long_split_done) {
             if ((int)fread(col_buf, 1, col_len, fp) != col_len) {
                 break; /* Truncated */
             }
@@ -1842,11 +1933,16 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
     int is_char_type = 0;
     int meta_lob_idx = 0;
     int lob_total = 0;      /* set during parse, not read after */
+    int meta_object_count = 0; /* object/REF columns (metadata type 0x79/0x7B) */
+    int meta_name_count = 0;   /* names to read in the post-column name section
+                                  (LOB names + object type-name sections) */
     int lob_name_len = 0;   /* set during parse, not read after */
     int lob_name_read = 0;  /* set during parse, not read after */
     unsigned char meta_buf[4];
     int null_count = 0;
     int pending_table = 0;  /* 1=table parsed but not yet notified */
+    int ddl_frag_start = 0; /* start of the newest fragment while joining an
+                               ALTER TABLE split across 0x00/0x0a (H-16) */
     int64_t pending_row_count = 0; /* row count to pass when notifying */
     int filter_found = 0;   /* 1=filter target table already processed */
 
@@ -1969,30 +2065,61 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                  * separated by 0x00/0x0a instead of one 0x0a-terminated
                  * line. Accumulate both as space for ALTER TABLE
                  * statements so the entire DDL is in one word buffer. */
-                if (wlen > 0 && starts_with_ci(word, "ALTER ")) {
-                    /* Check if the accumulated DDL ends with a terminal
-                     * keyword (ENABLE, DISABLE, NOVALIDATE, RELY etc.)
-                     * which signals the end of the ALTER TABLE statement.
-                     * Without this, we'd accumulate into the next DDL. */
+                if (wlen > 0 && starts_with_ci(word, "ALTER TABLE ")) {
+                    /* Join the fragments of one ALTER TABLE statement until a
+                     * terminal keyword (ENABLE/DISABLE/NOVALIDATE/VALIDATE/
+                     * LOGGING/DEFAULT) or a closing ')'. Restricted to ALTER
+                     * TABLE: an ALTER SESSION/PROCEDURE never reaches a terminal
+                     * keyword, so the old "ALTER " match kept swallowing the
+                     * following CONNECT / CREATE TABLE / INSERT (H-16). */
                     word[wlen] = '\0';
                     {
+                        /* The newest fragment (since the last joining space). If
+                         * it opens a new top-level statement, EXP had already
+                         * ended (or truncated) the ALTER TABLE — stop joining or
+                         * that statement and its table are lost (H-16). */
+                        const char *frag = word + ddl_frag_start;
+                        while (*frag == ' ') frag++;
+                        int new_stmt = ddl_frag_start > 0 &&
+                            (starts_with_ci(frag, "CREATE ") ||
+                             starts_with_ci(frag, "INSERT ") ||
+                             starts_with_ci(frag, "CONNECT ") ||
+                             starts_with_ci(frag, "COMMENT ") ||
+                             starts_with_ci(frag, "GRANT ") ||
+                             starts_with_ci(frag, "ALTER ") ||
+                             starts_with_ci(frag, "DROP ") ||
+                             starts_with_ci(frag, "REM "));
                         /* Find last space-separated token */
                         const char *last = word + wlen;
                         while (last > word && *(last - 1) == ' ') last--;
                         const char *tok = last;
                         while (tok > word && *(tok - 1) != ' ') tok--;
-                        if (starts_with_ci(tok, "ENABLE") ||
+                        int complete = starts_with_ci(tok, "ENABLE") ||
                             starts_with_ci(tok, "DISABLE") ||
                             starts_with_ci(tok, "NOVALIDATE") ||
                             starts_with_ci(tok, "VALIDATE") ||
                             starts_with_ci(tok, "LOGGING") ||
                             starts_with_ci(tok, "DEFAULT") ||
-                            (last > word && *(last - 1) == ')')) {
+                            (last > word && *(last - 1) == ')');
+                        if (new_stmt) {
+                            /* Drop the truncated ALTER TABLE prefix and reprocess
+                             * the new statement (complete at this terminator). */
+                            int newlen = wlen - ddl_frag_start;
+                            memmove(word, word + ddl_frag_start, (size_t)newlen);
+                            word[newlen] = '\0';
+                            wlen = newlen;
+                            ddl_frag_start = 0;
+                            /* fall through to handle_ddl with the new statement */
+                        } else if (complete) {
                             /* DDL complete — fall through to handle_ddl.
                              * DEFAULT: 26ai preamble "ALTER TABLE MODIFY DEFAULT"
                              * ')': statement like "MODIFY ("COL" DEFAULT val)" */
+                            ddl_frag_start = 0;
                         } else {
-                            if (wlen < ODV_WORD_LEN - 1) word[wlen++] = ' ';
+                            if (wlen < ODV_WORD_LEN - 1) {
+                                word[wlen++] = ' ';
+                                ddl_frag_start = wlen;
+                            }
                             break;
                         }
                     }
@@ -2026,6 +2153,18 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     if (starts_with_ci(after, "TABLE") &&
                         (after[5] == ' ' || after[5] == '\t' ||
                          after[5] == '"' || after[5] == '\0')) {
+                        /* A data_offset (seek_offset) open targets one table.
+                           All of its partitions share a single CREATE TABLE, and
+                           its trailing COMMENT ON / CREATE INDEX / ALTER are not
+                           CREATE TABLE, so the next CREATE TABLE is always a
+                           different table — stop before reading it. Bound on the
+                           CREATE TABLE boundary, not on the filter name match:
+                           a table whose name differs only in case still matches
+                           the case-insensitive filter, so otherwise the open
+                           would read that table's rows as the target's (H-13). */
+                        if (s->seek_offset > EXP_HEADER_SIZE && filter_found) {
+                            goto done;
+                        }
                         /* Notify previous pending table (with accumulated constraints) */
                         if (pending_table && s->table.name[0] != '\0') {
                             notify_exp_table(s, pending_row_count);
@@ -2464,6 +2603,8 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         meta_col_count = 0;
                         meta_col_idx = 0;
                         meta_lob_idx = 0;
+                        meta_object_count = 0;
+                        meta_name_count = 0;
                         null_count = 0;
                     }
                     /* else: DDL INSERT, ignore and stay in step 2 */
@@ -2558,6 +2699,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                 }
 
                 wlen = 0;
+                ddl_frag_start = 0;
             } else {
                 if (wlen < EXP_DDL_BUF_SIZE - 2)
                     word[wlen++] = (char)c;
@@ -2598,8 +2740,15 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                 meta_col_idx = 0;
                 is_char_type = 0;
                 if (meta_col_count <= 0 || meta_col_count > ODV_MAX_COLUMNS) {
+                    /* Discard this table. notify_exp_table is deferred to the
+                       next CREATE TABLE, so the current (pending) table is NOT
+                       in table_list yet — table_count still counts up to the
+                       PREVIOUS, already-notified table. Decrementing it here
+                       therefore deleted that good table's entry and shifted
+                       every later entry's type/partition by one (H-24). Just
+                       drop the pending table; leave table_count alone. */
                     s->table.name[0] = '\0';
-                    if (s->table_count > 0) s->table_count--;
+                    pending_table = 0;
                     step = 2;
                     wlen = 0;
                 } else {
@@ -2612,9 +2761,13 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
 
                 /* Check type code against known Oracle internal types */
                 switch (c) {
-                case 0x3A: /* XMLTYPE — unsupported */
+                case 0x3A: /* XMLTYPE STORE AS CLOB / OF XMLTYPE / ANYDATA —
+                              unsupported. Drop the pending table without
+                              touching table_count: it is not in table_list yet
+                              (deferred notify), so a decrement would delete the
+                              previous good table and misalign the rest (H-24). */
                     s->table.name[0] = '\0';
-                    if (s->table_count > 0) s->table_count--;
+                    pending_table = 0;
                     step = 2;
                     wlen = 0;
                     goto meta_done;
@@ -2646,6 +2799,20 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     is_char_type = 0;
                     break;
 
+                case 0x79: /* object type (ADT / VARRAY / nested table / SDO_GEOMETRY) */
+                case 0x7B: /* REF */
+                    /* The value is opaque (the DDL type falls back to VARCHAR),
+                       but after the last column the metadata carries a type-name
+                       section — same shape as the LOB name section
+                       (count, nulls, length-prefixed "TYPE\x04ATTR" name). If it
+                       is not skipped, data_step 20 takes the type name as the
+                       first row and reads past the table's 0xFFFF end into the
+                       next table, dropping the following table (H-25). Count the
+                       column so the name section is consumed below. */
+                    is_char_type = 0;
+                    meta_object_count++;
+                    break;
+
                 default:
                     /* Unknown type — WARNING and continue parsing */
                     is_char_type = 0;
@@ -2672,9 +2839,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                 } else {
                     if (meta_col_idx >= meta_col_count) {
                         /* Use DDL-parsed LOB count (ref: tbl_lob_num from
-                           table->lob_column_ct, not from metadata bytes) */
-                        if (s->table.lob_col_count > 0) {
-                            data_step = 10; /* LOB metadata */
+                           table->lob_column_ct, not from metadata bytes) plus
+                           object/REF columns, which carry the same kind of
+                           post-column name section (H-25). */
+                        if (s->table.lob_col_count > 0 || meta_object_count > 0) {
+                            meta_name_count = s->table.lob_col_count + meta_object_count;
+                            data_step = 10; /* LOB / object name section */
                         } else {
                             data_step = 20; /* null padding */
                             null_count = 0;
@@ -2691,9 +2861,11 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
 
             case 9: /* Charset byte 3 — advance to next col or finish */
                 if (meta_col_idx >= meta_col_count) {
-                    /* Use DDL-parsed LOB count (ref: tbl_lob_num) */
-                    if (s->table.lob_col_count > 0) {
-                        data_step = 10; /* LOB metadata */
+                    /* Use DDL-parsed LOB count (ref: tbl_lob_num) plus object/REF
+                       columns, which carry the same post-column name section (H-25). */
+                    if (s->table.lob_col_count > 0 || meta_object_count > 0) {
+                        meta_name_count = s->table.lob_col_count + meta_object_count;
+                        data_step = 10; /* LOB / object name section */
                     } else {
                         data_step = 20; /* null padding */
                         null_count = 0;
@@ -2736,42 +2908,96 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
 
             case 13: /* LOB column name bytes */
                 if (c < 0x04) {
-                    /* End of LOB column name */
+                    /* End of a LOB / object name */
                     meta_lob_idx++;
-                    if (meta_lob_idx >= s->table.lob_col_count) {
-                        /* All LOB names read — go to null padding */
+                    if (meta_lob_idx >= meta_name_count) {
+                        /* All names read — go to null padding */
                         null_count = 0;
                         meta_lob_idx = 0;
                         data_step = 20; /* final null padding */
                     } else {
-                        /* Next LOB — do NOT reset null_count (ref behavior) */
-                        data_step = 12; /* next LOB */
+                        /* Next name — do NOT reset null_count (ref behavior) */
+                        data_step = 12; /* next LOB/object */
                     }
                 }
                 /* else: accumulate (we don't need the actual name) */
                 break;
 
-            case 20: /* Null padding before record data */
-                /* Null padding before record data begins */
-                if (c == 0x00) {
-                    null_count++;
-                } else if (c == 0xFF) {
-                    /* No record data for this table — back to DDL
-                       (defer notify until constraints are collected) */
-                    pending_row_count = 0;
-                    step = 2;
-                    wlen = 0;
-                } else {
-                    /* For DUMP_EXP_DIRECT, need at least 3 null bytes */
-                    if (s->dump_type == DUMP_EXP_DIRECT && null_count < 3) {
+            case 20: { /* Null padding, then record data / 0xFFFF / next DDL */
+                int found_row = 0;
+                int64_t rec_start = 0;
+
+                /* The byte values at the row-data boundary were being guessed
+                   byte-by-byte, which could not tell a padding 0x00 from the low
+                   byte of a 256-byte first column, mistook a 255-byte first
+                   column's 0xFF for the no-row marker, took a 21c-direct 0-row
+                   table's 0x0a as row data, and (for a LOB-as-last-column table)
+                   waited for 3 nulls that never came — so those tables read 0
+                   rows and often swallowed the next table (H-11). Use the fixed
+                   layout instead. */
+                if (s->table.lob_col_count == 0 && meta_object_count == 0) {
+                    /* Plain table: a fixed 4-byte block — 00 00 00 00
+                       (conventional) or 00 00 01 00 (direct) — then 0xFFFF (no
+                       rows), the first row's first-column length, or (21c direct
+                       with no rows, where no 0xFFFF is written) the 0x0a that
+                       opens the next DDL line. `c` is the first padding byte. */
+                    unsigned char pad[3];
+                    unsigned char look[16];
+                    int64_t p;
+                    size_t n;
+                    if (fread(pad, 1, 3, fp) != 3) {
+                        address = odv_ftell(fp); step = 2; wlen = 0; break;
+                    }
+                    p = odv_ftell(fp);           /* just past the 4 padding bytes */
+                    memset(look, 0, sizeof(look));
+                    n = fread(look, 1, sizeof(look), fp);
+                    odv_fseek(fp, p, SEEK_SET);  /* rewind; `look` was only a peek */
+                    address = p;
+                    if (n < 2 || (look[0] == 0xFF && look[1] == 0xFF)) {
+                        /* No rows (0xFFFF table end, or EOF). */
+                        pending_row_count = 0;
+                        step = 2; wlen = 0;
                         break;
                     }
-                    /* First byte of record data detected.
-                       This byte is len_buff[0]; seek back 1 so
-                       parse_exp_records reads the full 2-byte length. */
-                    {
-                        int64_t rec_start = odv_ftell(fp) - 1;
+                    if (s->dump_type == DUMP_EXP_DIRECT && look[0] == 0x0A &&
+                        (starts_with_ci((const char *)look + 1, "CREATE ") ||
+                         starts_with_ci((const char *)look + 1, "ALTER ") ||
+                         starts_with_ci((const char *)look + 1, "INSERT ") ||
+                         starts_with_ci((const char *)look + 1, "CONNECT ") ||
+                         starts_with_ci((const char *)look + 1, "COMMENT ") ||
+                         starts_with_ci((const char *)look + 1, "GRANT ") ||
+                         starts_with_ci((const char *)look + 1, "PARTITION ") ||
+                         starts_with_ci((const char *)look + 1, "PARTITION\"") ||
+                         starts_with_ci((const char *)look + 1, "SUBPARTITION") ||
+                         starts_with_ci((const char *)look + 1, "REM ") ||
+                         starts_with_ci((const char *)look + 1, "METRIC"))) {
+                        /* 21c direct: a table/partition with no rows. The next
+                           DDL line begins at this 0x0a. Leave fp there so step 2
+                           reads it instead of treating it as a row (H-11 (3)). */
+                        pending_row_count = 0;
+                        step = 2; wlen = 0;
+                        break;
+                    }
+                    rec_start = p;
+                    found_row = 1;
+                } else {
+                    /* LOB / object table: conventional row layout (even inside a
+                       direct dump). The row starts at the first non-null byte
+                       after the name section; do NOT wait for 3 nulls, or a
+                       LOB-as-last-column table's single pad null leaves the
+                       locator misread and the table shows 0 rows (H-11 (1)). */
+                    if (c == 0x00) { null_count++; break; }
+                    if (c == 0xFF) {
+                        pending_row_count = 0;
+                        step = 2; wlen = 0;
+                        break;
+                    }
+                    rec_start = odv_ftell(fp) - 1;
+                    found_row = 1;
+                }
 
+                if (found_row) {
+                    {
                         if (list_only && s->filter_active && s->pass_flg) {
                             /* Filtered out in list_only: skip records entirely */
                             /* Scan forward to find 0xFFFF end marker */
@@ -2814,14 +3040,21 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     if (rc == ODV_ERROR_CANCELLED) goto done;
                     rc = ODV_OK;
 
-                    /* When parsing a specific partition (via seek_offset or
-                     * filter_partition), exit after the first match to avoid
-                     * parsing subsequent partitions of the same table. */
-                    if (s->filter_active && filter_found &&
-                        (s->seek_offset > 0 || s->filter_partition[0]))
+                    /* A partition-name filter wants only its one partition, so
+                     * stop once it has been read. A data_offset (seek_offset)
+                     * open must NOT stop here: every partition of a table shares
+                     * the CREATE TABLE offset, and the trailing COMMENT ON /
+                     * CREATE INDEX / ALTER ... ADD CONSTRAINT come after the row
+                     * data. Exiting after the first data block gave only the
+                     * first partition and dropped that DDL (H-13). The table
+                     * filter still bounds the scan: the next unrelated CREATE
+                     * TABLE triggers the early exit above, so no other table is
+                     * read. */
+                    if (s->filter_active && filter_found && s->filter_partition[0])
                         goto done;
                 }
                 break;
+            } /* case 20 */
             } /* switch data_step */
             break;
 
