@@ -616,6 +616,7 @@ void    odv_vclose(ODV_VFILE *vf);
 
 /* odv_number.c */
 int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_size);
+int decode_oracle_rowid(const unsigned char *buf, int len, int is_urowid, char *out, int out_size);
 
 /* odv_datetime.c */
 int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_size, int fmt, const char *custom_fmt);

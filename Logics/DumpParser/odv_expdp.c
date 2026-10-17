@@ -50,6 +50,16 @@ typedef struct {
     char cur_schema[ODV_OBJNAME_LEN + 1];
     char cur_table[ODV_OBJNAME_LEN + 1];
     int  property;
+    /* Current <COL_LIST_ITEM>: which optional tags were present.  The column
+     * slot is zeroed when the item opens, so "absent" and "0" would otherwise
+     * look the same, and the type name depends on exactly that distinction:
+     * NUMBER(p) has PRECISION_NUM and SCALE=0, FLOAT(p) has PRECISION_NUM
+     * only, INTEGER / NUMBER(*,s) have SCALE only, TIMESTAMP(0) has SCALE=0
+     * (M-04 / M-06 / M-20). */
+    int  col_type_num;      /* TYPE_NUM (69 ROWID / 208 UROWID ...) */
+    int  col_has_prec;      /* <PRECISION_NUM> present */
+    int  col_has_scale;     /* <SCALE> present */
+    int  col_char_len;      /* <CHARLENGTH>: declared length in characters */
 } DDL_CONTEXT;
 
 /*---------------------------------------------------------------------------
@@ -127,6 +137,10 @@ static void ddl_xml_callback(const char *tag, const char *value,
                 /* Opening: prepare next column slot */
                 dc->in_col_list = 1;
                 dc->col_item_depth = depth;
+                dc->col_type_num  = 0;
+                dc->col_has_prec  = 0;
+                dc->col_has_scale = 0;
+                dc->col_char_len  = 0;
                 if (dc->col_idx < ODV_MAX_COLUMNS) {
                     memset(&s->table.columns[dc->col_idx], 0, sizeof(ODV_COLUMN));
                 }
@@ -177,6 +191,7 @@ static void ddl_xml_callback(const char *tag, const char *value,
         }
         else if (strcmp(tag, "TYPE_NUM") == 0) {
             int tn = atoi(value);
+            dc->col_type_num = tn;
             col->type = type_num_to_col_type(tn, col->length, col->flags);
         }
         else if (strcmp(tag, "LENGTH") == 0) {
@@ -184,9 +199,14 @@ static void ddl_xml_callback(const char *tag, const char *value,
         }
         else if (strcmp(tag, "PRECISION_NUM") == 0) {
             col->precision = atoi(value);
+            dc->col_has_prec = 1;
         }
         else if (strcmp(tag, "SCALE") == 0) {
             col->scale = atoi(value);
+            dc->col_has_scale = 1;
+        }
+        else if (strcmp(tag, "CHARLENGTH") == 0) {
+            dc->col_char_len = atoi(value);
         }
         else if (strcmp(tag, "CHARSET") == 0 || strcmp(tag, "CHARSETID") == 0) {
             col->charset = atoi(value);
@@ -245,20 +265,42 @@ static void ddl_xml_callback(const char *tag, const char *value,
                              "NCHAR(%d)", col->length / 2);
                     break;
                 case COL_VARCHAR:
-                    snprintf(col->type_str, sizeof(col->type_str),
-                             "VARCHAR2(%d)", col->length);
+                case COL_CHAR: {
+                    /* LENGTH is the byte length.  A column declared with
+                     * character length semantics (n CHAR) has the PROPERTY bit
+                     * 0x800000 and its declared n in CHARLENGTH; showing the
+                     * byte length (4n in AL32UTF8) changed the column's
+                     * meaning and padded CHAR values on re-creation (M-05). */
+                    const char *base = (col->type == COL_CHAR) ? "CHAR" : "VARCHAR2";
+                    if ((col->property & 0x800000) && dc->col_char_len > 0)
+                        snprintf(col->type_str, sizeof(col->type_str),
+                                 "%s(%d CHAR)", base, dc->col_char_len);
+                    else
+                        snprintf(col->type_str, sizeof(col->type_str),
+                                 "%s(%d)", base, col->length);
                     break;
-                case COL_CHAR:
-                    snprintf(col->type_str, sizeof(col->type_str),
-                             "CHAR(%d)", col->length);
-                    break;
+                }
                 case COL_NUMBER:
-                    if (col->precision > 0 && col->scale != 0)
+                    /* The type follows from which of PRECISION_NUM / SCALE
+                     * are present (M-06):
+                     *   both          NUMBER(p) / NUMBER(p,s)
+                     *   PRECISION     FLOAT(p)  (binary precision; REAL is
+                     *                 FLOAT(63), FLOAT / DOUBLE PRECISION are
+                     *                 FLOAT(126))
+                     *   SCALE         NUMBER(*,s) (INTEGER etc. are NUMBER(*,0))
+                     *   neither       NUMBER */
+                    if (dc->col_has_prec && !dc->col_has_scale)
+                        snprintf(col->type_str, sizeof(col->type_str),
+                                 "FLOAT(%d)", col->precision);
+                    else if (dc->col_has_prec && col->scale != 0)
                         snprintf(col->type_str, sizeof(col->type_str),
                                  "NUMBER(%d,%d)", col->precision, col->scale);
-                    else if (col->precision > 0)
+                    else if (dc->col_has_prec)
                         snprintf(col->type_str, sizeof(col->type_str),
                                  "NUMBER(%d)", col->precision);
+                    else if (dc->col_has_scale)
+                        snprintf(col->type_str, sizeof(col->type_str),
+                                 "NUMBER(*,%d)", col->scale);
                     else
                         snprintf(col->type_str, sizeof(col->type_str), "NUMBER");
                     break;
@@ -266,19 +308,19 @@ static void ddl_xml_callback(const char *tag, const char *value,
                     snprintf(col->type_str, sizeof(col->type_str), "DATE");
                     break;
                 case COL_TIMESTAMP:
-                    if (col->precision <= 0) col->precision = 6; /* Oracle default */
-                    snprintf(col->type_str, sizeof(col->type_str),
-                             "TIMESTAMP(%d)", col->precision);
-                    break;
                 case COL_TIMESTAMP_TZ:
-                    if (col->precision <= 0) col->precision = 6;
-                    snprintf(col->type_str, sizeof(col->type_str),
-                             "TIMESTAMP(%d) WITH TIME ZONE", col->precision);
-                    break;
                 case COL_TIMESTAMP_LTZ:
-                    if (col->precision <= 0) col->precision = 6;
+                    /* The fractional-second precision is in SCALE (there is no
+                     * PRECISION_NUM); 0 is a real precision, the Oracle default
+                     * 6 applies only when the tag is absent.  col->precision is
+                     * also what decode_oracle_timestamp formats to (M-04). */
+                    col->precision = dc->col_has_scale ? col->scale : 6;
+                    if (col->precision < 0) col->precision = 0;
+                    if (col->precision > 9) col->precision = 9;
                     snprintf(col->type_str, sizeof(col->type_str),
-                             "TIMESTAMP(%d) WITH LOCAL TIME ZONE", col->precision);
+                             "TIMESTAMP(%d)%s", col->precision,
+                             col->type == COL_TIMESTAMP_TZ  ? " WITH TIME ZONE" :
+                             col->type == COL_TIMESTAMP_LTZ ? " WITH LOCAL TIME ZONE" : "");
                     break;
                 case COL_BLOB:
                     snprintf(col->type_str, sizeof(col->type_str), "BLOB");
@@ -290,12 +332,19 @@ static void ddl_xml_callback(const char *tag, const char *value,
                     snprintf(col->type_str, sizeof(col->type_str), "RAW(%d)", col->length);
                     break;
                 case COL_INTERVAL_YM:
+                    /* Leading precision in PRECISION_NUM (0 is valid; the
+                     * Oracle default 2 applies only when absent) (M-20). */
                     snprintf(col->type_str, sizeof(col->type_str),
-                             "INTERVAL YEAR TO MONTH");
+                             "INTERVAL YEAR(%d) TO MONTH",
+                             dc->col_has_prec ? col->precision : 2);
                     break;
                 case COL_INTERVAL_DS:
+                    /* Leading precision in PRECISION_NUM, fractional-second
+                     * precision in SCALE (defaults 2 / 6) (M-20). */
                     snprintf(col->type_str, sizeof(col->type_str),
-                             "INTERVAL DAY TO SECOND");
+                             "INTERVAL DAY(%d) TO SECOND(%d)",
+                             dc->col_has_prec ? col->precision : 2,
+                             dc->col_has_scale ? col->scale : 6);
                     break;
                 case COL_BIN_FLOAT:
                     snprintf(col->type_str, sizeof(col->type_str), "BINARY_FLOAT");
@@ -319,7 +368,14 @@ static void ddl_xml_callback(const char *tag, const char *value,
                     snprintf(col->type_str, sizeof(col->type_str), "NCLOB");
                     break;
                 case COL_ROWID:
-                    snprintf(col->type_str, sizeof(col->type_str), "ROWID");
+                    /* TYPE_NUM 208 is UROWID (LENGTH = its maximum size, 4000
+                     * unless declared); 69 / 11 are ROWID.  decode_column_value
+                     * tells the two apart by this name (M-35). */
+                    if (dc->col_type_num == 208)
+                        snprintf(col->type_str, sizeof(col->type_str),
+                                 "UROWID(%d)", col->length > 0 ? col->length : 4000);
+                    else
+                        snprintf(col->type_str, sizeof(col->type_str), "ROWID");
                     break;
                 case COL_USER_DEFINE:
                     snprintf(col->type_str, sizeof(col->type_str), "USER_DEFINED");
@@ -563,8 +619,19 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         v->type = col->type;
         break;
 
-    case COL_RAW:
     case COL_ROWID:
+        /* ROWID (10-byte internal form) / UROWID (01 physical, 02 logical):
+           Oracle's notation, not hex (M-35). */
+        if (decode_oracle_rowid(v->data, v->data_len,
+                                odv_strnicmp(col->type_str, "UROWID", 6) == 0,
+                                decode_buf, sizeof(decode_buf)) == ODV_OK) {
+            set_value_string(v, decode_buf, (int)strlen(decode_buf));
+            v->type = col->type;
+            break;
+        }
+        /* An unrecognised form is shown as hex, like RAW. */
+        /* FALLTHROUGH */
+    case COL_RAW:
     case COL_BLOB:
     case COL_LONG_RAW: {
         /* BLOB / LONG RAW only reach decode_column_value when read inline,

@@ -273,10 +273,9 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
-        /* INTERVAL */
-        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
-            strcmp(base, "INTERVAL") == 0) return "INTERVAL";
-        if (strcmp(base, "INTERVAL DAY TO SECOND") == 0) return "INTERVAL";
+        /* INTERVAL: by prefix, since a precision splits the name
+           ("INTERVAL YEAR(9) TO MONTH" has the base "INTERVAL YEAR") (M-20) */
+        if (strncmp(base, "INTERVAL", 8) == 0) return "INTERVAL";
         /* XMLTYPE / ROWID / BFILE / USER_DEFINED */
         if (strcmp(base, "XMLTYPE") == 0) return "XML";
         if (strcmp(base, "ROWID") == 0) return "VARCHAR(18)";
@@ -330,9 +329,7 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
-        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
-            strcmp(base, "INTERVAL DAY TO SECOND") == 0 ||
-            strcmp(base, "INTERVAL") == 0) return "VARCHAR(64)";
+        if (strncmp(base, "INTERVAL", 8) == 0) return "VARCHAR(64)";   /* by prefix (M-20) */
         if (strcmp(base, "XMLTYPE") == 0) return "LONGTEXT";
         if (strcmp(base, "ROWID") == 0) return "VARCHAR(18)";
         if (strcmp(base, "BFILE") == 0) return "VARCHAR(530)";
@@ -392,9 +389,7 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             snprintf(result, sizeof(result), "%s", oracle_type);
             return result;
         }
-        if (strcmp(base, "INTERVAL YEAR TO MONTH") == 0 ||
-            strcmp(base, "INTERVAL DAY TO SECOND") == 0 ||
-            strcmp(base, "INTERVAL") == 0) return "NVARCHAR(64)";
+        if (strncmp(base, "INTERVAL", 8) == 0) return "NVARCHAR(64)";  /* by prefix (M-20) */
         if (strcmp(base, "XMLTYPE") == 0) return "XML";
         if (strcmp(base, "ROWID") == 0) return "NVARCHAR(18)";
         if (strcmp(base, "BFILE") == 0) return "NVARCHAR(530)";

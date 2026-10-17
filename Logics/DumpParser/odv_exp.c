@@ -1200,8 +1200,22 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
         }
         break;
 
-    case COL_RAW:
-    case COL_ROWID: {
+    case COL_ROWID:
+        /* ROWID / UROWID: Oracle's notation (AAATxFAAMAAAEi9AAA, *BAMA...),
+           not the stored bytes.  exp stores a ROWID column in its external
+           form and a UROWID column in the internal one (M-35). */
+        if (data_len > 0 &&
+            ensure_value_buf(val, 19 + (data_len * 4 + 2) / 3) == ODV_OK &&
+            decode_oracle_rowid(data, data_len,
+                                odv_strnicmp(col->type_str, "UROWID", 6) == 0,
+                                (char *)val->data, val->buf_size) == ODV_OK) {
+            val->data_len = (int)strlen((const char *)val->data);
+            val->is_null = 0;
+            break;
+        }
+        /* An unrecognised form is shown as hex, like RAW. */
+        /* FALLTHROUGH */
+    case COL_RAW: {
         /* Hex output: "0x" + hex bytes */
         int needed = data_len * 2 + 3;
         rc = ensure_value_buf(val, needed);
@@ -1789,7 +1803,11 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
                 if (col_len > 1000) bad = 1;
                 break;
             case COL_ROWID:
-                if (col_len > 100) bad = 1;
+                /* A UROWID holds up to 4000 bytes: the logical ROWID of an
+                   index-organized table row carries the whole primary key.
+                   The old 100-byte bound dropped such a row and the rest of
+                   the table (M-35). */
+                if (col_len > 4000) bad = 1;
                 break;
             case COL_CHAR: case COL_NCHAR: case COL_VARCHAR: case COL_NVARCHAR:
                 if (col_len > ODV_VARCHAR_LEN * 3) bad = 1;
