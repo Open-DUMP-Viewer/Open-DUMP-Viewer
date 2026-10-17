@@ -395,6 +395,8 @@ Public Module ExportHelper
         Public Property ConstraintsJson As String
         Public Property RowCount As Long
         Public Property DataOffset As Long
+        ''' <summary>区画名フィルタ。空なら表全体（全区画）。区画を 1 つだけ出す子行用 (H-14)</summary>
+        Public Property Partition As String = ""
     End Class
 
     ''' <summary>

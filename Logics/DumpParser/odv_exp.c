@@ -27,8 +27,8 @@
 /*---------------------------------------------------------------------------
     Forward declarations
  ---------------------------------------------------------------------------*/
-static int parse_exp_header(ODV_SESSION *s, FILE *fp);
-static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only);
+static int parse_exp_header(ODV_SESSION *s, ODV_VFILE *fp);
+static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only);
 static int parse_column_type(const char *type_str, ODV_COLUMN *col);
 static void trim_right(char *str);
 
@@ -197,14 +197,14 @@ static void normalize_cesu8(char *str)
     Records 3-6: (misc)
     Record 7: Charset info - byte[1]=env, byte[3]=tbl, byte[5]=nls
  ---------------------------------------------------------------------------*/
-static int parse_exp_header(ODV_SESSION *s, FILE *fp)
+static int parse_exp_header(ODV_SESSION *s, ODV_VFILE *fp)
 {
     unsigned char hdr[EXP_HEADER_SIZE];
     unsigned char word[256];
     int i, ct, step, cs_start;
 
-    odv_fseek(fp, 0, SEEK_SET);
-    if (fread(hdr, 1, EXP_HEADER_SIZE, fp) != EXP_HEADER_SIZE) {
+    odv_vseek(fp, 0, SEEK_SET);
+    if (odv_vread(hdr, 1, EXP_HEADER_SIZE, fp) != EXP_HEADER_SIZE) {
         odv_strcpy(s->last_error, "Cannot read EXP header", ODV_MSG_LEN);
         return ODV_ERROR_FREAD;
     }
@@ -1403,7 +1403,7 @@ static int is_lob_type(int t)
     parameter is the LOB-only index used for odv_lob_accumulate addressing
     in extract mode.
  ---------------------------------------------------------------------------*/
-static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
+static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
                                int col_idx, int lob_idx,
                                unsigned char **chunk_buf_ptr,
                                int *chunk_buf_size_ptr)
@@ -1434,13 +1434,13 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
         }
     }
 
-    if (fread(hdr, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
+    if (odv_vread(hdr, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
     first_val = (int)hdr[0] | ((int)hdr[1] << 8);
 
     if (first_val > 0xFF00) {
         /* Extended length: 4-byte total + 4 reserved zero bytes */
         unsigned char ext[8];
-        if (fread(ext, 1, 8, fp) != 8) return ODV_ERROR_FREAD;
+        if (odv_vread(ext, 1, 8, fp) != 8) return ODV_ERROR_FREAD;
         total_len = (int)ext[0] | ((int)ext[1] << 8)
                   | ((int)ext[2] << 16) | ((int)ext[3] << 24);
         /* total_len is the whole LOB value, not a single read. ODV_EXP_RECORD_LEN
@@ -1467,7 +1467,7 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
         int chunk_size;
         if (multi_chunk) {
             unsigned char ch[2];
-            if (fread(ch, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
+            if (odv_vread(ch, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
             chunk_size = (int)ch[0] | ((int)ch[1] << 8);
         } else {
             chunk_size = total_len - accumulated;
@@ -1486,7 +1486,7 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
             *chunk_buf_size_ptr = chunk_size + 1;
         }
 
-        if ((int)fread(*chunk_buf_ptr, 1, (size_t)chunk_size, fp) != chunk_size) {
+        if ((int)odv_vread(*chunk_buf_ptr, 1, (size_t)chunk_size, fp) != chunk_size) {
             return ODV_ERROR_FREAD;
         }
 
@@ -1518,7 +1518,7 @@ static int read_one_lob_column(ODV_SESSION *s, FILE *fp,
         - For each non-NULL LOB column (in declaration order):
             chunk stream — see read_one_lob_column().
  ---------------------------------------------------------------------------*/
-static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
+static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
                              int list_only)
 {
     unsigned char len_buf[2];
@@ -1534,7 +1534,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
     int64_t row_count = 0;
 
     /* Seek to data start */
-    odv_fseek(fp, data_start, SEEK_SET);
+    odv_vseek(fp, data_start, SEEK_SET);
 
     /* Ensure record can hold all columns */
     if (s->table.col_count > s->record.max_columns) {
@@ -1576,7 +1576,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
 
     while (!s->cancelled) {
         /* Read 2-byte length prefix */
-        if (fread(len_buf, 1, 2, fp) != 2) {
+        if (odv_vread(len_buf, 1, 2, fp) != 2) {
             break; /* EOF */
         }
 
@@ -1642,9 +1642,9 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 /* Corrupt LOB section — try to recover to next 0xFFFF */
                 while (!s->cancelled) {
                     unsigned char scan[2];
-                    if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
                     if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_fseek(fp, -1, SEEK_CUR);
+                    odv_vseek(fp, -1, SEEK_CUR);
                 }
                 break;
             }
@@ -1705,7 +1705,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
         if (col_len == 0xFF00) {
             unsigned char big_len[4];
             unsigned int ulen;
-            if (fread(big_len, 1, 4, fp) != 4) break;
+            if (odv_vread(big_len, 1, 4, fp) != 4) break;
             ulen = (unsigned int)big_len[0]
                  | ((unsigned int)big_len[1] << 8)
                  | ((unsigned int)big_len[2] << 16)
@@ -1745,12 +1745,12 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                     col_buf_size = assembled + piece_len + 1;
                 }
                 if (piece_len > 0 &&
-                    (int)fread(col_buf + assembled, 1, (size_t)piece_len, fp) != piece_len) {
+                    (int)odv_vread(col_buf + assembled, 1, (size_t)piece_len, fp) != piece_len) {
                     ok = 0; break;
                 }
                 assembled += piece_len;
                 if (last) break;
-                if (fread(len_buf, 1, 2, fp) != 2) { ok = 0; break; }
+                if (odv_vread(len_buf, 1, 2, fp) != 2) { ok = 0; break; }
                 cur = (int)((unsigned int)len_buf[0] | ((unsigned int)len_buf[1] << 8));
             }
             if (ok == -1) { rc = ODV_ERROR_MALLOC; break; }
@@ -1758,9 +1758,9 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 /* Truncated/corrupt split — recover to the next 0xFFFF. */
                 while (!s->cancelled) {
                     unsigned char scan[2];
-                    if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
                     if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_fseek(fp, -1, SEEK_CUR);
+                    odv_vseek(fp, -1, SEEK_CUR);
                 }
                 break;
             }
@@ -1801,9 +1801,9 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
                 /* Corrupt data — skip to next table */
                 while (!s->cancelled) {
                     unsigned char scan[2];
-                    if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                    if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
                     if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                    odv_fseek(fp, -1, SEEK_CUR);
+                    odv_vseek(fp, -1, SEEK_CUR);
                 }
                 break;
             }
@@ -1814,10 +1814,10 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             /* Corrupt data — try to find 0xFFFF end marker */
             while (!s->cancelled) {
                 unsigned char scan[2];
-                if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
                 if (scan[0] == 0xFF && scan[1] == 0xFF) break;
                 /* Seek back 1 byte (sliding window) */
-                odv_fseek(fp, -1, SEEK_CUR);
+                odv_vseek(fp, -1, SEEK_CUR);
             }
             break;
         }
@@ -1832,7 +1832,7 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
 
         /* Read column data (already assembled above for a split LONG). */
         if (col_len > 0 && !long_split_done) {
-            if ((int)fread(col_buf, 1, col_len, fp) != col_len) {
+            if ((int)odv_vread(col_buf, 1, col_len, fp) != col_len) {
                 break; /* Truncated */
             }
         }
@@ -1882,9 +1882,9 @@ static int parse_exp_records(ODV_SESSION *s, FILE *fp, int64_t data_start,
             /* Scan forward to find 0xFFFF table end marker */
             while (!s->cancelled) {
                 unsigned char scan[2];
-                if (fread(scan, 1, 2, fp) != 2) goto rec_done;
+                if (odv_vread(scan, 1, 2, fp) != 2) goto rec_done;
                 if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                odv_fseek(fp, -1, SEEK_CUR);
+                odv_vseek(fp, -1, SEEK_CUR);
             }
             break;
         }
@@ -1914,7 +1914,7 @@ rec_done:
 
     DDL statements are terminated by \0 or \n.
  ---------------------------------------------------------------------------*/
-static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
+static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
 {
     int step;               /* 0=header, 1=mode, 2=ddl, 3=metadata */
     int data_step;          /* sub-state within step 3 */
@@ -1953,7 +1953,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
        jump directly to the target table's DDL position.
        Header must already be parsed (charset info needed). */
     if (s->seek_offset > EXP_HEADER_SIZE && s->filter_active) {
-        odv_fseek(fp, s->seek_offset, SEEK_SET);
+        odv_vseek(fp, s->seek_offset, SEEK_SET);
         address = s->seek_offset;
         step = 2;   /* Start in DDL scan mode */
         wlen = 0;
@@ -1976,7 +1976,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
         }
     } else {
         /* Normal: start from beginning of file */
-        odv_fseek(fp, 0, SEEK_SET);
+        odv_vseek(fp, 0, SEEK_SET);
         step = 0;
 
         /* Pre-set current_schema from export user in the header.
@@ -1993,7 +1993,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
     data_step = 0;
 
     while (!s->cancelled) {
-        if (fread(&c, 1, 1, fp) != 1) break;
+        if (odv_vread(&c, 1, 1, fp) != 1) break;
         address++;
 
         /* Report progress periodically during DDL scan / metadata parse.
@@ -2945,13 +2945,13 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                     unsigned char look[16];
                     int64_t p;
                     size_t n;
-                    if (fread(pad, 1, 3, fp) != 3) {
-                        address = odv_ftell(fp); step = 2; wlen = 0; break;
+                    if (odv_vread(pad, 1, 3, fp) != 3) {
+                        address = odv_vtell(fp); step = 2; wlen = 0; break;
                     }
-                    p = odv_ftell(fp);           /* just past the 4 padding bytes */
+                    p = odv_vtell(fp);           /* just past the 4 padding bytes */
                     memset(look, 0, sizeof(look));
-                    n = fread(look, 1, sizeof(look), fp);
-                    odv_fseek(fp, p, SEEK_SET);  /* rewind; `look` was only a peek */
+                    n = odv_vread(look, 1, sizeof(look), fp);
+                    odv_vseek(fp, p, SEEK_SET);  /* rewind; `look` was only a peek */
                     address = p;
                     if (n < 2 || (look[0] == 0xFF && look[1] == 0xFF)) {
                         /* No rows (0xFFFF table end, or EOF). */
@@ -2992,7 +2992,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                         step = 2; wlen = 0;
                         break;
                     }
-                    rec_start = odv_ftell(fp) - 1;
+                    rec_start = odv_vtell(fp) - 1;
                     found_row = 1;
                 }
 
@@ -3005,9 +3005,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                 int skip_ct = 0;
                                 while (!s->cancelled) {
                                     unsigned char scan[2];
-                                    if (fread(scan, 1, 2, fp) != 2) goto done;
+                                    if (odv_vread(scan, 1, 2, fp) != 2) goto done;
                                     if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                                    odv_fseek(fp, -1, SEEK_CUR);
+                                    odv_vseek(fp, -1, SEEK_CUR);
                                     if ((++skip_ct & 0x7FFF) == 0)
                                         odv_report_progress(s, fp);
                                 }
@@ -3023,9 +3023,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                                 int skip_ct = 0;
                                 while (!s->cancelled) {
                                     unsigned char scan[2];
-                                    if (fread(scan, 1, 2, fp) != 2) goto done;
+                                    if (odv_vread(scan, 1, 2, fp) != 2) goto done;
                                     if (scan[0] == 0xFF && scan[1] == 0xFF) break;
-                                    odv_fseek(fp, -1, SEEK_CUR);
+                                    odv_vseek(fp, -1, SEEK_CUR);
                                     if ((++skip_ct & 0x7FFF) == 0)
                                         odv_report_progress(s, fp);
                                 }
@@ -3033,7 +3033,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, FILE *fp, int list_only)
                             pending_row_count = 0;
                         }
                         /* Update address to match new file position */
-                        address = odv_ftell(fp);
+                        address = odv_vtell(fp);
                     }
                     step = 2;
                     wlen = 0;
@@ -3084,19 +3084,19 @@ done:
  ---------------------------------------------------------------------------*/
 int parse_exp_dump(ODV_SESSION *s, int list_only)
 {
-    FILE *fp;
+    ODV_VFILE vf;
+    ODV_VFILE *fp = &vf;
     int rc;
 
     if (!s) return ODV_ERROR_INVALID_ARG;
 
-    fp = fopen(s->dump_path, "rb");
-    if (!fp) {
-        odv_strcpy(s->last_error, "Cannot open dump file", ODV_MSG_LEN);
-        return ODV_ERROR_FOPEN;
+    /* Open the dump as one logical stream (joins FILESIZE= split volumes). */
+    rc = odv_vopen(&vf, s);
+    if (rc != ODV_OK) {
+        if (s->last_error[0] == '\0')
+            odv_strcpy(s->last_error, "Cannot open dump file", ODV_MSG_LEN);
+        return rc;
     }
-
-    /* Set 64KB I/O buffer for improved read throughput */
-    setvbuf(fp, NULL, _IOFBF, 65536);
 
     /* Reset progress tracking */
     s->last_progress_pct = -1;
@@ -3104,14 +3104,14 @@ int parse_exp_dump(ODV_SESSION *s, int list_only)
     /* Parse header */
     rc = parse_exp_header(s, fp);
     if (rc != ODV_OK) {
-        fclose(fp);
+        odv_vclose(&vf);
         return rc;
     }
 
     /* Parse DDL and data */
     rc = parse_exp_ddl_and_data(s, fp, list_only);
 
-    fclose(fp);
+    odv_vclose(&vf);
     return rc;
 }
 

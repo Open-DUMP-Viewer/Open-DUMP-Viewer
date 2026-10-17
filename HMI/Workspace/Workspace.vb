@@ -517,6 +517,8 @@ Public Class Workspace
         ctx.TableName = tableName
         ctx.RowCount = entry.RowCount
         ctx.DataOffset = entry.DataOffset
+        ' 親行（表全体）は PartitionName="" → 全区画。子の区画行はその区画名 → 1 区画だけ (H-14)
+        ctx.Partition = entry.PartitionName
 
         If _columnNamesMap.ContainsKey(tableKey) Then ctx.ColumnNames = _columnNamesMap(tableKey)
         If _columnTypesMap.ContainsKey(tableKey) Then ctx.ColumnTypes = _columnTypesMap(tableKey)
@@ -536,6 +538,11 @@ Public Class Workspace
         If String.IsNullOrEmpty(_currentSchema) Then Return result
         If Not _tableList.ContainsKey(_currentSchema) Then Return result
 
+        ' 区画表は 1 表 1 コンテキストにまとめる (H-14)。区画エントリごとに出すと、
+        ' CSV はファイル名が衝突し、SQL は区画ごとに DROP/CREATE を連発して最後の区画しか残らない。
+        ' 親行と同じく data_offset=0・区画名なしの「表全体」コンテキストにして全区画を 1 ファイルへ出す。
+        Dim emitted As New HashSet(Of String)(StringComparer.Ordinal)
+
         For Each tableInfo In _tableList(_currentSchema)
             Dim tableName = tableInfo.TableName
             Dim tableKey = tableInfo.Key
@@ -543,12 +550,25 @@ Public Class Workspace
             ' 除外テーブルをスキップ
             If _excludedTables.Contains(tableKey) Then Continue For
 
+            ' 同じ表（区画表の 2 件目以降のエントリ）は 1 回だけ出す
+            If emitted.Contains(tableKey) Then Continue For
+            emitted.Add(tableKey)
+
             Dim ctx As New ExportHelper.TableExportContext()
             ctx.DumpFilePath = DumpFilePath
             ctx.Schema = _currentSchema
             ctx.TableName = tableName
-            ctx.RowCount = tableInfo.RowCount
-            ctx.DataOffset = tableInfo.DataOffset
+            If tableInfo.IsPartitioned Then
+                ' 表全体（全区画）: 合計行数、先頭から走査 (data_offset=0)、区画名なし
+                ctx.RowCount = _tableList(_currentSchema).
+                    Where(Function(e) e.Key = tableKey AndAlso Not _excludedTables.Contains(e.Key)).
+                    Sum(Function(e) e.RowCount)
+                ctx.DataOffset = 0
+                ctx.Partition = ""
+            Else
+                ctx.RowCount = tableInfo.RowCount
+                ctx.DataOffset = tableInfo.DataOffset
+            End If
 
             If _columnNamesMap.ContainsKey(tableKey) Then
                 ctx.ColumnNames = _columnNamesMap(tableKey)
@@ -745,11 +765,27 @@ Public Class Workspace
                     Dim parentEntry = group.FirstOrDefault(Function(e) e.EntryType = Open_NativeParser.TABLE_TYPE_PARTITION_TABLE)
                     If parentEntry Is Nothing Then parentEntry = group(0)
 
+                    ' 親行の Tag は「表全体（全区画）」を開く合成エントリにする (H-14)。
+                    ' 先頭区画のエントリ (parentEntry) をそのまま使うと、その区画名と data_offset で
+                    ' 開いてしまい先頭区画の行しか出ない。data_offset=0・区画名なしで解析すると、
+                    ' exp/expdp とも表全体（全区画）の行が出る。先頭区画は別途子行として表示される。
+                    Dim wholeEntry As New Open_NativeParser.TableEntry With {
+                        .Schema = parentEntry.Schema,
+                        .TableName = parentEntry.TableName,
+                        .ColCount = parentEntry.ColCount,
+                        .RowCount = totalRows,
+                        .DataOffset = 0,
+                        .EntryType = Open_NativeParser.TABLE_TYPE_PARTITION_TABLE,
+                        .PartitionName = "",
+                        .ParentPartition = "",
+                        .IsWholeTable = True
+                    }
+
                     Dim parentItem As New ListViewItem(groupName)
                     parentItem.SubItems.Add(schemaName)
                     parentItem.SubItems.Add($"TABLE (PARTITIONED, {group.Count})")
                     parentItem.SubItems.Add(totalRows.ToString("#,0"))
-                    parentItem.Tag = parentEntry
+                    parentItem.Tag = wholeEntry
                     lstTableList.Items.Add(parentItem)
 
                     ' 子パーティション行（インデント表示）

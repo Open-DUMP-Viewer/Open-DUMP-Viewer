@@ -19,7 +19,7 @@ Public Class BulkExportLogic
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
             Dim ctx = contexts(i)
-            Dim safeName = String.Join("_", ctx.TableName.Split(Path.GetInvalidFileNameChars()))
+            Dim safeName = SafeFileBase(ctx)
             Dim outputPath = Path.Combine(outputFolder, $"{safeName}.csv")
 
             ' C DLL ストリーミング (進捗表示付き)
@@ -43,7 +43,7 @@ Public Class BulkExportLogic
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
             Dim ctx = contexts(i)
-            Dim safeName = String.Join("_", ctx.TableName.Split(Path.GetInvalidFileNameChars()))
+            Dim safeName = SafeFileBase(ctx)
             Dim outputPath = Path.Combine(outputFolder, $"{safeName}.sql")
 
             Dim ok As Boolean
@@ -225,7 +225,7 @@ Public Class BulkExportLogic
     ''' </summary>
     Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext) As List(Of String())
         Dim result = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, ctx.RowCount, ctx.Partition)
 
         If result IsNot Nothing AndAlso
            result.ContainsKey(ctx.Schema) AndAlso
@@ -244,6 +244,19 @@ Public Class BulkExportLogic
         worker.ReportProgress(pct,
             New ExportProgressDialog.ProgressInfo(tableName, 0, 0, currentIndex, totalCount))
     End Sub
+
+    ''' <summary>
+    ''' 出力ファイル名の基底を作る。区画を 1 つだけ出す子行コンテキスト (Partition 非空) は
+    ''' 表名に区画名を付けて、同じ表の区画どうしでファイル名が衝突しないようにする (H-14)。
+    ''' 親行・通常表 (Partition 空) は表名のみ。
+    ''' </summary>
+    Private Shared Function SafeFileBase(ctx As ExportHelper.TableExportContext) As String
+        Dim name = ctx.TableName
+        If ctx.Partition IsNot Nothing AndAlso ctx.Partition.Length > 0 Then
+            name = name & "_" & ctx.Partition
+        End If
+        Return String.Join("_", name.Split(Path.GetInvalidFileNameChars()))
+    End Function
 
     ''' <summary>Excel シート名の禁止文字を除去 (31文字制限)</summary>
     Private Shared Function SanitizeSheetName(name As String) As String

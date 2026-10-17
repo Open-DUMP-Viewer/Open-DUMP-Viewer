@@ -222,13 +222,13 @@ int deliver_row(ODV_SESSION *s)
     Only fires the callback when the percentage changes (0-100),
     reducing UI thread overhead from per-row to at most 101 calls.
  ---------------------------------------------------------------------------*/
-void odv_report_progress(ODV_SESSION *s, FILE *fp)
+void odv_report_progress(ODV_SESSION *s, ODV_VFILE *fp)
 {
     int pct;
 
     if (!s || !s->progress_cb || s->dump_size <= 0) return;
 
-    pct = (int)(odv_ftell(fp) * 100 / s->dump_size);
+    pct = (int)(odv_vtell(fp) * 100 / s->dump_size);
     if (pct > 100) pct = 100;
 
     /* Hysteresis: only fire when percentage actually changes */

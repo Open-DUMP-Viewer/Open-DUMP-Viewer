@@ -223,6 +223,315 @@ ODV_API int ODV_CALL odv_set_app_version(ODV_SESSION *s, const char *ver)
 }
 
 /*---------------------------------------------------------------------------
+    Virtual multi-file read stream (H-28)
+
+    FILESIZE= (exp) / dumpfile=%U (expdp) split a single logical dump into
+    <stem>_01, _02, ... .  The parsers want one continuous byte stream; this
+    layer presents the ordered set as that stream.  Discovery is driven from
+    the opened file: only when its trailing number is 1 do we look for _02,
+    _03, ... in the same directory (opening a middle file never auto-joins).
+    Each later file is accepted only after a signature check against the first,
+    so an unrelated same-named neighbour is not concatenated.  For a single,
+    non-split dump the stream is one segment with skip 0 and behaves byte-for-
+    byte like the one FILE.
+ ---------------------------------------------------------------------------*/
+
+static int64_t vf_filesize(const char *path)
+{
+    FILE *fp = fopen(path, "rb");
+    int64_t sz;
+    if (!fp) return -1;
+    if (odv_fseek(fp, 0, SEEK_END) != 0) { fclose(fp); return -1; }
+    sz = odv_ftell(fp);
+    fclose(fp);
+    return sz;
+}
+
+static int vf_read_head(const char *path, unsigned char *buf, int n)
+{
+    FILE *fp = fopen(path, "rb");
+    int got;
+    if (!fp) return -1;
+    got = (int)fread(buf, 1, (size_t)n, fp);
+    fclose(fp);
+    return got;
+}
+
+/* Parse the exp header's block-size field (4th 0x0A/0x00-delimited field after
+   the "EXPORT:Vnn.nn.nn" signature) and the start of the charset region
+   (record 7), the byte just past the 7th delimiter.  The 2-byte big-endian
+   volume number sits at cs_start+6 (right after the 6-byte charset region).
+   *block_size / *cs_start are set to 0 / -1 when not found. */
+static void exp_header_info(const unsigned char *hdr, int len,
+                            int *block_size, int *cs_start)
+{
+    int i, field = 0, fs = 3, bs = 0, cs = -1;
+    *block_size = 0;
+    *cs_start = -1;
+    if (len < 4 || hdr[0] != 0x03) return;
+    for (i = 3; i < len; i++) {
+        if (hdr[i] == 0x0A || hdr[i] == 0x00) {
+            if (field == 3) {            /* field 3 text [fs,i) = block size */
+                int j, v = 0, any = 0;
+                for (j = fs; j < i; j++) {
+                    if (hdr[j] < '0' || hdr[j] > '9') { any = 0; break; }
+                    v = v * 10 + (hdr[j] - '0');
+                    any = 1;
+                    if (v > (1 << 24)) break;
+                }
+                if (any) bs = v;
+            }
+            field++;
+            fs = i + 1;
+            if (field == 7) { cs = fs; break; }
+        }
+    }
+    *block_size = bs;
+    *cs_start = cs;
+}
+
+/* 1 if `cand_head` looks like volume `seq` of the same split set as
+   `f0_head`.  exp: EXP signature + volume number == seq.  expdp: same leading
+   DataPump block type and job-id region [6,34) as the first file. */
+static int vf_candidate_ok(const unsigned char *f0_head, int f0_len,
+                           const unsigned char *cand_head, int cand_len,
+                           int dump_type, int seq)
+{
+    if (dump_type == DUMP_EXP || dump_type == DUMP_EXP_DIRECT) {
+        int i, found = 0, bs, cs;
+        if (cand_len < 64) return 0;
+        if (cand_head[0] < 0x01 || cand_head[0] > 0x05) return 0;
+        for (i = 3; i + 7 <= 0x20 && i + 7 <= cand_len; i++) {
+            if (memcmp(cand_head + i, "EXPORT:", 7) == 0) { found = 1; break; }
+        }
+        if (!found) return 0;
+        exp_header_info(cand_head, cand_len, &bs, &cs);
+        if (cs < 0 || cs + 8 > cand_len) return 0;
+        {
+            int vol = ((int)cand_head[cs + 6] << 8) | (int)cand_head[cs + 7];
+            return (vol == seq);
+        }
+    } else {
+        /* expdp: DataPump file-header block.  First two bytes are the block
+           type, bytes [6,34) are the per-job id shared by every volume. */
+        if (f0_len < 34 || cand_len < 34) return 0;
+        if (cand_head[0] != f0_head[0] || cand_head[1] != f0_head[1]) return 0;
+        return (memcmp(cand_head + 6, f0_head + 6, 28) == 0);
+    }
+}
+
+static int vf_add_seg(ODV_VFILE *vf, const char *path, int64_t skip, int64_t size)
+{
+    ODV_VSEG *sg;
+    int64_t avail = size - skip;
+    if (avail <= 0) return 0;            /* nothing to contribute */
+    if (vf->nfiles >= vf->cap) {
+        int ncap = vf->cap ? vf->cap * 2 : 4;
+        ODV_VSEG *ns = (ODV_VSEG *)realloc(vf->seg, (size_t)ncap * sizeof(ODV_VSEG));
+        if (!ns) return ODV_ERROR_MALLOC;
+        vf->seg = ns;
+        vf->cap = ncap;
+    }
+    sg = &vf->seg[vf->nfiles];
+    sg->path = (char *)malloc(strlen(path) + 1);
+    if (!sg->path) return ODV_ERROR_MALLOC;
+    strcpy(sg->path, path);
+    sg->skip = skip;
+    sg->avail = avail;
+    sg->logstart = vf->logsize;
+    vf->logsize += avail;
+    vf->nfiles++;
+    return ODV_OK;
+}
+
+int odv_vopen(ODV_VFILE *vf, ODV_SESSION *s)
+{
+    unsigned char f0_head[256];
+    int f0_len, block_size = 0, cs = -1, split_skip = 0;
+    int64_t size0;
+    int num_start, num_end, width, ext_pos, plen, k;
+    char cand[ODV_PATH_LEN * 2 + 1];
+
+    if (!vf || !s) return ODV_ERROR_INVALID_ARG;
+    memset(vf, 0, sizeof(*vf));
+    vf->open_idx = -1;
+    vf->phys_pos = -1;
+
+    size0 = vf_filesize(s->dump_path);
+    if (size0 < 0) {
+        set_error(s, "Cannot open dump file");
+        return ODV_ERROR_FOPEN;
+    }
+
+    /* First file is always the whole file (skip 0). */
+    {
+        int rc = vf_add_seg(vf, s->dump_path, 0, size0);
+        if (rc != ODV_OK) return rc;
+    }
+
+    /* Per-format leading-header size to drop from each later file. */
+    f0_len = vf_read_head(s->dump_path, f0_head, (int)sizeof(f0_head));
+    if (f0_len < 0) f0_len = 0;
+    if (s->dump_type == DUMP_EXP || s->dump_type == DUMP_EXP_DIRECT) {
+        exp_header_info(f0_head, f0_len, &block_size, &cs);
+        if (block_size >= 512 && block_size <= (1 << 20))
+            split_skip = block_size;       /* data starts at the block boundary */
+    } else if (s->dump_type == DUMP_EXPDP) {
+        split_skip = ODV_DUMP_BLOCK_LEN;    /* one 4KB file-header block */
+    }
+
+    /* Locate the trailing decimal run just before the extension. */
+    plen = (int)strlen(s->dump_path);
+    ext_pos = plen;
+    for (k = plen - 1; k >= 0; k--) {
+        if (s->dump_path[k] == '.') { ext_pos = (int)k; break; }
+        if (s->dump_path[k] == '/' || s->dump_path[k] == '\\') break;
+    }
+    num_end = ext_pos;
+    num_start = ext_pos;
+    while (num_start > 0 &&
+           s->dump_path[num_start - 1] >= '0' && s->dump_path[num_start - 1] <= '9')
+        num_start--;
+
+    /* Auto-join only when a positive per-file skip was determined, the name
+       ends in digits, and that number is 1 (the first volume). */
+    if (split_skip > 0 && num_end > num_start) {
+        int64_t v = 0;
+        int j;
+        for (j = num_start; j < num_end; j++) v = v * 10 + (s->dump_path[j] - '0');
+        width = num_end - num_start;
+        if (v == 1) {
+            for (k = 2; k < ODV_MAX_SPLIT; k++) {
+                unsigned char ch[256];
+                int cl;
+                int64_t csz;
+                /* Build <prefix><k zero-padded to width><suffix>. */
+                int pre = num_start;
+                int n = snprintf(cand, sizeof(cand), "%.*s%0*lld%s",
+                                 pre, s->dump_path, width, (long long)k,
+                                 s->dump_path + num_end);
+                if (n < 0 || n >= (int)sizeof(cand)) break;
+                csz = vf_filesize(cand);
+                if (csz < 0) break;                 /* no more files */
+                cl = vf_read_head(cand, ch, (int)sizeof(ch));
+                if (cl < 0) break;
+                if (!vf_candidate_ok(f0_head, f0_len, ch, cl,
+                                     s->dump_type, (int)k))
+                    break;                          /* not a continuation */
+                if (vf_add_seg(vf, cand, split_skip, csz) != ODV_OK)
+                    break;
+            }
+        }
+    }
+
+    /* Progress percentage is against the whole logical stream. */
+    s->dump_size = vf->logsize;
+    return ODV_OK;
+}
+
+static FILE *vf_ensure_open(ODV_VFILE *vf, int idx)
+{
+    if (vf->open_idx == idx && vf->fp) return vf->fp;
+    if (vf->fp) { fclose(vf->fp); vf->fp = NULL; }
+    vf->fp = fopen(vf->seg[idx].path, "rb");
+    vf->open_idx = vf->fp ? idx : -1;
+    vf->phys_pos = -1;
+    if (vf->fp) setvbuf(vf->fp, NULL, _IOFBF, 65536);
+    return vf->fp;
+}
+
+static int vf_find_seg(ODV_VFILE *vf, int64_t logpos)
+{
+    int i;
+    /* Common case: still inside the currently open segment. */
+    if (vf->open_idx >= 0) {
+        ODV_VSEG *sg = &vf->seg[vf->open_idx];
+        if (logpos >= sg->logstart && logpos < sg->logstart + sg->avail)
+            return vf->open_idx;
+    }
+    for (i = 0; i < vf->nfiles; i++) {
+        ODV_VSEG *sg = &vf->seg[i];
+        if (logpos >= sg->logstart && logpos < sg->logstart + sg->avail)
+            return i;
+    }
+    return -1;
+}
+
+size_t odv_vread(void *ptr, size_t size, size_t nmemb, ODV_VFILE *vf)
+{
+    int64_t want, done = 0;
+    unsigned char *out = (unsigned char *)ptr;
+
+    if (!vf || !ptr || size == 0) return 0;
+    want = (int64_t)size * (int64_t)nmemb;
+
+    while (done < want) {
+        int i;
+        ODV_VSEG *sg;
+        int64_t seg_off, seg_rem, chunk, pofs;
+        FILE *fp;
+        size_t got;
+
+        if (vf->logpos >= vf->logsize) break;          /* logical EOF */
+        i = vf_find_seg(vf, vf->logpos);
+        if (i < 0) break;
+        sg = &vf->seg[i];
+        seg_off = vf->logpos - sg->logstart;
+        seg_rem = sg->avail - seg_off;
+        chunk = want - done;
+        if (chunk > seg_rem) chunk = seg_rem;
+
+        fp = vf_ensure_open(vf, i);
+        if (!fp) break;
+        pofs = sg->skip + seg_off;
+        if (vf->phys_pos != pofs) {
+            if (odv_fseek(fp, pofs, SEEK_SET) != 0) break;
+            vf->phys_pos = pofs;
+        }
+        got = fread(out + done, 1, (size_t)chunk, fp);
+        vf->phys_pos += (int64_t)got;
+        vf->logpos   += (int64_t)got;
+        done         += (int64_t)got;
+        if (got < (size_t)chunk) break;                 /* short read / error */
+    }
+    return (size_t)(done / (int64_t)size);
+}
+
+int odv_vseek(ODV_VFILE *vf, int64_t offset, int whence)
+{
+    int64_t np;
+    if (!vf) return -1;
+    switch (whence) {
+    case SEEK_SET: np = offset; break;
+    case SEEK_CUR: np = vf->logpos + offset; break;
+    case SEEK_END: np = vf->logsize + offset; break;
+    default: return -1;
+    }
+    if (np < 0) return -1;
+    vf->logpos = np;        /* physical reposition is deferred to the next read */
+    return 0;
+}
+
+int64_t odv_vtell(ODV_VFILE *vf)
+{
+    return vf ? vf->logpos : -1;
+}
+
+void odv_vclose(ODV_VFILE *vf)
+{
+    int i;
+    if (!vf) return;
+    if (vf->fp) { fclose(vf->fp); vf->fp = NULL; }
+    for (i = 0; i < vf->nfiles; i++)
+        free(vf->seg[i].path);
+    free(vf->seg);
+    vf->seg = NULL;
+    vf->nfiles = 0;
+    vf->cap = 0;
+    vf->open_idx = -1;
+}
+
+/*---------------------------------------------------------------------------
     Operations
  ---------------------------------------------------------------------------*/
 

@@ -345,6 +345,8 @@ Public Class Open_NativeParser
         Public Property EntryType As Integer = TABLE_TYPE_TABLE
         Public Property PartitionName As String = ""
         Public Property ParentPartition As String = ""
+        ''' <summary>区画表の親行（表全体＝全区画をまとめて開く合成エントリ）か否か (H-14)</summary>
+        Public Property IsWholeTable As Boolean = False
 
         ''' <summary>キー文字列 (schema.table)</summary>
         Public ReadOnly Property Key As String
@@ -589,7 +591,8 @@ Public Class Open_NativeParser
     Public Shared Function ExportCsv(filePath As String, tableName As String, outputPath As String,
                                       Optional schema As String = Nothing,
                                       Optional dataOffset As Long = 0,
-                                      Optional progressAction As Action(Of Long, String, Integer) = Nothing) As Integer
+                                      Optional progressAction As Action(Of Long, String, Integer) = Nothing,
+                                      Optional partitionName As String = Nothing) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Dim progCb As ProgressCallback = Nothing
         Dim gcHandle As GCHandle = Nothing
@@ -619,6 +622,11 @@ Public Class Open_NativeParser
             End If
             If tableName IsNot Nothing AndAlso tableName.Length > 0 Then
                 odv_set_table_filter(session, If(schema, ""), tableName)
+            End If
+            ' 区画名フィルタ (H-14): odv_set_table_filter が区画名をクリアするので必ず後に設定する。
+            ' 空のとき（親行・通常表）は設定しない＝表全体（全区画）を出力する
+            If partitionName IsNot Nothing AndAlso partitionName.Length > 0 Then
+                odv_set_partition_filter(session, partitionName)
             End If
 
             Return odv_export_csv(session, tableName, outputPath)
@@ -643,7 +651,8 @@ Public Class Open_NativeParser
     Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer,
                                       Optional schema As String = Nothing,
                                       Optional dataOffset As Long = 0,
-                                      Optional progressAction As Action(Of Long, String, Integer) = Nothing) As Integer
+                                      Optional progressAction As Action(Of Long, String, Integer) = Nothing,
+                                      Optional partitionName As String = Nothing) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Dim progCb As ProgressCallback = Nothing
         Dim gcHandle As GCHandle = Nothing
@@ -673,6 +682,11 @@ Public Class Open_NativeParser
             End If
             If tableName IsNot Nothing AndAlso tableName.Length > 0 Then
                 odv_set_table_filter(session, If(schema, ""), tableName)
+            End If
+            ' 区画名フィルタ (H-14): odv_set_table_filter が区画名をクリアするので必ず後に設定する。
+            ' 空のとき（親行・通常表）は設定しない＝表全体（全区画）を出力する
+            If partitionName IsNot Nothing AndAlso partitionName.Length > 0 Then
+                odv_set_partition_filter(session, partitionName)
             End If
 
             Return odv_export_sql(session, tableName, outputPath, dbmsType)

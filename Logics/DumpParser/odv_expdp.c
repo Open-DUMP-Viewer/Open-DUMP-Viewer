@@ -859,7 +859,7 @@ static int expdp_block_prefix_ok(ODV_SESSION *s, const unsigned char *pre,
     return prefix == s->expdp_xml_prefix;
 }
 
-static int finish_fragment(ODV_SESSION *s, FILE *fp, int list_only,
+static int finish_fragment(ODV_SESSION *s, ODV_VFILE *fp, int list_only,
                            int *record_count)
 {
     ODV_PARSE_STATE *st = &s->state;
@@ -899,7 +899,7 @@ static int finish_fragment(ODV_SESSION *s, FILE *fp, int list_only,
     return ODV_OK;
 }
 
-static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
+static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                                int list_only)
 {
     ODV_PARSE_STATE *st = &s->state;
@@ -985,7 +985,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
 
     while (!s->cancelled) {
         /* Read one byte */
-        if (fread(&b, 1, 1, fp) != 1) break;
+        if (odv_vread(&b, 1, 1, fp) != 1) break;
         (*address)++;
 
         /* Safety net: a table-definition block begins at a 4KB boundary with
@@ -997,20 +997,20 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
            table definition and does not truncate the table (see H-23). */
         if (b == '<' && (*address % ODV_DUMP_BLOCK_LEN) == 3) {
             unsigned char peek[4];
-            if (fread(peek, 1, 4, fp) == 4) {
+            if (odv_vread(peek, 1, 4, fp) == 4) {
                 int looks_xml = (memcmp(peek, "?xml", 4) == 0);
-                odv_fseek(fp, -4, SEEK_CUR);          /* back to just past '<' */
+                odv_vseek(fp, -4, SEEK_CUR);          /* back to just past '<' */
                 if (looks_xml) {
                     unsigned char pre[2];
                     int64_t here = *address;          /* file pos just past '<' */
                     int is_block_prefix = 0;
-                    odv_fseek(fp, here - 3, SEEK_SET);
-                    if (fread(pre, 1, 2, fp) == 2 &&
+                    odv_vseek(fp, here - 3, SEEK_SET);
+                    if (odv_vread(pre, 1, 2, fp) == 2 &&
                         expdp_block_prefix_ok(s, pre, 0))
                         is_block_prefix = 1;
-                    odv_fseek(fp, here, SEEK_SET);     /* restore */
+                    odv_vseek(fp, here, SEEK_SET);     /* restore */
                     if (is_block_prefix) {
-                        odv_fseek(fp, here - 3, SEEK_SET);
+                        odv_vseek(fp, here - 3, SEEK_SET);
                         *address = here - 3;
                         break;
                     }
@@ -1059,13 +1059,13 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                  * length itself only needs to be skipped. */
                 if (b & 0x10) {
                     unsigned char lenb[2];
-                    if (fread(lenb, 1, 2, fp) != 2) return ODV_OK;
+                    if (odv_vread(lenb, 1, 2, fp) != 2) return ODV_OK;
                     (*address) += 2;
                     (void)lenb;
                 }
 
                 /* Column count for this fragment. */
-                if (fread(&cc, 1, 1, fp) != 1) return ODV_OK;
+                if (odv_vread(&cc, 1, 1, fp) != 1) return ODV_OK;
                 (*address)++;
                 st->seg_remaining = (int)cc;
 
@@ -1277,7 +1277,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     record_count++;
                     s->table.record_count++;
 
-                    odv_fseek(fp, -1, SEEK_CUR);   /* unread the header byte */
+                    odv_vseek(fp, -1, SEEK_CUR);   /* unread the header byte */
                     (*address)--;
                     st->step          = 1;
                     st->data_step     = DS_COL_LENGTH;
@@ -1454,7 +1454,7 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                     int need = chunk_size - lob_read;
                     int blk  = (need < (int)sizeof(lob_tmp))
                                 ? need : (int)sizeof(lob_tmp);
-                    int got  = (int)fread(lob_tmp, 1, blk, fp);
+                    int got  = (int)odv_vread(lob_tmp, 1, blk, fp);
                     if (got <= 0) goto END_PARSE;
                     *address += got;
 
@@ -1476,11 +1476,11 @@ static int parse_expdp_records(ODV_SESSION *s, FILE *fp, int64_t *address,
                 st->lob_length += chunk_size;
 
                 /* Peek ahead 2 bytes to determine is_last_chunk */
-                if (fread(next_buf, 2, 1, fp) != 1) {
+                if (odv_vread(next_buf, 2, 1, fp) != 1) {
                     /* EOF — treat as last chunk */
                     st->is_last_chunk = 1;
                 } else {
-                    odv_fseek(fp, -2, SEEK_CUR);
+                    odv_vseek(fp, -2, SEEK_CUR);
                     switch (next_buf[0]) {
                     case 0xfe: case 0xff:
                         st->is_last_chunk = 1;
@@ -1601,7 +1601,9 @@ static void scan_master_metadata(ODV_SESSION *s)
     ODV_PART_MARK *pmarks = NULL;
     int pmark_count = 0, pmark_alloc = 0;
 
-    FILE *sfp = NULL;
+    ODV_VFILE vsf;
+    ODV_VFILE *sfp = &vsf;
+    int sfp_open = 0;
     unsigned char blk[8192];
     int carry = 0;
     int ti, k, mi, pass;
@@ -1621,12 +1623,11 @@ static void scan_master_metadata(ODV_SESSION *s)
         }
     }
 
-    sfp = fopen(s->dump_path, "rb");
-    if (!sfp) goto scan_cleanup;
-    setvbuf(sfp, NULL, _IOFBF, 65536);
+    if (odv_vopen(&vsf, s) != ODV_OK) goto scan_cleanup;
+    sfp_open = 1;
 
     for (;;) {
-        int got = (int)fread(blk + carry, 1, sizeof(blk) - carry, sfp);
+        int got = (int)odv_vread(blk + carry, 1, sizeof(blk) - carry, sfp);
         int avail = carry + got;
         int at_eof = (got < (int)sizeof(blk) - carry);
         int scan_end = at_eof ? avail : (avail - ODV_META_SCAN_OVERLAP);
@@ -1872,7 +1873,7 @@ scan_apply:
     }
 
 scan_cleanup:
-    if (sfp) fclose(sfp);
+    if (sfp_open) odv_vclose(&vsf);
     free(matches);
     free(pmarks);
     free(part_occ);
@@ -1892,7 +1893,8 @@ scan_cleanup:
  ---------------------------------------------------------------------------*/
 int parse_expdp_dump(ODV_SESSION *s, int list_only)
 {
-    FILE *fp;
+    ODV_VFILE vf;
+    ODV_VFILE *fp = &vf;
     unsigned char block[ODV_DUMP_BLOCK_LEN];
     char *ddl_buf = NULL;
     int ddl_len = 0;
@@ -1906,14 +1908,13 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 
     if (!s) return ODV_ERROR_INVALID_ARG;
 
-    fp = fopen(s->dump_path, "rb");
-    if (!fp) {
-        snprintf(s->last_error, ODV_MSG_LEN, "Cannot open: %s", s->dump_path);
-        return ODV_ERROR_FOPEN;
+    /* Open the dump as one logical stream (joins dumpfile=%U split volumes). */
+    rc = odv_vopen(&vf, s);
+    if (rc != ODV_OK) {
+        if (s->last_error[0] == '\0')
+            snprintf(s->last_error, ODV_MSG_LEN, "Cannot open: %s", s->dump_path);
+        return rc;
     }
-
-    /* Set 64KB I/O buffer for improved read throughput */
-    setvbuf(fp, NULL, _IOFBF, 65536);
 
     /* Reset progress tracking */
     s->last_progress_pct = -1;
@@ -1922,7 +1923,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
     ddl_alloc = ODV_DDL_BUF_LEN;
     ddl_buf = (char *)malloc(ddl_alloc);
     if (!ddl_buf) {
-        fclose(fp);
+        odv_vclose(&vf);
         return ODV_ERROR_MALLOC;
     }
 
@@ -1937,13 +1938,13 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
        (= block_start + 2), so we round down to the enclosing block. */
     if (s->seek_offset > 0 && s->filter_active) {
         int64_t aligned = (s->seek_offset / ODV_DUMP_BLOCK_LEN) * ODV_DUMP_BLOCK_LEN;
-        odv_fseek(fp, aligned, SEEK_SET);
+        odv_vseek(fp, aligned, SEEK_SET);
         address = aligned;
     }
 
     /* Read blocks sequentially */
     while (!s->cancelled) {
-        n = (int)fread(block, 1, ODV_DUMP_BLOCK_LEN, fp);
+        n = (int)odv_vread(block, 1, ODV_DUMP_BLOCK_LEN, fp);
         if (n <= 0) break;
 
         /* Report progress during DDL scan so UI stays responsive */
@@ -1960,7 +1961,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 
         if (xml_pos >= 0 && !in_ddl) {
             /* Start of XML DDL block - record file position for caching */
-            cur_ddl_pos = odv_ftell(fp) - n + xml_pos;
+            cur_ddl_pos = odv_vtell(fp) - n + xml_pos;
             in_ddl = 1;
             ddl_len = 0;
 
@@ -2009,8 +2010,8 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                 s->table.ddl_offset = cur_ddl_pos;
 
                 /* Seek to just after </ROWSET> for record data */
-                odv_fseek(fp, cur_ddl_pos + end_pos, SEEK_SET);
-                address = odv_ftell(fp);
+                odv_vseek(fp, cur_ddl_pos + end_pos, SEEK_SET);
+                address = odv_vtell(fp);
 
                 /* Skip dictionary tables and metadata-only XMLs (0 columns) */
                 if (s->table.name[0] != '\0' && s->table.col_count > 0
@@ -2104,21 +2105,21 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                  * under-reads, we always re-sync to the correct position.
                  * First, align to the next block boundary. */
                 {
-                    int64_t cur = odv_ftell(fp);
+                    int64_t cur = odv_vtell(fp);
                     int64_t rem = cur % ODV_DUMP_BLOCK_LEN;
                     if (rem != 0)
-                        odv_fseek(fp, cur + (ODV_DUMP_BLOCK_LEN - rem), SEEK_SET);
+                        odv_vseek(fp, cur + (ODV_DUMP_BLOCK_LEN - rem), SEEK_SET);
                 }
                 /* Then scan block-by-block until we find <?xml or EOF.
                    Require the dump's charset-id block prefix so a "<?xml" that
                    is really row-data text is not taken for a table (H-23). */
                 while (!s->cancelled) {
-                    int nr = (int)fread(skip_blk, 1, ODV_DUMP_BLOCK_LEN, fp);
+                    int nr = (int)odv_vread(skip_blk, 1, ODV_DUMP_BLOCK_LEN, fp);
                     if (nr < 7) break;  /* EOF */
                     if (memcmp(skip_blk + 2, "<?xml", 5) == 0 &&
                         expdp_block_prefix_ok(s, skip_blk, 1)) {
                         /* Found next DDL block — seek back so main loop reads it */
-                        odv_fseek(fp, odv_ftell(fp) - nr, SEEK_SET);
+                        odv_vseek(fp, odv_vtell(fp) - nr, SEEK_SET);
                         break;
                     }
                 }
@@ -2128,7 +2129,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
             }
         }
 
-        address = odv_ftell(fp);
+        address = odv_vtell(fp);
     }
 
 expdp_done:
@@ -2139,7 +2140,7 @@ expdp_done:
         scan_master_metadata(s);
 
     free(ddl_buf);
-    fclose(fp);
+    odv_vclose(&vf);
 
     if (s->cancelled) return ODV_ERROR_CANCELLED;
     return ODV_OK;

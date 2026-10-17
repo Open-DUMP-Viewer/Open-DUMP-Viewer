@@ -26,7 +26,7 @@ Public Class SqlExportLogic
         End If
 
         Dim rc = Open_NativeParser.ExportSql(ctx.DumpFilePath, ctx.TableName, outputPath, dbmsType,
-                                               ctx.Schema, ctx.DataOffset, progressAction)
+                                               ctx.Schema, ctx.DataOffset, progressAction, ctx.Partition)
         If rc <> Open_NativeParser.ODV_OK Then
             Throw New Exception(Loc.SF("SqlExport_ErrorRc", rc))
         End If

@@ -130,6 +130,7 @@
 #define ODV_MAX_COLUMNS       1000
 #define ODV_MAX_CONSTRAINTS     50
 #define ODV_MAX_CONSTRAINT_COLS 16
+#define ODV_MAX_SPLIT         2048   /* Max files in a FILESIZE/%U split set */
 
 /* Table/Partition types (for ODV_TABLE_ENTRY.type) */
 #define TABLE_TYPE_TABLE              0
@@ -277,6 +278,37 @@ typedef struct {
     int         col_count;
     int         max_columns;
 } ODV_RECORD;
+
+/*---------------------------------------------------------------------------
+    Virtual multi-file read stream (H-28)
+
+    Presents an ordered set of split dump files (exp FILESIZE= / expdp
+    dumpfile=%U, named <stem>_01, _02, ...) as one continuous logical byte
+    stream, so a row / LOB / XML / master table that straddles a file boundary
+    is read without interruption.  Each physical file after the first carries
+    its own header block that is NOT part of the logical stream; `skip` is how
+    many leading bytes of that physical file are dropped (0 for the first file,
+    the block size for exp, one 4KB block for expdp).  For a single, non-split
+    dump the stream has exactly one segment with skip 0, so read/seek/tell are
+    byte-for-byte identical to operating on the one FILE directly.
+ ---------------------------------------------------------------------------*/
+typedef struct {
+    char   *path;        /* physical file path (heap) */
+    int64_t skip;        /* leading bytes of this file not in the logical stream */
+    int64_t avail;       /* logical bytes this file contributes (size - skip) */
+    int64_t logstart;    /* logical offset of this file's first contributed byte */
+} ODV_VSEG;
+
+typedef struct {
+    ODV_VSEG *seg;       /* heap array of nfiles segments */
+    int       nfiles;
+    int       cap;
+    int64_t   logsize;   /* total logical size (sum of seg[].avail) */
+    int64_t   logpos;    /* current logical read position */
+    FILE     *fp;        /* lazily-opened handle for segment open_idx */
+    int       open_idx;  /* segment fp refers to (-1 = none open) */
+    int64_t   phys_pos;  /* physical offset fp is positioned at (avoids re-seek) */
+} ODV_VFILE;
 
 /*---------------------------------------------------------------------------
     EXPDP record parsing state machine (ARK-style)
@@ -569,9 +601,18 @@ int  set_value_null(ODV_VALUE *v);
 int  set_value_string(ODV_VALUE *v, const char *str, int len);
 int  ensure_value_buf(ODV_VALUE *v, int needed);
 int  deliver_row(ODV_SESSION *s);
-void odv_report_progress(ODV_SESSION *s, FILE *fp);
+void odv_report_progress(ODV_SESSION *s, ODV_VFILE *fp);
 void invalidate_meta_cache(void);
 void update_meta_cache(ODV_SESSION *s);
+
+/* Virtual multi-file read stream (odv_api.c; see ODV_VFILE). For a single,
+ * non-split dump these behave exactly like fopen/fread/fseek/ftell/fclose on
+ * the one file. */
+int     odv_vopen(ODV_VFILE *vf, ODV_SESSION *s);
+size_t  odv_vread(void *ptr, size_t size, size_t nmemb, ODV_VFILE *vf);
+int     odv_vseek(ODV_VFILE *vf, int64_t offset, int whence);
+int64_t odv_vtell(ODV_VFILE *vf);
+void    odv_vclose(ODV_VFILE *vf);
 
 /* odv_number.c */
 int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_size);
