@@ -239,6 +239,14 @@ Stellen Sie sicher, dass Open_DumpParser.dll im selben Ordner wie die ausführba
   <data name="Analyze_ParseError" xml:space="preserve"><value>Fehler bei der Dump-Dateianalyse: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Fehler beim Abrufen der Tabellenliste: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Fehler bei der Tabellenanalyse: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>Diese Dump-Datei ist abgeschnitten (das Ende der Datei fehlt).
+
+Die angezeigten bzw. exportierten Tabellen und Zeilen umfassen nur das, was bis zu der Stelle gelesen werden konnte, an der die Datei endet. Tabellen und Zeilen nach dieser Stelle sind nicht enthalten, und in der zuletzt gelesenen Tabelle können Zeilen fehlen.
+
+Mögliche Ursachen sind eine abgebrochene Übertragung oder Kopie, ein voller Datenträger oder ein fehlgeschlagener Export. Bitte prüfen Sie die ursprüngliche Dump-Datei.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>Dieser Dump ist auf mehrere Dateien aufgeteilt (Export mit FILESIZE o. Ä.), aber die nächste Datei wurde nicht gefunden.
+
+Die angezeigten bzw. exportierten Tabellen und Zeilen umfassen nur den Inhalt der gefundenen Dateien. Legen Sie die übrigen Dateien (…_02.dmp usw.) in denselben Ordner und öffnen Sie anschließend die erste Datei erneut.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>Dateipfad ist nicht angegeben.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>Datei nicht gefunden: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>Datei muss im .dmp-Format vorliegen.</value></data>

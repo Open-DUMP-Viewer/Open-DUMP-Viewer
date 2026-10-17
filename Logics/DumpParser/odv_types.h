@@ -48,6 +48,13 @@
 #define ODV_ERROR_CANCELLED   -200
 #define ODV_ERROR_UNSUPPORTED -300
 
+/* Success with a warning (M-21): the operation completed and everything that
+   could be read was delivered, but the dump ends early. Positive, so a caller
+   that only accepts ODV_OK does not mistake a partial result for a whole one.
+   Same values as in odv_api.h. */
+#define ODV_WARN_TRUNCATED       1   /* the dump stops before its own end */
+#define ODV_WARN_VOLUME_MISSING  2   /* a later file of a split set is missing */
+
 /* Boolean */
 #define ODV_TRUE   1
 #define ODV_FALSE  0
@@ -115,9 +122,12 @@
 #define EXPDP_REC_END          0xff
 
 /* Buffer sizes */
-#define ODV_PATH_LEN           260
+/* Paths are UTF-8 (M-26). A MAX_PATH (260 UTF-16 units) Windows path takes
+   up to 780 bytes in UTF-8 (3 per kanji), so 260 bytes cut a short Japanese
+   path. A longer path is refused, never silently truncated. */
+#define ODV_PATH_LEN          1024
 #define ODV_OBJNAME_LEN        128
-#define ODV_MSG_LEN           1024
+#define ODV_MSG_LEN           2048   /* holds a message with a whole path */
 #define ODV_WORD_LEN          6000
 #define ODV_VARCHAR_LEN      98301   /* UTF-8 max VARCHAR2 */
 #define ODV_FILE_BUF_LEN     32768
@@ -351,7 +361,18 @@ typedef struct {
     FILE     *fp;        /* lazily-opened handle for segment open_idx */
     int       open_idx;  /* segment fp refers to (-1 = none open) */
     int64_t   phys_pos;  /* physical offset fp is positioned at (avoids re-seek) */
+    int       tail;      /* how the stream ends: ODV_TAIL_* (M-21) */
+    struct _odv_session *owner; /* told when a read reaches an early end */
 } ODV_VFILE;
+
+/* How a dump's logical stream ends (ODV_VFILE.tail, M-21). Decided in
+   odv_vopen from the last file of the set: an exp dump ends with its EXIT
+   records, an expdp file holds the master table where its header (or, from
+   23ai, its trailer block) says. */
+#define ODV_TAIL_COMPLETE  0   /* ends where the dump says it ends */
+#define ODV_TAIL_CUT       1   /* ends early: copy cut short, export failed */
+#define ODV_TAIL_VOLMISS   2   /* this file is complete, but the dump goes on
+                                  in a split volume that was not found */
 
 /*---------------------------------------------------------------------------
     EXPDP record parsing state machine (ARK-style)
@@ -574,6 +595,9 @@ struct _odv_session {
     /* Control */
     int             cancelled;
     char            last_error[ODV_MSG_LEN + 1];
+    int             stream_cut;      /* ODV_TAIL_* of a stream whose early end
+                                        the current operation read up to (M-21);
+                                        reset at the start of each operation */
 
     /* Statistics */
     int64_t         total_rows;
@@ -601,6 +625,7 @@ struct _odv_session {
     char            lob_extension[32];     /* File extension (default "lob") */
     int64_t         lob_files_written;     /* Count of files written */
     int64_t         lob_files_failed;      /* Count of LOB rows that could not be written (H-07) */
+    int             lob_column_missing;    /* 1 = the table had no such LOB column (M-27) */
 };
 
 /*---------------------------------------------------------------------------
@@ -689,6 +714,17 @@ size_t  odv_vread(void *ptr, size_t size, size_t nmemb, ODV_VFILE *vf);
 int     odv_vseek(ODV_VFILE *vf, int64_t offset, int whence);
 int64_t odv_vtell(ODV_VFILE *vf);
 void    odv_vclose(ODV_VFILE *vf);
+
+/* fopen for a path in UTF-8 (odv_api.c, M-26). On Windows a valid UTF-8 path
+ * is opened through its UTF-16 form (_wfopen), so it may hold characters
+ * outside the ANSI code page; bytes that are not UTF-8 are taken as ANSI, as
+ * plain fopen does. Elsewhere it is fopen. */
+FILE   *odv_fopen_path(const char *path, const char *mode);
+
+/* 1 if the expdp file at s->dump_path ends before the master table its own
+ * header (or trailer) points to: a dump cut short, not a compressed one,
+ * when no table definition is found in it (odv_api.c, M-21). */
+int     odv_expdp_cut_short(ODV_SESSION *s);
 
 /* odv_number.c */
 int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_size);

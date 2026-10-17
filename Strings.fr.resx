@@ -259,6 +259,14 @@ Assurez-vous que Open_DumpParser.dll se trouve dans le même dossier que l'exéc
   <data name="Analyze_ParseError" xml:space="preserve"><value>Erreur lors de l'analyse du fichier Dump : {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Erreur lors de la récupération de la liste des tables : {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Erreur lors de l'analyse de la table : {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>Ce fichier de dump est tronqué (la fin du fichier est manquante).
+
+Les tables et les lignes affichées ou exportées sont uniquement celles qui ont pu être lues avant l'endroit où le fichier s'arrête. Les tables et les lignes situées après ce point ne sont pas incluses, et il peut manquer des lignes à la dernière table lue.
+
+Causes possibles : transfert ou copie interrompu, disque plein ou échec de l'export. Vérifiez le fichier de dump d'origine.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>Ce dump est réparti sur plusieurs fichiers (export avec FILESIZE ou une option similaire), mais le fichier suivant est introuvable.
+
+Les tables et les lignes affichées ou exportées sont uniquement celles contenues dans les fichiers trouvés. Placez les fichiers restants (…_02.dmp, etc.) dans le même dossier, puis rouvrez le premier fichier.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>Le chemin du fichier n'est pas spécifié.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>Le fichier doit être au format .dmp.</value></data>

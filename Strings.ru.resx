@@ -253,6 +253,14 @@ https://www.odv.dev/
   <data name="Analyze_ParseError" xml:space="preserve"><value>Ошибка при анализе файла дампа: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Ошибка при получении списка таблиц: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Ошибка при анализе таблицы: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>Этот файл дампа обрезан (отсутствует конец файла).
+
+Отображаемые и экспортируемые таблицы и строки — только те, которые удалось прочитать до места, где файл обрывается. Таблицы и строки после этого места не включены, а в последней прочитанной таблице могут отсутствовать строки.
+
+Возможные причины: прерванная передача или копирование, нехватка места на диске или сбой самого экспорта. Проверьте исходный файл дампа.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>Этот дамп разделён на несколько файлов (экспорт с параметром FILESIZE или аналогичным), но следующий файл не найден.
+
+Отображаемые и экспортируемые таблицы и строки — только те, что содержатся в найденных файлах. Поместите остальные файлы (…_02.dmp и т. д.) в ту же папку и откройте первый файл заново.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>Путь к файлу не указан.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>Файл не найден: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>Файл должен быть в формате .dmp.</value></data>

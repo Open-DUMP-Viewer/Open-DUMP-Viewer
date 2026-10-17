@@ -1104,7 +1104,7 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
 
     all_tables = (!table_name || table_name[0] == '\0');
 
-    ctx.fp = fopen(output_path, "wb");
+    ctx.fp = odv_fopen_path(output_path, "wb");   /* UTF-8 path (M-26) */
     if (!ctx.fp) {
         odv_strcpy(s->last_error, "Cannot create SQL output file", ODV_MSG_LEN);
         return ODV_ERROR_FOPEN;

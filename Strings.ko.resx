@@ -253,6 +253,14 @@ Open_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세�
   <data name="Analyze_ParseError" xml:space="preserve"><value>덤프 파일 분석 중 오류 발생: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>테이블 목록 가져오기 중 오류 발생: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>테이블 분석 중 오류 발생: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>이 덤프 파일은 중간에 잘려 있습니다(파일의 끝부분이 없습니다).
+
+표시되거나 내보내지는 테이블과 행은 파일이 끝나는 위치까지 읽을 수 있었던 부분뿐입니다. 그 위치 이후의 테이블과 행은 포함되지 않으며, 마지막으로 읽은 테이블은 일부 행이 빠져 있을 수 있습니다.
+
+전송이나 복사 중단, 디스크 공간 부족, 내보내기 자체의 실패 등이 원인일 수 있습니다. 원본 덤프 파일을 확인하십시오.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>이 덤프는 여러 파일로 나뉘어 있지만(FILESIZE 등을 지정한 내보내기), 다음 파일을 찾을 수 없습니다.
+
+표시되거나 내보내지는 테이블과 행은 찾은 파일에 들어 있는 부분뿐입니다. 나머지 파일(…_02.dmp 등)을 같은 폴더에 둔 다음 첫 번째 파일을 다시 여십시오.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>파일 경로가 지정되지 않았습니다.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>파일을 찾을 수 없습니다: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>파일은 .dmp 형식이어야 합니다.</value></data>

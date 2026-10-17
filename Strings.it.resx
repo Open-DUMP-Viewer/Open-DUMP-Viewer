@@ -255,6 +255,14 @@ Assicurarsi che Open_DumpParser.dll sia nella stessa cartella dell'eseguibile.</
   <data name="Analyze_ParseError" xml:space="preserve"><value>Errore durante l'analisi del file Dump: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Errore durante il recupero dell'elenco tabelle: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Errore durante l'analisi della tabella: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>Questo file di dump è troncato (manca la parte finale del file).
+
+Le tabelle e le righe visualizzate o esportate sono solo quelle che è stato possibile leggere prima del punto in cui il file si interrompe. Le tabelle e le righe successive a quel punto non sono incluse e nell'ultima tabella letta potrebbero mancare delle righe.
+
+Possibili cause: trasferimento o copia interrotti, disco pieno o esportazione non riuscita. Verificare il file di dump originale.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>Questo dump è suddiviso in più file (esportazione con FILESIZE o un'opzione simile), ma il file successivo non è stato trovato.
+
+Le tabelle e le righe visualizzate o esportate sono solo quelle contenute nei file trovati. Collocare i file rimanenti (…_02.dmp e così via) nella stessa cartella, quindi riaprire il primo file.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>Il percorso del file non è specificato.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>File non trovato: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>Il file deve essere in formato .dmp.</value></data>

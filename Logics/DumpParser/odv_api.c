@@ -26,6 +26,115 @@ static void set_error(ODV_SESSION *s, const char *msg)
     }
 }
 
+/* Start of a public operation that reads the dump: forget how far the
+   previous one read (M-21). */
+static void op_begin(ODV_SESSION *s)
+{
+    s->stream_cut = ODV_TAIL_COMPLETE;
+}
+
+/* End of such an operation (M-21). When it read up to the early end of a
+   dump (see "Where a dump ends"), a successful result is turned into the
+   matching warning, with the reason in last_error; everything read before
+   that point has been delivered. Errors and cancellation pass unchanged. */
+static int op_finish(ODV_SESSION *s, int rc)
+{
+    if (rc != ODV_OK) return rc;
+    if (s->stream_cut == ODV_TAIL_CUT) {
+        set_error(s, "The dump file is truncated: it ends before the end of the "
+                     "export. Tables and rows after that point are missing, and "
+                     "the last table read may be incomplete.");
+        return ODV_WARN_TRUNCATED;
+    }
+    if (s->stream_cut == ODV_TAIL_VOLMISS) {
+        set_error(s, "The dump continues in a further file of a split dump set "
+                     "(FILESIZE / dumpfile=%U) that was not found next to this "
+                     "one. Only the tables and rows in the files found are read.");
+        return ODV_WARN_VOLUME_MISSING;
+    }
+    return rc;
+}
+
+/*---------------------------------------------------------------------------
+    odv_fopen_path (M-26)
+
+    The application hands every path to the DLL in UTF-8 (LPUTF8Str). The
+    Windows CRT's fopen() reads a char path in the ANSI code page, so a path
+    with Japanese or any other non-ASCII character named a different, non-
+    existent file: LOB extraction into C:\temp\出力 wrote nothing at all.
+    A path that is valid UTF-8 is therefore converted to UTF-16 and opened
+    with _wfopen(); one of MAX_PATH (260) or more units gets the \\?\ prefix
+    (after GetFullPathNameW, which that prefix requires), so a long path does
+    not fail either. Bytes that are not UTF-8 can only be an ANSI path from an
+    older caller and go to fopen() as before; so does a read-only open whose
+    UTF-8 reading names no file, for the same reason.
+ ---------------------------------------------------------------------------*/
+#ifdef WINDOWS
+static wchar_t *odv_utf8_to_wpath(const char *path)
+{
+    int wn;
+    wchar_t *w;
+
+    wn = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (wn <= 0) return NULL;                       /* not UTF-8 */
+    w = (wchar_t *)malloc((size_t)wn * sizeof(wchar_t));
+    if (!w) return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, w, wn) != wn) {
+        free(w);
+        return NULL;
+    }
+    if (wn - 1 >= MAX_PATH && wcsncmp(w, L"\\\\?\\", 4) != 0) {
+        DWORD fn = GetFullPathNameW(w, 0, NULL, NULL);
+        wchar_t *full, *lp;
+        size_t fl;
+        if (fn == 0) return w;                      /* let _wfopen report it */
+        full = (wchar_t *)malloc((size_t)fn * sizeof(wchar_t));
+        if (!full) return w;
+        if (GetFullPathNameW(w, fn, full, NULL) == 0) { free(full); return w; }
+        fl = wcslen(full);
+        lp = (wchar_t *)malloc((fl + 8) * sizeof(wchar_t));
+        if (!lp) { free(full); return w; }
+        if (full[0] == L'\\' && full[1] == L'\\') {  /* \\server\share\... */
+            wcscpy(lp, L"\\\\?\\UNC\\");
+            wcscat(lp, full + 2);
+        } else {
+            wcscpy(lp, L"\\\\?\\");
+            wcscat(lp, full);
+        }
+        free(full);
+        free(w);
+        w = lp;
+    }
+    return w;
+}
+#endif
+
+FILE *odv_fopen_path(const char *path, const char *mode)
+{
+#ifdef WINDOWS
+    wchar_t wmode[8];
+    wchar_t *w;
+    FILE *fp;
+    int i;
+
+    if (!path || !mode) return NULL;
+    w = odv_utf8_to_wpath(path);
+    if (!w) return fopen(path, mode);               /* ANSI path */
+    for (i = 0; mode[i] && i < 7; i++) wmode[i] = (wchar_t)(unsigned char)mode[i];
+    wmode[i] = L'\0';
+    fp = _wfopen(w, wmode);
+    free(w);
+    if (!fp && mode[0] == 'r') {
+        for (i = 0; path[i]; i++)
+            if ((unsigned char)path[i] >= 0x80) return fopen(path, mode);
+    }
+    return fp;
+#else
+    if (!path || !mode) return NULL;
+    return fopen(path, mode);
+#endif
+}
+
 static void clear_session(ODV_SESSION *s)
 {
     memset(s, 0, sizeof(ODV_SESSION));
@@ -272,10 +381,15 @@ ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path)
 
     if (!s || !path) return ODV_ERROR_INVALID_ARG;
 
+    /* A cut path would name another file (or none): refuse it (M-26). */
+    if (strlen(path) > ODV_PATH_LEN) {
+        set_error(s, "Dump file path is too long");
+        return ODV_ERROR_INVALID_ARG;
+    }
     odv_strcpy(s->dump_path, path, ODV_PATH_LEN);
 
     /* Verify file is accessible and get size */
-    fp = fopen(path, "rb");
+    fp = odv_fopen_path(path, "rb");
     if (!fp) {
         set_error(s, "Cannot open dump file");
         return ODV_ERROR_FOPEN;
@@ -416,7 +530,7 @@ ODV_API int ODV_CALL odv_set_app_version(ODV_SESSION *s, const char *ver)
 
 static int64_t vf_filesize(const char *path)
 {
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = odv_fopen_path(path, "rb");
     int64_t sz;
     if (!fp) return -1;
     if (odv_fseek(fp, 0, SEEK_END) != 0) { fclose(fp); return -1; }
@@ -427,7 +541,7 @@ static int64_t vf_filesize(const char *path)
 
 static int vf_read_head(const char *path, unsigned char *buf, int n)
 {
-    FILE *fp = fopen(path, "rb");
+    FILE *fp = odv_fopen_path(path, "rb");
     int got;
     if (!fp) return -1;
     got = (int)fread(buf, 1, (size_t)n, fp);
@@ -522,6 +636,205 @@ static int vf_add_seg(ODV_VFILE *vf, const char *path, int64_t skip, int64_t siz
     return ODV_OK;
 }
 
+/*---------------------------------------------------------------------------
+    Where a dump ends (M-21)
+
+    A dump whose end is missing (a copy or transfer cut short, a full disk,
+    an export that failed) used to read as a smaller, complete dump: the
+    parsers stop at end of file without a word, so the tables after the cut
+    vanished and the table being read lost rows, with rc 0 and no message.
+    Rather than teach every read in the parsers to tell "end of file" from
+    "end of dump", the end is checked once against what the dump itself says,
+    in the last file of the (possibly split) set:
+
+    exp    The export closes with its EXIT records ("EXIT\n" twice), then
+           zeros up to the block size. All 417 complete exp dumps at hand end
+           so (11.2 / 21c / 23ai, conventional and direct). A volume of a
+           FILESIZE= set that is not the last one ends in row data instead; its
+           header carries the FILESIZE (8 bytes BE, after the volume number,
+           at cs+8) and the volume is exactly that long.
+    expdp  The file header block gives the master table's first block
+           (BE32 at 0x36, 1-based) and its length (BE64 at 0x3a); the file
+           holds it whole: (start - 1) * block size + length <= file size.
+           From 23ai (0x40 in the flags byte 0x32) the header leaves these 0
+           and the last block of the file is a trailer, a copy of the header
+           (same 2-byte type and job id [6,34), flag 0x80) that holds them.
+           Only the file(s) at the end of a dumpfile=%U set carry the master;
+           a volume without it, or one whose "a:b:<pieces>:<piece>" field at
+           0x395 (21c and later) has more pieces to come, goes on in the next
+           volume.
+
+    odv_vopen records the verdict in vf->tail. odv_vread reports it to the
+    session only when a read actually reaches that early end, so an
+    operation that finished before it (a table opened through its data
+    offset, ahead of the cut) is not flagged, and a dump that is damaged in
+    the middle but ends properly is never called truncated.
+ ---------------------------------------------------------------------------*/
+#define VF_TAIL_CHUNK    65536
+#define VF_TAIL_MAXZERO  (16 * 1024 * 1024)   /* exp pads less than a block */
+
+static int vf_pread(FILE *fp, int64_t off, unsigned char *buf, int n)
+{
+    if (off < 0 || odv_fseek(fp, off, SEEK_SET) != 0) return -1;
+    return (int)fread(buf, 1, (size_t)n, fp);
+}
+
+/* Big-endian unsigned field (header bytes are untrusted: no signed shifts). */
+static uint64_t vf_be(const unsigned char *p, int n)
+{
+    uint64_t v = 0;
+    int i;
+    for (i = 0; i < n; i++) v = (v << 8) | p[i];
+    return v;
+}
+
+static int exp_tail_state(const char *path, int64_t size)
+{
+    unsigned char hdr[256], tail[5];
+    unsigned char *buf;
+    FILE *fp;
+    int hn, i, field = 0, cs = -1, state = ODV_TAIL_COMPLETE;
+    uint64_t filesize = 0;
+    int64_t end = size, last = -1;
+
+    fp = odv_fopen_path(path, "rb");
+    if (!fp) return ODV_TAIL_COMPLETE;            /* cannot tell: say nothing */
+    hn = vf_pread(fp, 0, hdr, (int)sizeof(hdr));
+    for (i = 0; hn > 0 && i + 7 <= hn && i + 7 <= 0x20; i++) {
+        if (memcmp(hdr + i, "EXPORT:", 7) == 0) {
+            int k;
+            for (k = i; k < hn; k++) {           /* fields from "EXPORT:" */
+                if (hdr[k] == 0x0A || hdr[k] == 0x00) {
+                    if (++field == 7) { cs = k + 1; break; }
+                }
+            }
+            break;
+        }
+    }
+    if (cs >= 0 && cs + 16 <= hn)
+        filesize = vf_be(hdr + cs + 8, 8);
+
+    /* The last non-zero byte of the file */
+    buf = (unsigned char *)malloc(VF_TAIL_CHUNK);
+    if (!buf) { fclose(fp); return ODV_TAIL_COMPLETE; }
+    while (end > 0 && size - end < VF_TAIL_MAXZERO) {
+        int64_t st = (end > VF_TAIL_CHUNK) ? end - VF_TAIL_CHUNK : 0;
+        int n = vf_pread(fp, st, buf, (int)(end - st));
+        if (n != (int)(end - st)) { last = -2; break; }
+        for (i = n - 1; i >= 0 && buf[i] == 0; i--)
+            ;
+        if (i >= 0) { last = st + i; break; }
+        end = st;
+    }
+    free(buf);
+
+    if (last == -2) {
+        state = ODV_TAIL_COMPLETE;                 /* read error: say nothing */
+    } else if (last >= 4 && vf_pread(fp, last - 4, tail, 5) == 5 &&
+               memcmp(tail, "EXIT\n", 5) == 0) {
+        state = ODV_TAIL_COMPLETE;
+    } else if (filesize > 0 && (uint64_t)size >= filesize) {
+        state = ODV_TAIL_VOLMISS;                  /* a full FILESIZE volume */
+    } else {
+        state = ODV_TAIL_CUT;
+    }
+    fclose(fp);
+    return state;
+}
+
+/* "a:b:<pieces>:<piece>" at 0x395 of a DataPump header (21c and later):
+   1 when the master table goes on in a later volume. */
+static int expdp_master_continues(const unsigned char *b)
+{
+    int64_t v[4] = { 0, 0, 0, 0 };
+    int i = 0x395, k = 0, digits = 0;
+
+    for (; i < 0x3B0 && k < 4; i++) {
+        if (b[i] >= '0' && b[i] <= '9') {
+            if (v[k] < 1000000000) v[k] = v[k] * 10 + (b[i] - '0');
+            digits++;
+        } else if (b[i] == ':' && digits > 0) {
+            k++;
+            digits = 0;
+        } else {
+            break;
+        }
+    }
+    if (k == 3 && digits > 0) k = 4;
+    return (k == 4 && v[3] > 0 && v[2] > v[3]);
+}
+
+static int expdp_tail_state(const char *path, int64_t size)
+{
+    unsigned char h[ODV_DUMP_BLOCK_LEN], t[ODV_DUMP_BLOCK_LEN];
+    const unsigned char *m = h;
+    FILE *fp;
+    uint64_t bs, mstart, mlen;
+    int state;
+
+    fp = odv_fopen_path(path, "rb");
+    if (!fp) return ODV_TAIL_COMPLETE;            /* cannot tell: say nothing */
+    if (vf_pread(fp, 0, h, (int)sizeof(h)) != (int)sizeof(h)) {
+        fclose(fp);
+        return ODV_TAIL_CUT;                       /* not even a header block */
+    }
+    bs = vf_be(h + 0x23, 4);
+    if (bs < 512 || bs > (1u << 20) || (bs & (bs - 1)) != 0)
+        bs = ODV_DUMP_BLOCK_LEN;
+    mstart = vf_be(h + 0x36, 4);
+    mlen = vf_be(h + 0x3a, 8);
+
+    if (mstart == 0 && (h[0x32] & 0x40)) {
+        /* 23ai and later: the master's place is in the trailer block. */
+        if (size < (int64_t)(2 * bs) ||
+            vf_pread(fp, size - (int64_t)bs, t, (int)sizeof(t)) != (int)sizeof(t) ||
+            t[0] != h[0] || t[1] != h[1] || memcmp(t + 6, h + 6, 28) != 0 ||
+            !(t[0x32] & 0x80)) {
+            fclose(fp);
+            return ODV_TAIL_CUT;                   /* the trailer is gone */
+        }
+        m = t;
+        mstart = vf_be(t + 0x36, 4);
+        mlen = vf_be(t + 0x3a, 8);
+    }
+    fclose(fp);
+
+    if (mstart > 0 && mlen > 0) {
+        /* mstart < 2^32 and bs <= 2^20, so the sum cannot wrap once
+           mlen <= size has been checked. */
+        if (mlen > (uint64_t)size || (mstart - 1) * bs + mlen > (uint64_t)size)
+            state = ODV_TAIL_CUT;                  /* master table cut off */
+        else if (expdp_master_continues(m))
+            state = ODV_TAIL_VOLMISS;
+        else
+            state = ODV_TAIL_COMPLETE;
+    } else {
+        state = ODV_TAIL_VOLMISS;                  /* master is in a later file */
+    }
+    return state;
+}
+
+static int vf_tail_state(const ODV_VFILE *vf, const ODV_SESSION *s)
+{
+    const ODV_VSEG *sg;
+    if (vf->nfiles <= 0) return ODV_TAIL_COMPLETE;
+    sg = &vf->seg[vf->nfiles - 1];
+    if (s->dump_type == DUMP_EXP || s->dump_type == DUMP_EXP_DIRECT)
+        return exp_tail_state(sg->path, sg->skip + sg->avail);
+    if (s->dump_type == DUMP_EXPDP)
+        return expdp_tail_state(sg->path, sg->skip + sg->avail);
+    return ODV_TAIL_COMPLETE;
+}
+
+int odv_expdp_cut_short(ODV_SESSION *s)
+{
+    int64_t size;
+    if (!s || s->dump_path[0] == '\0') return 0;
+    size = vf_filesize(s->dump_path);
+    if (size < 0) return 0;
+    return expdp_tail_state(s->dump_path, size) == ODV_TAIL_CUT;
+}
+
 int odv_vopen(ODV_VFILE *vf, ODV_SESSION *s)
 {
     unsigned char f0_head[256];
@@ -604,6 +917,10 @@ int odv_vopen(ODV_VFILE *vf, ODV_SESSION *s)
 
     /* Progress percentage is against the whole logical stream. */
     s->dump_size = vf->logsize;
+
+    /* How the stream ends (M-21); reported when a read gets there. */
+    vf->owner = s;
+    vf->tail = vf_tail_state(vf, s);
     return ODV_OK;
 }
 
@@ -611,7 +928,7 @@ static FILE *vf_ensure_open(ODV_VFILE *vf, int idx)
 {
     if (vf->open_idx == idx && vf->fp) return vf->fp;
     if (vf->fp) { fclose(vf->fp); vf->fp = NULL; }
-    vf->fp = fopen(vf->seg[idx].path, "rb");
+    vf->fp = odv_fopen_path(vf->seg[idx].path, "rb");
     vf->open_idx = vf->fp ? idx : -1;
     vf->phys_pos = -1;
     if (vf->fp) setvbuf(vf->fp, NULL, _IOFBF, 65536);
@@ -672,6 +989,11 @@ size_t odv_vread(void *ptr, size_t size, size_t nmemb, ODV_VFILE *vf)
         done         += (int64_t)got;
         if (got < (size_t)chunk) break;                 /* short read / error */
     }
+    /* The reader wanted bytes past the end of a dump that ends early: what
+       it is reading (and all that follows) is cut off (M-21). */
+    if (done < want && vf->logpos >= vf->logsize &&
+        vf->tail != ODV_TAIL_COMPLETE && vf->owner)
+        vf->owner->stream_cut = vf->tail;
     return (size_t)(done / (int64_t)size);
 }
 
@@ -745,17 +1067,18 @@ ODV_API int ODV_CALL odv_list_tables(ODV_SESSION *s)
     s->cancelled = 0;
     s->table_count = 0;
     s->partition_count = 0;
+    op_begin(s);
 
     switch (s->dump_type) {
     case DUMP_EXPDP:
-        return parse_expdp_dump(s, 1 /* list_only */);
+        return op_finish(s, parse_expdp_dump(s, 1 /* list_only */));
     case DUMP_EXPDP_COMPRESS:
         set_error(s, "Compressed EXPDP dumps (COMPRESSION=ALL) are not supported. "
                      "Please re-export with COMPRESSION=NONE.");
         return ODV_ERROR_UNSUPPORTED;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
-        return parse_exp_dump(s, 1 /* list_only */);
+        return op_finish(s, parse_exp_dump(s, 1 /* list_only */));
     default:
         set_error(s, "Unknown or unsupported dump format");
         return ODV_ERROR_FORMAT;
@@ -852,17 +1175,18 @@ ODV_API int ODV_CALL odv_parse_dump(ODV_SESSION *s)
 
     s->cancelled = 0;
     s->total_rows = 0;
+    op_begin(s);
 
     switch (s->dump_type) {
     case DUMP_EXPDP:
-        return parse_expdp_dump(s, 0 /* full parse */);
+        return op_finish(s, parse_expdp_dump(s, 0 /* full parse */));
     case DUMP_EXPDP_COMPRESS:
         set_error(s, "Compressed EXPDP dumps (COMPRESSION=ALL) are not supported. "
                      "Please re-export with COMPRESSION=NONE.");
         return ODV_ERROR_UNSUPPORTED;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
-        return parse_exp_dump(s, 0 /* full parse */);
+        return op_finish(s, parse_exp_dump(s, 0 /* full parse */));
     default:
         set_error(s, "Unknown or unsupported dump format");
         return ODV_ERROR_FORMAT;
@@ -877,13 +1201,15 @@ ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter)
 ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path)
 {
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
-    return write_csv_file(s, table_name, output_path);
+    op_begin(s);
+    return op_finish(s, write_csv_file(s, table_name, output_path));
 }
 
 ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type)
 {
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
-    return write_sql_file(s, table_name, output_path, dbms_type);
+    op_begin(s);
+    return op_finish(s, write_sql_file(s, table_name, output_path, dbms_type));
 }
 
 /*---------------------------------------------------------------------------
@@ -912,6 +1238,10 @@ int odv_lob_check_column(ODV_SESSION *s)
         }
     }
 
+    /* The parsers skip the table on this error and carry on (and the exp
+       parser does not pass it up), so it is also kept here for
+       odv_extract_lob to report: rc 0 with 0 files hid it (M-27). */
+    s->lob_column_missing = 1;
     set_error(s, "LOB column not found in table");
     return ODV_ERROR;
 }
@@ -1114,8 +1444,10 @@ int odv_lob_write_file(ODV_SESSION *s)
 
     /* Write binary. A failure here (fopen/fwrite) is counted in
        lob_files_failed and surfaced via odv_get_lob_files_failed(); it is not
-       made fatal, so the remaining rows of the table are still extracted. */
-    fpw = fopen(path, "wb");
+       made fatal, so the remaining rows of the table are still extracted.
+       The path is UTF-8 (output directory from the application, file name
+       from the dump), so it is opened through UTF-16 on Windows (M-26). */
+    fpw = odv_fopen_path(path, "wb");
     if (!fpw) {
         s->lob_files_failed++;
         set_error(s, "Cannot create LOB output file");
@@ -1164,6 +1496,12 @@ ODV_API int ODV_CALL odv_extract_lob(
     if (!s || !table || !lob_column || !output_dir)
         return ODV_ERROR_INVALID_ARG;
 
+    /* A cut directory name would write somewhere else (M-26). */
+    if (strlen(output_dir) > ODV_PATH_LEN) {
+        set_error(s, "LOB output directory path is too long");
+        return ODV_ERROR_INVALID_ARG;
+    }
+
     /* Configure LOB extraction */
     s->lob_extract_mode = 1;
     odv_strcpy(s->lob_column, lob_column, ODV_OBJNAME_LEN);
@@ -1171,6 +1509,7 @@ ODV_API int ODV_CALL odv_extract_lob(
     s->lob_column_index = -1;
     s->lob_files_written = 0;
     s->lob_files_failed = 0;
+    s->lob_column_missing = 0;
 
     if (filename_col && filename_col[0])
         odv_strcpy(s->lob_filename_col, filename_col, ODV_OBJNAME_LEN);
@@ -1203,6 +1542,7 @@ ODV_API int ODV_CALL odv_extract_lob(
     s->cancelled = 0;
     s->total_rows = 0;
     odv_lob_reset_buffer(s);
+    op_begin(s);
 
     /* Run the parse (LOB accumulation happens inside parse_*_dump) */
     switch (s->dump_type) {
@@ -1222,6 +1562,14 @@ ODV_API int ODV_CALL odv_extract_lob(
         rc = ODV_ERROR_FORMAT;
         break;
     }
+
+    /* The table was found but has no LOB column of that name: nothing could
+       be extracted, which is an error, not "0 files written" (M-27). */
+    if (rc == ODV_OK && s->lob_column_missing) {
+        set_error(s, "LOB column not found in table");
+        rc = ODV_ERROR;
+    }
+    rc = op_finish(s, rc);
 
 cleanup:
     /* Always clean up LOB state regardless of success/failure */

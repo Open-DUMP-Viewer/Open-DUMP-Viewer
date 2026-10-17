@@ -253,6 +253,14 @@ Ensure Open_DumpParser.dll is in the same folder as the executable.</value></dat
   <data name="Analyze_ParseError" xml:space="preserve"><value>Error during dump file analysis: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Error getting table list: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Error during table analysis: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>This dump file is truncated (the end of the file is missing).
+
+The tables and rows shown or exported are only those that could be read before the point where the file ends. Tables and rows after that point are not included, and the last table read may be missing rows.
+
+Possible causes include an interrupted transfer or copy, a full disk, or a failed export. Please check the original dump file.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>This dump is split into several files (an export with FILESIZE or a similar option), but the following file could not be found.
+
+The tables and rows shown or exported are only those contained in the files that were found. Place the remaining files (…_02.dmp and so on) in the same folder, then open the first file again.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>File path is not specified.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>File not found: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>File must be in .dmp format.</value></data>

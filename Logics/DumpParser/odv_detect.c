@@ -99,7 +99,7 @@ int detect_dump_kind(ODV_SESSION *s)
 
     if (!s || s->dump_path[0] == '\0') return ODV_ERROR_INVALID_ARG;
 
-    fp = fopen(s->dump_path, "rb");
+    fp = odv_fopen_path(s->dump_path, "rb");   /* UTF-8 path (M-26) */
     if (!fp) {
         snprintf(s->last_error, ODV_MSG_LEN, "Cannot open file: %s", s->dump_path);
         return ODV_ERROR_FOPEN;
@@ -231,7 +231,10 @@ int detect_dump_kind(ODV_SESSION *s)
     }
 
     if (found_kgc) {
-        s->dump_type = DUMP_EXPDP_COMPRESS;
+        /* A file cut short before its first table definition has no XML
+           either. Its own header says the master table lies past the end, so
+           it is a truncated dump, read (and reported) as such (M-21). */
+        s->dump_type = odv_expdp_cut_short(s) ? DUMP_EXPDP : DUMP_EXPDP_COMPRESS;
         s->dump_charset = get_charset_from_name(charset_buf);
         if (schema_buf[0])
             odv_strcpy(s->table.schema, schema_buf, ODV_OBJNAME_LEN);

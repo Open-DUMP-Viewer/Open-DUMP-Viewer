@@ -59,6 +59,21 @@ typedef struct _odv_session ODV_SESSION;
 #define ODV_ERR                   -1
 #define ODV_ERR_CANCELLED       -200
 
+/* Success with a warning (odv_list_tables, odv_parse_dump, odv_export_csv,
+   odv_export_sql, odv_extract_lob). The operation read up to where the dump
+   file ends and delivered everything found before that point, but the dump
+   ends early, so tables or rows after that point are missing (and the last
+   table reached may be incomplete). odv_get_last_error() describes it. An
+   operation that finished before reaching that point returns ODV_OK.
+     ODV_WARN_TRUNCATED       the file stops before the dump's own end
+                              (copy or transfer cut short, disk full, or the
+                              export itself failed)
+     ODV_WARN_VOLUME_MISSING  the file is one volume of a dump split with
+                              FILESIZE (or dumpfile=%U), and the volume that
+                              follows it was not found next to it */
+#define ODV_WARN_TRUNCATED         1
+#define ODV_WARN_VOLUME_MISSING    2
+
 /*---------------------------------------------------------------------------
     SQL Export Flags (for odv_set_sql_flags)
  ---------------------------------------------------------------------------*/
@@ -123,6 +138,10 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session);
     Configuration
  ---------------------------------------------------------------------------*/
 
+/* File paths given to the DLL (dump file, CSV / SQL output file, LOB output
+   directory) are UTF-8. On Windows they are opened through UTF-16, so any
+   character may appear in them; a string that is not valid UTF-8 is taken as
+   the ANSI code page, as before. A path longer than 1024 bytes is refused. */
 ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path);
 ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data);
 ODV_API int ODV_CALL odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data);
@@ -202,7 +221,9 @@ ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, cons
    output_dir:   directory to write LOB files to
    filename_col: column whose value is used as filename (NULL=sequential numbering)
    extension:    file extension (NULL="lob")
-   data_offset:  DDL offset for fast seek (0=scan from beginning) */
+   data_offset:  DDL offset for fast seek (0=scan from beginning)
+   Returns ODV_ERROR when the table was found but has no LOB column of that
+   name (nothing could be extracted). */
 ODV_API int ODV_CALL odv_extract_lob(
     ODV_SESSION *s,
     const char *schema, const char *table,

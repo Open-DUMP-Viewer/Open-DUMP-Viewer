@@ -152,7 +152,7 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
     if (!s || !output_path) return ODV_ERROR_INVALID_ARG;
 
     /* Open output file (UTF-8, no BOM) */
-    ctx.fp = fopen(output_path, "wb");
+    ctx.fp = odv_fopen_path(output_path, "wb");   /* UTF-8 path (M-26) */
     if (!ctx.fp) {
         odv_strcpy(s->last_error, "Cannot create CSV output file", ODV_MSG_LEN);
         return ODV_ERROR_FOPEN;
