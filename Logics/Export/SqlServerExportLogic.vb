@@ -15,13 +15,16 @@ Public Class SqlServerExportLogic
     ''' <summary>
     ''' テーブルデータを SQL Server に直接出力
     ''' </summary>
+    ''' <param name="data">行データ (エクスポートの書き手と同じ値: LOB・LONG は全体)</param>
+    ''' <param name="marks">値の形を持たない値・上限を超えた値の位置 (値として書かず NULL にする)</param>
     Public Shared Function Export(data As List(Of String()),
                                   columnNames As List(Of String),
                                   columnTypes As String(),
                                   schema As String,
                                   tableName As String,
                                   connectionString As String,
-                                  Optional worker As System.ComponentModel.BackgroundWorker = Nothing) As Boolean
+                                  Optional worker As System.ComponentModel.BackgroundWorker = Nothing,
+                                  Optional marks As Open_NativeParser.ValueMarks = Nothing) As Boolean
         Try
             Dim totalRows As Long = data.Count
             Dim fullTableName = $"[{schema.Replace("]", "]]")}].[{tableName.Replace("]", "]]")}]"
@@ -60,7 +63,7 @@ Public Class SqlServerExportLogic
                         End If
 
                         Dim batchEnd = CInt(Math.Min(rowIdx + BATCH_SIZE, totalRows))
-                        Dim dt = BuildDataTable(data, columnNames, columnTypes, CInt(rowIdx), batchEnd)
+                        Dim dt = BuildDataTable(data, columnNames, columnTypes, CInt(rowIdx), batchEnd, marks)
                         bulk.WriteToServer(dt)
                         dt.Dispose()
 
@@ -117,7 +120,8 @@ Public Class SqlServerExportLogic
     End Function
 
     Private Shared Function BuildDataTable(data As List(Of String()), columnNames As List(Of String),
-                                            columnTypes As String(), startIdx As Integer, endIdx As Integer) As DataTable
+                                            columnTypes As String(), startIdx As Integer, endIdx As Integer,
+                                            marks As Open_NativeParser.ValueMarks) As DataTable
         Dim dt As New DataTable()
 
         ' カラム定義
@@ -130,7 +134,9 @@ Public Class SqlServerExportLogic
             Dim row = data(rowIdx)
             Dim dr = dt.NewRow()
             For colIdx As Integer = 0 To columnNames.Count - 1
-                If colIdx < row.Length AndAlso row(colIdx) IsNot Nothing Then
+                ' 値の形を持たない値の印 (%BLOB% など) は値ではない
+                If colIdx < row.Length AndAlso row(colIdx) IsNot Nothing AndAlso
+                   (marks Is Nothing OrElse marks.StateOf(row, colIdx) = Open_NativeParser.ValueState.Value) Then
                     dr(colIdx) = row(colIdx)
                 Else
                     dr(colIdx) = DBNull.Value

@@ -17,6 +17,8 @@ Public Class AccessExportLogic
     ''' <summary>
     ''' テーブルデータを Access (.accdb) ファイルにエクスポート
     ''' </summary>
+    ''' <param name="data">行データ (エクスポートの書き手と同じ値: LOB・LONG は全体)</param>
+    ''' <param name="marks">値の形を持たない値・上限を超えた値の位置 (値として書かず NULL にする)</param>
     Public Shared Function Export(data As List(Of String()),
                                   columnNames As List(Of String),
                                   columnTypes As String(),
@@ -24,7 +26,8 @@ Public Class AccessExportLogic
                                   outputPath As String,
                                   Optional worker As System.ComponentModel.BackgroundWorker = Nothing,
                                   Optional currentTableIndex As Integer = 0,
-                                  Optional totalTableCount As Integer = 0) As Boolean
+                                  Optional totalTableCount As Integer = 0,
+                                  Optional marks As Open_NativeParser.ValueMarks = Nothing) As Boolean
         Try
             ' ACE ドライバチェック
             If Not IsAceDriverAvailable() Then
@@ -92,6 +95,8 @@ Public Class AccessExportLogic
                                 For colIdx As Integer = 0 To colCount - 1
                                     Dim raw As String = Nothing
                                     If colIdx < row.Length Then raw = row(colIdx)
+                                    ' 値の形を持たない値の印 (%BLOB% など) は値ではない
+                                    If marks IsNot Nothing AndAlso marks.StateOf(row, colIdx) <> Open_NativeParser.ValueState.Value Then raw = Nothing
                                     cmd.Parameters(colIdx).Value = If(String.IsNullOrEmpty(raw), DirectCast(DBNull.Value, Object), raw)
                                 Next
                                 cmd.ExecuteNonQuery()

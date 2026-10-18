@@ -39,6 +39,13 @@ Public Class Open_NativeParser
     Public Const DATE_FMT_COMPACT As Integer = 1    ' YYYYMMDD
     Public Const DATE_FMT_FULL As Integer = 2       ' YYYYMMDDHHMMSS
     Public Const DATE_FMT_CUSTOM As Integer = 3     ' Custom format string
+
+    ' 値のモード (odv_set_value_mode)。EXPORT はエクスポートの書き手 (odv_export_sql / _csv) が受け取るのと同じ値:
+    ' LOB・LONG は全体 (1 値 512 MiB まで)。値の形を持たない値は長さ -2 (値のポインタは印の文字列)、上限を超えた値は -3
+    Public Const ODV_VALUES_PREVIEW As Integer = 0
+    Public Const ODV_VALUES_EXPORT As Integer = 1
+    Private Const VALUE_LEN_MARKER As Integer = -2
+    Private Const VALUE_LEN_TOO_LONG As Integer = -3
 #End Region
 
 #Region "コールバックデリゲート"
@@ -178,6 +185,34 @@ Public Class Open_NativeParser
     Private Shared Function odv_set_app_version(session As IntPtr,
         <MarshalAs(UnmanagedType.LPUTF8Str)> ver As String) As Integer
     End Function
+
+    ' odv_parse_dump が渡す値の形 (ODV_VALUES_PREVIEW / ODV_VALUES_EXPORT)
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_value_mode(session As IntPtr, mode As Integer) As Integer
+    End Function
+
+    ' 表から離れた所にある DDL の位置のヒント (一覧の後に表ごとに受け取り、表ごとの SQL・odv_read_table_ddl の前に渡す)。
+    ' 中身は ASCII の不透明な文字列で、こちらでは解釈しない。無いときは "" (渡さなくても出力は同じで、遅いだけ)
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_get_table_ddl_hint(session As IntPtr, index As Integer) As IntPtr
+    End Function
+
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_ddl_hint(session As IntPtr,
+        <MarshalAs(UnmanagedType.LPUTF8Str)> hint As String) As Integer
+    End Function
+
+    ' Data Pump の表の DDL (制約・NOT NULL・DEFAULT・コメント) を SQL の出力と同じ形で、表コールバック 1 回で受け取る。
+    ' exp のダンプは ODV_ERROR_UNSUPPORTED (一覧のコールバックが既に持つ)
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_read_table_ddl(session As IntPtr) As Integer
+    End Function
+
+    ''' <summary>表ごとのエクスポートの前に DDL の位置のヒントを渡す (空なら渡さない)</summary>
+    Private Shared Sub ApplyDdlHint(session As IntPtr, ddlHint As String)
+        If String.IsNullOrEmpty(ddlHint) Then Return
+        odv_set_ddl_hint(session, ddlHint)
+    End Sub
 
     ' 操作
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
@@ -382,6 +417,15 @@ Public Class Open_NativeParser
 
         ' List<T>の初期容量ヒントは ExpectedRowCount で設定済み
 
+        ''' <summary>値のモードが EXPORT のとき、値の形を持たない値・上限を超えた値の位置を記録する先 (Nothing = 記録しない)</summary>
+        Public Marks As ValueMarks = Nothing
+
+        ''' <summary>
+        ''' 取り出す行の番号 (表の中で 0 から)。Nothing なら全行。含まれない行は値を読まず Nothing を置く
+        ''' (行の番号を保つため。絞り込んだ一部の行だけを LOB の全体付きで読み直すときにメモリを抑える)
+        ''' </summary>
+        Public WantedRows As ISet(Of Integer) = Nothing
+
         ' テーブル切替検出用キャッシュ（毎行のマーシャリングを回避）
         Public LastSchema As String = ""
         Public LastTable As String = ""
@@ -420,6 +464,52 @@ Public Class Open_NativeParser
     End Class
 #End Region
 
+#Region "値の印"
+    ''' <summary>エクスポート用の値 (ODV_VALUES_EXPORT) の、値でないものの種類</summary>
+    Public Enum ValueState As Byte
+        ''' <summary>値 (NULL・空を含む)</summary>
+        Value = 0
+        ''' <summary>値の形を持たない (復号できない型など)。行の配列には DLL がプレビューに出す印の文字列 (%BLOB% など) が入る</summary>
+        Marker = 1
+        ''' <summary>1 値の上限 (512 MiB) を超えて全体を持てなかった。行の配列には Nothing が入る</summary>
+        TooLong = 2
+    End Enum
+
+    ''' <summary>
+    ''' 行の値のうち、値でないもの (ValueState.Marker / TooLong) の位置。行の配列 (参照) と列の番号で引く。
+    ''' 行の配列は ParseDump が返したものそのもので、並べ替え・絞り込みをしても同じ配列を指していれば引ける。
+    ''' 印のある行だけを持つ (ほとんどの表では空)
+    ''' </summary>
+    Public NotInheritable Class ValueMarks
+        Private ReadOnly _rows As New Dictionary(Of String(), ValueState())(ReferenceEqualityComparer.Instance)
+
+        ''' <summary>row の col 列の値の種類</summary>
+        Public Function StateOf(row As String(), col As Integer) As ValueState
+            Dim states As ValueState() = Nothing
+            If row Is Nothing OrElse Not _rows.TryGetValue(row, states) OrElse col < 0 OrElse col >= states.Length Then
+                Return ValueState.Value
+            End If
+            Return states(col)
+        End Function
+
+        ''' <summary>印のある行の数</summary>
+        Public ReadOnly Property Count As Integer
+            Get
+                Return _rows.Count
+            End Get
+        End Property
+
+        Friend Sub Mark(row As String(), col As Integer, state As ValueState)
+            Dim states As ValueState() = Nothing
+            If Not _rows.TryGetValue(row, states) Then
+                states = New ValueState(row.Length - 1) {}
+                _rows(row) = states
+            End If
+            states(col) = state
+        End Sub
+    End Class
+#End Region
+
 #Region "テーブルエントリ"
     ''' <summary>
     ''' テーブル一覧のエントリ（パーティション情報を含む）
@@ -440,6 +530,11 @@ Public Class Open_NativeParser
         ''' DLL の odv_set_data_offsets に渡し、データの並びで他の表を挟む区画も漏れなく読む
         ''' </summary>
         Public Property DataOffsets As Long() = Nothing
+        ''' <summary>
+        ''' 表から離れた所にある DDL の位置のヒント (odv_get_table_ddl_hint。"" = なし)。表ごとの SQL エクスポートと
+        ''' ReadTableDdl に渡すと、その DDL をダンプの残り全体 (exp) / マスター表の全行 (expdp) から探さずに済む
+        ''' </summary>
+        Public Property DdlHint As String = ""
 
         ''' <summary>キー文字列 (schema.table)</summary>
         Public ReadOnly Property Key As String
@@ -480,6 +575,20 @@ Public Class Open_NativeParser
         Public ColumnDefaults As New Dictionary(Of String, String())
         ''' <summary>テーブルごとの制約 JSON (キー: "schema.table")</summary>
         Public ConstraintsJson As New Dictionary(Of String, String)
+    End Class
+
+    ''' <summary>
+    ''' 1 つの表の DDL (ReadTableDdl。SQL の出力が使うのと同じもの)
+    ''' </summary>
+    Public Class TableDdl
+        Public ColumnNames As String()
+        Public ColumnTypes As String()
+        ''' <summary>0 = NULL 可、1 = NOT NULL、2 = 主キーの列なので NOT NULL (それ自体の NOT NULL 制約は無い。CREATE TABLE には書かない)</summary>
+        Public ColumnNotNulls As Integer()
+        ''' <summary>DEFAULT の式 ("" = なし)</summary>
+        Public ColumnDefaults As String()
+        ''' <summary>制約・索引・コメント・注記の JSON (一覧の exp の表と同じ形)</summary>
+        Public ConstraintsJson As String
     End Class
 #End Region
 
@@ -527,6 +636,13 @@ Public Class Open_NativeParser
     ''' <param name="progressAction">進捗コールバック (処理行数, 現在のテーブル名, パーセンテージ0-100)</param>
     ''' <param name="filterSchema">フィルタ: このスキーマのテーブルのみ蓄積 (Nothing=全スキーマ)</param>
     ''' <param name="filterTable">フィルタ: このテーブルのみ蓄積 (Nothing=全テーブル)</param>
+    ''' <param name="sqlDateFormat">日付・時刻を SQL 用の固定の書式 (SYYYY/MM/DD HH24:MI:SS[.F]) で (SQL・Excel・ODBC の書き手用)</param>
+    ''' <param name="exportValues">
+    ''' 値をエクスポートの書き手と同じ形で受け取る (ODV_VALUES_EXPORT: LOB・LONG は全体)。値の形を持たない値は
+    ''' 印の文字列、上限を超えた値は Nothing で、どちらも marks に記録する。False (既定) は表示用 (プレビュー) の値
+    ''' </param>
+    ''' <param name="marks">exportValues のとき、値でないものの位置を記録する先 (exportValues のときは必須)</param>
+    ''' <param name="wantedRows">取り出す行の番号 (表の中で 0 から)。含まれない行は Nothing を置く (Nothing = 全行)</param>
     ''' <returns>スキーマ→テーブル→行リストの辞書</returns>
     Public Shared Function ParseDump(filePath As String,
                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
@@ -535,13 +651,21 @@ Public Class Open_NativeParser
                                       Optional dataOffset As Long = 0,
                                       Optional expectedRowCount As Long = 0,
                                       Optional filterPartition As String = Nothing,
-                                      Optional dataOffsets As Long() = Nothing) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
+                                      Optional dataOffsets As Long() = Nothing,
+                                      Optional sqlDateFormat As Boolean = False,
+                                      Optional exportValues As Boolean = False,
+                                      Optional marks As ValueMarks = Nothing,
+                                      Optional wantedRows As ISet(Of Integer) = Nothing) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ParseContext()
         ctx.ProgressAction = progressAction
         ctx.FilterSchema = filterSchema
         ctx.FilterTable = filterTable
         ctx.ExpectedRowCount = expectedRowCount
+        ' エクスポートの値では印が値の欄に入るので、印の位置を受け取る先が無ければ値と見分けられない
+        If exportValues AndAlso marks Is Nothing Then Throw New ArgumentNullException(NameOf(marks))
+        ctx.Marks = If(exportValues, marks, Nothing)
+        ctx.WantedRows = wantedRows
         Dim gcHandle As GCHandle = GCHandle.Alloc(ctx)
 
         ' コールバックデリゲート（GC回収防止は Finally の GC.KeepAlive。ローカル変数に置くだけでは守られない）
@@ -565,6 +689,14 @@ Public Class Open_NativeParser
 
             ' エクスポートオプション適用（日付フォーマット等）
             ApplyExportOptions(session)
+            If sqlDateFormat Then
+                ' SQL・Excel の書き手が読む固定の形 (SYYYY/MM/DD HH24:MI:SS[.F])。表示用の日付書式によらない (M-14)
+                odv_set_date_format(session, DATE_FMT_SLASH, "")
+            End If
+            If exportValues Then
+                ' エクスポートの書き手と同じ値 (LOB・LONG は全体。印は長さ -2、上限超えは -3)。表示の経路は既定のまま
+                odv_set_value_mode(session, ODV_VALUES_EXPORT)
+            End If
 
             ' コールバック設定
             Dim userData As IntPtr = GCHandle.ToIntPtr(gcHandle)
@@ -668,6 +800,8 @@ Public Class Open_NativeParser
                     ctx.Tables(i).PartitionName = PtrToStringUTF8(ePartition)
                     ctx.Tables(i).ParentPartition = PtrToStringUTF8(eParentPart)
                 End If
+                ' 表から離れた DDL の位置 (表ごとの SQL エクスポートで使う。同じ表のエントリは同じ文字列)
+                ctx.Tables(i).DdlHint = String.Intern(PtrToStringUTF8(odv_get_table_ddl_hint(session, i)))
             Next
 
             columnNamesMap = ctx.ColumnNames
@@ -769,12 +903,14 @@ Public Class Open_NativeParser
     ''' <param name="schema">スキーマ名 (テーブルフィルタ用)</param>
     ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
     ''' <param name="dataOffsets">区画表の表全体のとき、全エントリの data_offset (群9)</param>
+    ''' <param name="ddlHint">表から離れた DDL の位置のヒント (TableEntry.DdlHint。空なら渡さない。出力は同じで遅いだけ)</param>
     Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer,
                                       Optional schema As String = Nothing,
                                       Optional dataOffset As Long = 0,
                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
                                       Optional partitionName As String = Nothing,
-                                      Optional dataOffsets As Long() = Nothing) As Integer
+                                      Optional dataOffsets As Long() = Nothing,
+                                      Optional ddlHint As String = Nothing) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Dim progCb As ProgressCallback = Nothing
         Dim gcHandle As GCHandle = Nothing
@@ -812,6 +948,8 @@ Public Class Open_NativeParser
             End If
             ' 区画表の表全体: 全区画の位置 (群9)
             ApplyDataOffsets(session, dataOffsets)
+            ' 表から離れた DDL (exp の後置の外部キー・索引、expdp のマスター表の行) の位置
+            If tableName IsNot Nothing AndAlso tableName.Length > 0 Then ApplyDdlHint(session, ddlHint)
 
             ' 途中で切れたダンプ: 読めた行までは書き出せているので成功とし、警告を記録する (M-21)
             rc = odv_export_sql(session, tableName, outputPath, dbmsType)
@@ -826,6 +964,67 @@ Public Class Open_NativeParser
             If session <> IntPtr.Zero Then
                 odv_destroy_session(session)
             End If
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' Data Pump の 1 つの表の DDL (制約・索引・コメント・NOT NULL・DEFAULT) を、SQL の出力が使うのと同じ形で読む
+    ''' (odv_read_table_ddl。Data Pump の一覧はこれを読まない)。exp のダンプは一覧が既に持つので Nothing を返す。
+    ''' 行は読まない。読めなければ例外
+    ''' </summary>
+    ''' <param name="ddlHint">表から離れた DDL の位置のヒント (TableEntry.DdlHint。空なら渡さない)</param>
+    Public Shared Function ReadTableDdl(filePath As String, schema As String, tableName As String,
+                                        Optional dataOffset As Long = 0,
+                                        Optional partitionName As String = Nothing,
+                                        Optional dataOffsets As Long() = Nothing,
+                                        Optional ddlHint As String = Nothing) As TableDdl
+        Dim session As IntPtr = IntPtr.Zero
+        Dim result As New TableDdl()
+        Dim found As Boolean = False
+        Dim tableCb As New TableCallback(
+            Sub(schemaPtr, tablePtr, colCount, colNamesPtr, colTypesPtr, colNotNullsPtr, colDefaultsPtr,
+                constraintCount, constraintsJsonPtr, rowCount, offset, userData)
+                Try
+                    result.ColumnNames = If(colCount > 0 AndAlso colNamesPtr <> IntPtr.Zero, PtrArrayToStrings(colNamesPtr, colCount), Array.Empty(Of String)())
+                    result.ColumnTypes = If(colCount > 0 AndAlso colTypesPtr <> IntPtr.Zero, PtrArrayToStrings(colTypesPtr, colCount), Array.Empty(Of String)())
+                    Dim nn(Math.Max(colCount, 0) - 1) As Integer
+                    If colCount > 0 AndAlso colNotNullsPtr <> IntPtr.Zero Then Marshal.Copy(colNotNullsPtr, nn, 0, colCount)
+                    result.ColumnNotNulls = nn
+                    result.ColumnDefaults = If(colCount > 0 AndAlso colDefaultsPtr <> IntPtr.Zero, PtrArrayToStrings(colDefaultsPtr, colCount), Array.Empty(Of String)())
+                    Dim cj = PtrToStringUTF8(constraintsJsonPtr)
+                    result.ConstraintsJson = If(String.IsNullOrEmpty(cj) OrElse cj = "[]", Nothing, cj)
+                    found = True
+                Catch
+                    ' コールバック中の例外は握りつぶす (DLL 側に伝播させない)
+                End Try
+            End Sub)
+        Try
+            Dim rc = odv_create_session(session)
+            If rc <> ODV_OK Then Throw New Exception(Loc.SF("Parser_SessionCreateFailed", rc))
+            rc = odv_set_dump_file(session, filePath)
+            If rc <> ODV_OK Then
+                Throw New Exception(Loc.SF("Parser_DumpFileSettingError", PtrToStringUTF8(odv_get_last_error(session))))
+            End If
+            odv_set_table_callback(session, tableCb, IntPtr.Zero)
+            odv_set_table_filter(session, If(schema, ""), tableName)
+            If partitionName IsNot Nothing AndAlso partitionName.Length > 0 Then
+                odv_set_partition_filter(session, partitionName)
+            End If
+            If dataOffset > 0 Then odv_set_data_offset(session, dataOffset)
+            ApplyDataOffsets(session, dataOffsets)
+            ApplyDdlHint(session, ddlHint)
+
+            rc = odv_read_table_ddl(session)
+            If rc = ODV_ERROR_UNSUPPORTED Then Return Nothing       ' exp: 一覧の DDL を使う
+            If IsDumpWarning(rc) Then
+                RecordDumpWarning(filePath, rc)
+            ElseIf rc <> ODV_OK Then
+                Throw New Exception(Loc.SF("Parser_DumpParseError", PtrToStringUTF8(odv_get_last_error(session))))
+            End If
+            Return If(found, result, Nothing)
+        Finally
+            If session <> IntPtr.Zero Then odv_destroy_session(session)
+            GC.KeepAlive(tableCb)
         End Try
     End Function
     ''' <summary>
@@ -961,13 +1160,28 @@ Public Class Open_NativeParser
                 schemaTables(table) = tableRows
             End If
 
+            ' 取り出さない行: 番号を保つために Nothing を置き、値は読まない
+            If ctx.WantedRows IsNot Nothing AndAlso Not ctx.WantedRows.Contains(tableRows.Count) Then
+                tableRows.Add(Nothing)
+                ctx.RowsProcessed += 1
+                Return
+            End If
+
             ' 行データを文字列配列に変換して追加（位置インデックスで格納）
             ' 値は長さで読む: NUL 終端で読むと 0x00 の位置で切れ、先頭が 0x00 の値が空 = NULL になっていた (M-22)
             Dim row As String() = New String(colCount - 1) {}
             For i As Integer = 0 To colCount - 1
                 Dim valPtr As IntPtr = Marshal.ReadIntPtr(colValuesPtr, i * IntPtr.Size)
                 Dim valLen As Integer = Marshal.ReadInt32(colLensPtr, i * 4)
-                If valPtr = IntPtr.Zero OrElse valLen < 0 Then
+                If valLen = VALUE_LEN_MARKER Then
+                    ' 値の形を持たない (ODV_VALUES_EXPORT のときだけ): 値のポインタは印の文字列 (NUL 終端)
+                    row(i) = PtrToStringUTF8(valPtr)
+                    ctx.Marks?.Mark(row, i, ValueState.Marker)
+                ElseIf valLen = VALUE_LEN_TOO_LONG Then
+                    ' 上限 (512 MiB) を超えて全体を持てなかった (ODV_VALUES_EXPORT のときだけ)
+                    row(i) = Nothing
+                    ctx.Marks?.Mark(row, i, ValueState.TooLong)
+                ElseIf valPtr = IntPtr.Zero OrElse valLen < 0 Then
                     row(i) = Nothing                ' NULL
                 ElseIf valLen = 0 Then
                     row(i) = String.Empty           ' 空 (NULL ではない)

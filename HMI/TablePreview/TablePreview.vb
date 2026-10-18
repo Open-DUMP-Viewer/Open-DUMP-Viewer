@@ -107,6 +107,15 @@ Public Class TablePreview
     Private Const LohCompactionRowThreshold As Integer = 50000
 
     ''' <summary>
+    ''' 表を開いたときの Workspace の表の情報 (ダンプのパス・位置・区画・制約の JSON)。
+    ''' エクスポートを DLL の経路で出す・エクスポート用の値で解析し直すときに使う
+    ''' </summary>
+    Private _sourceContext As ExportHelper.TableExportContext
+
+    ''' <summary>値の中の U+0000 を表に表示するときの記号 (␀ U+2400)。表示だけで、保持する値・検索・エクスポートは元のまま</summary>
+    Private Shared ReadOnly NulDisplay As String = ChrW(&H2400).ToString()
+
+    ''' <summary>
     ''' コンストラクタ
     '''
     ''' テーブルデータ、列名、テーブル名を受け取り、フォームを初期化する。
@@ -116,11 +125,14 @@ Public Class TablePreview
     ''' <param name="tableName">テーブル名（ウィンドウタイトルに使用）</param>
     ''' <param name="schema">スキーマ名（エクスポート用）</param>
     ''' <param name="columnTypes">カラム型配列（エクスポート用）</param>
+    ''' <param name="sourceContext">Workspace の表の情報 (ダンプのパス・位置・区画・制約。エクスポート用)</param>
     Public Sub New(tableData As List(Of String()), columnNames As List(Of String), tableName As String,
                    Optional schema As String = Nothing, Optional columnTypes As String() = Nothing,
-                   Optional columnNotNulls As Boolean() = Nothing, Optional columnDefaults As String() = Nothing)
+                   Optional columnNotNulls As Boolean() = Nothing, Optional columnDefaults As String() = Nothing,
+                   Optional sourceContext As ExportHelper.TableExportContext = Nothing)
         ' デザイナーで定義されたコンポーネントを初期化
         InitializeComponent()
+        _sourceContext = sourceContext
 
         ' パラメータを保存
         _tableData = tableData
@@ -209,16 +221,47 @@ Public Class TablePreview
     ''' エクスポート用のテーブルコンテキストを取得
     ''' </summary>
     Public Function GetExportContext() As ExportHelper.TableExportContext
+        Dim src = _sourceContext
         Return New ExportHelper.TableExportContext() With {
+            .DumpFilePath = src?.DumpFilePath,
             .Schema = _schema,
             .TableName = _tableName,
             .ColumnNames = _columnNames.ToArray(),
             .ColumnTypes = _columnTypes,
             .ColumnNotNulls = _columnNotNulls,
             .ColumnDefaults = _columnDefaults,
+            .ConstraintsJson = src?.ConstraintsJson,
             .RowCount = _filteredData.Count,
-            .DataOffset = 0
+            .DataOffset = If(src IsNot Nothing, src.DataOffset, 0),
+            .Partition = If(src?.Partition, ""),
+            .DataOffsets = src?.DataOffsets,
+            .DdlHint = If(src?.DdlHint, "")
         }
+    End Function
+
+    ''' <summary>
+    ''' 絞り込みが無く、表の全行が出力の対象か。全行のときのエクスポートは DLL の経路で出せる
+    ''' (Workspace から出すのと同じ出力。LOB は全体、Data Pump の制約・DEFAULT・コメントも出る)
+    ''' </summary>
+    Public ReadOnly Property ShowsAllRows As Boolean
+        Get
+            Return _tableData IsNot Nothing AndAlso _filteredData IsNot Nothing AndAlso
+                   _filteredData.Count = _tableData.Count AndAlso
+                   _sourceContext IsNot Nothing AndAlso Not String.IsNullOrEmpty(_sourceContext.DumpFilePath)
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' VB の書き手 (SQL・CSV・Excel・ODBC・Access・SQL Server) に渡す行 (絞り込み・並べ替えの後の行)。
+    ''' 表示している値はプレビュー (LOB は先頭だけ、日付は表示の書式) なので、同じ表をエクスポートの書き手と同じ値
+    ''' (ODV_VALUES_EXPORT: LOB・LONG は全体) で解析し直し、表示中の行だけを同じ位置から取り出す。表示は変えない。
+    ''' BackgroundWorker のスレッドから呼んでよい (画面に触れない)
+    ''' </summary>
+    ''' <param name="sqlDateFormat">日付・時刻を SQL 用の固定の書式 (SYYYY/MM/DD HH24:MI:SS[.F]) で (SQL・Excel・ODBC。M-14)。
+    ''' False なら利用者の日付書式 (CSV・Access・SQL Server)</param>
+    ''' <param name="marks">値の形を持たない値・上限を超えた値の位置を記録する先</param>
+    Public Function GetRowsForExport(sqlDateFormat As Boolean, marks As Open_NativeParser.ValueMarks) As List(Of String())
+        Return ExportHelper.RowsForExport(_sourceContext, sqlDateFormat, _tableData, _filteredData, marks)
     End Function
 
 #End Region
@@ -296,6 +339,7 @@ Public Class TablePreview
         _columnDefaults = Nothing
         _currentSearchCondition = Nothing
         _lastSearchCondition = Nothing
+        _sourceContext = Nothing
         _lobColumnIndices.Clear()
         _blobColumnIndices.Clear()
 
@@ -812,15 +856,24 @@ Public Class TablePreview
         ' CLOB カラム: テキストプレビュー（長い場合は省略）
         If _lobColumnIndices.Contains(e.ColumnIndex) AndAlso Not String.IsNullOrEmpty(cellValue) Then
             If cellValue.Length > 200 Then
-                e.Value = cellValue.Substring(0, 200) & "..."
+                e.Value = ForDisplay(cellValue.Substring(0, 200)) & "..."
             Else
-                e.Value = cellValue
+                e.Value = ForDisplay(cellValue)
             End If
             Return
         End If
 
-        e.Value = If(cellValue, String.Empty)
+        e.Value = ForDisplay(If(cellValue, String.Empty))
     End Sub
+
+    ''' <summary>
+    ''' 値を表に表示する文字列にする: U+0000 (ダンプの 0x00) は DataGridView が描かず、そこで表示が切れるので ␀ (U+2400) にする。
+    ''' 表示だけで、保持する値・検索・エクスポートは元の値のまま
+    ''' </summary>
+    Private Shared Function ForDisplay(value As String) As String
+        If value.IndexOf(ChrW(0)) < 0 Then Return value
+        Return value.Replace(ChrW(0).ToString(), NulDisplay)
+    End Function
 
     ''' <summary>
     ''' hex 文字列からサムネイル画像を生成する。
@@ -968,7 +1021,7 @@ Public Class TablePreview
                 .Font = New Font("Consolas", 10),
                 .ReadOnly = True,
                 .WordWrap = True,
-                .Text = textData
+                .Text = ForDisplay(textData)
             }
             frm.Controls.Add(tb)
             frm.ShowDialog(Me)

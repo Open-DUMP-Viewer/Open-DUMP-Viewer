@@ -826,29 +826,24 @@ Public Class Open_DUMP_Viewer
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim ok As Boolean
-                        If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータから出力
-                            ok = SqlExportLogic.ExportFromData(preview.FilteredData,
-                                    preview.ExportColumnNames, ctx.ColumnTypes,
-                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
-                                    ctx.ColumnNotNulls, ctx.ColumnDefaults, dbName, ctx.ConstraintsJson)
+                        If preview IsNot Nothing AndAlso preview.ShowsAllRows AndAlso Not ExportOptions.SqlInferInteger Then
+                            ' TablePreview で絞り込みが無い: Workspace から出すのと同じ DLL の経路で出す
+                            ' (同じ表は同じ SQL。LOB は全体、Data Pump の制約・DEFAULT・コメントも出る)
+                            ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType, worker, dbName)
+                        ElseIf preview IsNot Nothing Then
+                            ' TablePreview の絞り込み後の行: VB の書き手 (DLL と同じ規則)。表示中の行をエクスポート用の値
+                            ' (LOB・LONG は全体) で読み直す。日付は SQL 用の固定の書式 (M-14)。Data Pump の制約などは DLL から
+                            Dim marks As New Open_NativeParser.ValueMarks()
+                            Dim rows = preview.GetRowsForExport(True, marks)
+                            Dim ddl = ExportHelper.TableDdlForSql(ctx)
+                            ok = SqlExportLogic.ExportFromData(rows, preview.ExportColumnNames, ctx.ColumnTypes,
+                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker, ddl, dbName, marks)
                         ElseIf ExportOptions.SqlInferInteger Then
-                            ' InferInteger ON: データを読み込んで VB.NET パスで出力
-                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
-                            Dim rows As New List(Of String())
-                            If tableData IsNot Nothing AndAlso
-                               tableData.ContainsKey(ctx.Schema) AndAlso
-                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                                rows = tableData(ctx.Schema)(ctx.TableName)
-                            End If
-                            Dim colNames = New List(Of String)(If(ctx.ColumnNames, Array.Empty(Of String)()))
-                            ok = SqlExportLogic.ExportFromData(rows, colNames, ctx.ColumnTypes,
-                                    ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
-                                    ctx.ColumnNotNulls, ctx.ColumnDefaults, dbName, ctx.ConstraintsJson)
+                            ' InferInteger ON: データを読み込んで VB.NET パスで出力 (値は SQL 出力と同じ形、日付は SQL 用の固定の書式)
+                            ok = SqlExportLogic.ExportTableViaWriter(ctx, outputPath, dbmsType, worker, dbName)
                         Else
                             ' Workspace: DLLから再パース（進捗表示付き）
-                            ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType, worker)
+                            ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType, worker, dbName)
                         End If
                         If Not ok Then args.Cancel = True
                     End Sub)
@@ -897,10 +892,13 @@ Public Class Open_DUMP_Viewer
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
                         Dim ok As Boolean
-                        If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータから出力
-                            ok = CsvExportLogic.ExportFromData(preview.FilteredData,
-                                    preview.ExportColumnNames, outputPath, worker, ctx.TableName)
+                        If preview IsNot Nothing AndAlso Not preview.ShowsAllRows Then
+                            ' TablePreview の絞り込み後の行: 表示中の行をエクスポート用の値 (LOB・LONG は全体) で読み直して出力
+                            ' (絞り込みが無いときは下の DLL の経路)
+                            Dim marks As New Open_NativeParser.ValueMarks()
+                            Dim rows = preview.GetRowsForExport(False, marks)
+                            ok = CsvExportLogic.ExportFromData(rows,
+                                    preview.ExportColumnNames, outputPath, worker, ctx.TableName, ctx.ColumnTypes, marks)
                         Else
                             ' Workspace: DLLから再パース
                             ok = CsvExportLogic.ExportFromDump(ctx, outputPath, worker)
@@ -955,26 +953,20 @@ Public Class Open_DUMP_Viewer
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim rows As List(Of String()) = Nothing
-
+                        ' 値はエクスポート用 (LOB・LONG は全体)、日付は SQL 用の固定の書式 (日時のセルに)
+                        Dim marks As New Open_NativeParser.ValueMarks()
+                        Dim rows As List(Of String())
                         If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータを使用
-                            rows = preview.FilteredData
+                            ' TablePreview: 表示中の行 (絞り込み・並べ替えの後) を読み直す
+                            rows = preview.GetRowsForExport(True, marks)
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
-                            If tableData IsNot Nothing AndAlso
-                               tableData.ContainsKey(ctx.Schema) AndAlso
-                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                                rows = tableData(ctx.Schema)(ctx.TableName)
-                            End If
+                            rows = ExportHelper.LoadExportRows(ctx, True, marks)
                         End If
-                        If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
 
                         Dim ok = ExcelExportLogic.Export(rows, columnList, ctx.ColumnTypes,
-                                                         $"{ctx.Schema}.{ctx.TableName}", outputPath, worker)
+                                                         $"{ctx.Schema}.{ctx.TableName}", outputPath, worker, marks)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
@@ -1022,26 +1014,20 @@ Public Class Open_DUMP_Viewer
             Using dlg As New ExportProgressDialog()
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim rows As List(Of String()) = Nothing
-
+                        ' 値はエクスポート用 (LOB・LONG は全体)、日付は利用者の日付書式 (Access の列は文字列)
+                        Dim marks As New Open_NativeParser.ValueMarks()
+                        Dim rows As List(Of String())
                         If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータを使用
-                            rows = preview.FilteredData
+                            ' TablePreview: 表示中の行 (絞り込み・並べ替えの後) を読み直す
+                            rows = preview.GetRowsForExport(False, marks)
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
-                            If tableData IsNot Nothing AndAlso
-                               tableData.ContainsKey(ctx.Schema) AndAlso
-                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                                rows = tableData(ctx.Schema)(ctx.TableName)
-                            End If
+                            rows = ExportHelper.LoadExportRows(ctx, False, marks)
                         End If
-                        If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
 
                         Dim ok = AccessExportLogic.Export(rows, columnList, ctx.ColumnTypes,
-                                                          ctx.TableName, outputPath, worker)
+                                                          ctx.TableName, outputPath, worker, marks:=marks)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
@@ -1099,26 +1085,20 @@ Public Class Open_DUMP_Viewer
                 Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim rows As List(Of String()) = Nothing
-
+                        ' 値はエクスポート用 (LOB・LONG は全体)、日付は利用者の日付書式 (これまでどおり)
+                        Dim marks As New Open_NativeParser.ValueMarks()
+                        Dim rows As List(Of String())
                         If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータを使用
-                            rows = preview.FilteredData
+                            ' TablePreview: 表示中の行 (絞り込み・並べ替えの後) を読み直す
+                            rows = preview.GetRowsForExport(False, marks)
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
-                            If tableData IsNot Nothing AndAlso
-                               tableData.ContainsKey(ctx.Schema) AndAlso
-                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                                rows = tableData(ctx.Schema)(ctx.TableName)
-                            End If
+                            rows = ExportHelper.LoadExportRows(ctx, False, marks)
                         End If
-                        If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
 
                         Dim ok = SqlServerExportLogic.Export(rows, columnList, ctx.ColumnTypes,
-                                                             ctx.Schema, ctx.TableName, connStr, worker)
+                                                             ctx.Schema, ctx.TableName, connStr, worker, marks)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
@@ -1174,26 +1154,20 @@ Public Class Open_DUMP_Viewer
                 Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim rows As List(Of String()) = Nothing
-
+                        ' 値はエクスポート用 (LOB・LONG は全体)、日付は SQL 用の固定の書式 (日時のパラメータに)
+                        Dim marks As New Open_NativeParser.ValueMarks()
+                        Dim rows As List(Of String())
                         If preview IsNot Nothing Then
-                            ' TablePreview: インメモリデータを使用
-                            rows = preview.FilteredData
+                            ' TablePreview: 表示中の行 (絞り込み・並べ替えの後) を読み直す
+                            rows = preview.GetRowsForExport(True, marks)
                         Else
                             ' Workspace: DLLから再パース
-                            Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
-                            If tableData IsNot Nothing AndAlso
-                               tableData.ContainsKey(ctx.Schema) AndAlso
-                               tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
-                                rows = tableData(ctx.Schema)(ctx.TableName)
-                            End If
+                            rows = ExportHelper.LoadExportRows(ctx, True, marks)
                         End If
-                        If rows Is Nothing Then rows = New List(Of String())
                         exportedRows = rows.Count
 
                         Dim ok = OdbcExportLogic.Export(rows, columnList, ctx.ColumnTypes,
-                                                        ctx.TableName, connStr, worker)
+                                                        ctx.TableName, connStr, worker, marks)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then

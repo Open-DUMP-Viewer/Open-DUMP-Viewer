@@ -262,7 +262,8 @@ Public Class Workspace
                                                If(tableData, New List(Of String())),
                                                columnNames,
                                                tableName, _currentSchema, columnTypes,
-                                               columnNotNulls, columnDefaults)
+                                               columnNotNulls, columnDefaults,
+                                               BuildExportContext(entry))
 
         Catch ex As Exception
             MessageBox.Show(Loc.SF("Workspace_TableDisplayError", ex.Message), Loc.S("Title_Error"), MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -522,6 +523,8 @@ Public Class Workspace
         ctx.Partition = entry.PartitionName
         ' 親行は全区画の位置も渡す (群9)。子の区画行は Nothing
         ctx.DataOffsets = entry.DataOffsets
+        ' 表から離れた DDL の位置 (表ごとの SQL を速くする)
+        ctx.DdlHint = entry.DdlHint
 
         If _columnNamesMap.ContainsKey(tableKey) Then ctx.ColumnNames = _columnNamesMap(tableKey)
         If _columnTypesMap.ContainsKey(tableKey) Then ctx.ColumnTypes = _columnTypesMap(tableKey)
@@ -572,9 +575,14 @@ Public Class Workspace
                 ctx.DataOffsets = _tableList(_currentSchema).
                     Where(Function(e) e.Key = tableKey).
                     Select(Function(e) e.DataOffset).ToArray()
+                ' 区画のエントリは同じ表のヒントを持つ
+                ctx.DdlHint = If(_tableList(_currentSchema).
+                    Where(Function(e) e.Key = tableKey AndAlso Not String.IsNullOrEmpty(e.DdlHint)).
+                    Select(Function(e) e.DdlHint).FirstOrDefault(), "")
             Else
                 ctx.RowCount = tableInfo.RowCount
                 ctx.DataOffset = tableInfo.DataOffset
+                ctx.DdlHint = tableInfo.DdlHint
             End If
 
             If _columnNamesMap.ContainsKey(tableKey) Then
@@ -786,7 +794,8 @@ Public Class Workspace
                         .PartitionName = "",
                         .ParentPartition = "",
                         .IsWholeTable = True,
-                        .DataOffsets = group.Select(Function(e) e.DataOffset).ToArray()
+                        .DataOffsets = group.Select(Function(e) e.DataOffset).ToArray(),
+                        .DdlHint = If(group.Select(Function(e) e.DdlHint).FirstOrDefault(Function(h) Not String.IsNullOrEmpty(h)), "")
                     }
 
                     Dim parentItem As New ListViewItem(groupName)

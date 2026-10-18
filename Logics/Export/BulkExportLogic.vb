@@ -48,16 +48,11 @@ Public Class BulkExportLogic
 
             Dim ok As Boolean
             If ExportOptions.SqlInferInteger Then
-                ' InferInteger ON: データを読み込んで VB.NET パスで出力
-                Dim tableData = LoadTableData(ctx)
-                Dim colNames = New List(Of String)(If(ctx.ColumnNames, Array.Empty(Of String)()))
-                ok = SqlExportLogic.ExportFromData(tableData, colNames, ctx.ColumnTypes,
-                        ctx.Schema, ctx.TableName, outputPath, dbmsType, worker,
-                        ctx.ColumnNotNulls, ctx.ColumnDefaults, databaseName, ctx.ConstraintsJson)
-                tableData = Nothing
+                ' InferInteger ON: データを読み込んで VB.NET パスで出力 (値は SQL 出力と同じ形、日付は SQL 用の固定の書式)
+                ok = SqlExportLogic.ExportTableViaWriter(ctx, outputPath, dbmsType, worker, databaseName)
             Else
                 ' C DLL ストリーミング (進捗表示付き)
-                ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType, worker)
+                ok = SqlExportLogic.ExportFromDump(ctx, outputPath, dbmsType, worker, databaseName)
             End If
             If Not ok Then Return False
 
@@ -79,8 +74,9 @@ Public Class BulkExportLogic
 
                     Dim ctx = contexts(i)
 
-                    ' テーブルデータを取得 (UIスレッド非依存の直接呼び出し)
-                    Dim tableData = LoadTableData(ctx)
+                    ' テーブルデータを取得 (UIスレッド非依存の直接呼び出し。日付は固定の書式で日時のセルに)
+                    Dim marks As New Open_NativeParser.ValueMarks()
+                    Dim tableData = LoadTableData(ctx, True, marks)
 
                     Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
                     Dim columnList = New List(Of String)(colNames)
@@ -89,30 +85,8 @@ Public Class BulkExportLogic
                     Dim sheetName = SanitizeSheetName(ctx.TableName)
                     Dim ws = wb.Worksheets.Add(sheetName)
 
-                    ' ヘッダ行
-                    For col As Integer = 0 To columnList.Count - 1
-                        ws.Cell(1, col + 1).Value = columnList(col)
-                        ws.Cell(1, col + 1).Style.Font.Bold = True
-                        ws.Cell(1, col + 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightSteelBlue
-                    Next
-
-                    ' データ行
-                    For row As Integer = 0 To tableData.Count - 1
-                        For col As Integer = 0 To columnList.Count - 1
-                            If col < tableData(row).Length AndAlso tableData(row)(col) IsNot Nothing Then
-                                Dim cellValue = tableData(row)(col)
-                                Dim dblVal As Double
-                                If Double.TryParse(cellValue, dblVal) Then
-                                    ws.Cell(row + 2, col + 1).Value = dblVal
-                                Else
-                                    ws.Cell(row + 2, col + 1).Value = cellValue
-                                End If
-                            End If
-                        Next
-                    Next
-
-                    ' 列幅自動調整
-                    ws.Columns().AdjustToContents(1, Math.Min(tableData.Count + 1, 100))
+                    ' ヘッダ行・データ行 (セルの型は列の型で決める。単表の Excel 出力と同じ)
+                    If Not ExcelExportLogic.WriteSheet(ws, tableData, columnList, ctx.ColumnTypes, Nothing, ctx.TableName, marks) Then Return False
 
                     ' メモリ解放
                     tableData = Nothing
@@ -146,14 +120,15 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = LoadTableData(ctx)
+            Dim marks As New Open_NativeParser.ValueMarks()
+            Dim tableData = LoadTableData(ctx, False, marks)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
 
             Dim ok = AccessExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
                                               ctx.TableName, outputPath, worker,
-                                              i + 1, contexts.Count)
+                                              i + 1, contexts.Count, marks)
             If Not ok Then Return False
 
             tableData = Nothing
@@ -174,13 +149,14 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = LoadTableData(ctx)
+            Dim marks As New Open_NativeParser.ValueMarks()
+            Dim tableData = LoadTableData(ctx, False, marks)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
 
             Dim ok = SqlServerExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
-                                                 ctx.Schema, ctx.TableName, connectionString, worker)
+                                                 ctx.Schema, ctx.TableName, connectionString, worker, marks)
             If Not ok Then Return False
 
             tableData = Nothing
@@ -201,13 +177,14 @@ Public Class BulkExportLogic
 
             Dim ctx = contexts(i)
 
-            Dim tableData = LoadTableData(ctx)
+            Dim marks As New Open_NativeParser.ValueMarks()
+            Dim tableData = LoadTableData(ctx, True, marks)
 
             Dim colNames = If(ctx.ColumnNames, Array.Empty(Of String)())
             Dim columnList = New List(Of String)(colNames)
 
             Dim ok = OdbcExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
-                                             ctx.TableName, connectionString, worker)
+                                             ctx.TableName, connectionString, worker, marks)
             If Not ok Then Return False
 
             tableData = Nothing
@@ -221,19 +198,13 @@ Public Class BulkExportLogic
     ''' <summary>
     ''' テーブルデータを DLL 経由で取得 (スレッドセーフ: UIアクセスなし)
     ''' AnalyzeLogic.AnalyzeTable() はCOMMONのUI操作を含むため、
-    ''' BackgroundWorkerスレッドからは直接 Open_NativeParser.ParseDump() を使用する
+    ''' BackgroundWorkerスレッドからは直接 Open_NativeParser.ParseDump() を使用する。
+    ''' 値はエクスポートの書き手と同じ形 (ODV_VALUES_EXPORT: LOB・LONG は全体。値でないものは marks に記録)
     ''' </summary>
-    Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext) As List(Of String())
-        Dim result = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, ctx.RowCount, ctx.Partition, ctx.DataOffsets)
-
-        If result IsNot Nothing AndAlso
-           result.ContainsKey(ctx.Schema) AndAlso
-           result(ctx.Schema).ContainsKey(ctx.TableName) Then
-            Return result(ctx.Schema)(ctx.TableName)
-        End If
-
-        Return New List(Of String())
+    ''' <param name="sqlDateFormat">日付・時刻を SQL 用の固定の書式 (SYYYY/MM/DD HH24:MI:SS[.F]) で (Excel・ODBC の書き手用)</param>
+    Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext, sqlDateFormat As Boolean,
+                                          marks As Open_NativeParser.ValueMarks) As List(Of String())
+        Return ExportHelper.LoadExportRows(ctx, sqlDateFormat, marks)
     End Function
 
     ''' <summary>テーブル単位の進捗報告</summary>
