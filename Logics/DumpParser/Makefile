@@ -23,7 +23,8 @@ endif
 TARGET  = libodv_dumpparser.$(LIBEXT)
 
 SRCS    = odv_api.c odv_detect.c odv_expdp.c odv_exp.c odv_record.c \
-          odv_number.c odv_datetime.c odv_charset.c odv_xml.c odv_csv.c odv_sql.c
+          odv_number.c odv_datetime.c odv_charset.c odv_xml.c odv_csv.c odv_sql.c \
+          odv_tz.c odv_tzdata.c odv_ja16.c odv_ja16map.c
 
 OBJS    = $(SRCS:.c=.o)
 

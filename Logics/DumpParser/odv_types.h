@@ -18,7 +18,9 @@
 
 #ifdef WINDOWS
 #include <windows.h>
+#ifdef _MSC_VER
 #pragma warning(disable:4996)
+#endif
 #endif
 
 /* Calling convention: __stdcall on Windows, default on POSIX */
@@ -78,6 +80,17 @@
 #define CHARSET_WIN1252       12  /* Windows-1252 (WE8MSWIN1252) */
 #define CHARSET_ISO8859P15    13  /* ISO-8859-15 (WE8ISO8859P15) */
 #define CHARSET_GBK           14  /* GBK (ZHS16GBK) */
+/* Japanese Oracle charsets.  CHARSET_SJIS / CHARSET_EUC are JA16SJIS /
+   JA16EUC; they and the TILDE / YEN variants are decoded with Oracle's own
+   mapping (odv_ja16.c), not a Windows code page.  Other charsets whose name
+   or exp id merely looks like SJIS / EUC keep the Windows code page
+   conversion (CP932 / CP20932). */
+#define CHARSET_SJIS_TILDE    15  /* JA16SJISTILDE */
+#define CHARSET_EUC_TILDE     16  /* JA16EUCTILDE */
+#define CHARSET_SJIS_CP932    17  /* other "SJIS" charsets: Windows CP932 */
+#define CHARSET_EUC_CP20932   18  /* other "EUC" charsets: Windows CP20932 */
+#define CHARSET_SJIS_YEN      19  /* JA16SJISYEN */
+#define CHARSET_EUC_YEN       20  /* JA16EUCYEN */
 
 /* Column data types */
 #define COL_NULL               0
@@ -616,6 +629,11 @@ struct _odv_session {
     char            csv_delimiter;         /* CSV field delimiter (default ',') */
     uint32_t        sql_flags;             /* Bitwise OR of ODV_SQL_* flags (default: ODV_SQL_ALL) */
 
+    /* TIMESTAMP WITH (LOCAL) TIME ZONE (odv_tz.c) */
+    char            db_timezone[64];       /* Source DBTIMEZONE from the dump ("" = not found) */
+    int             tz_raw_values;         /* Internal: 1 while write_sql_file parses; TSTZ/TSLTZ
+                                              values are then delivered as "#<hex bytes>" */
+
     /* LOB extraction options */
     int             lob_extract_mode;      /* 1=extracting LOB files */
     char            lob_column[ODV_OBJNAME_LEN + 1];   /* Target LOB column name */
@@ -738,9 +756,29 @@ int decode_binary_double(const unsigned char *buf, char *out, int out_size);
 int decode_interval_ym(const unsigned char *buf, int len, char *out, int out_size);
 int decode_interval_ds(const unsigned char *buf, int len, char *out, int out_size);
 
+/* odv_tz.c */
+int  odv_decode_timestamp_value(ODV_SESSION *s, int col_type,
+                                const unsigned char *buf, int len,
+                                char *out, int out_size, int ts_precision);
+int  odv_tz_sql_value(ODV_SESSION *s, int col_type, int ts_precision,
+                      const char *value, int dbms_type,
+                      char *out, int out_size, int *is_expr);
+const char *odv_tz_region_name(int region_id);
+int  odv_tz_region_offset(int region_id, int64_t utc_secs, int32_t *off_secs);
+const char *odv_tz_data_version(void);
+void odv_tz_scan_exp_dbtz(ODV_SESSION *s, FILE *fp);
+void odv_tz_capture_dbtz_xml(ODV_SESSION *s, const char *xml, int len);
+
 /* odv_charset.c */
 int convert_charset(const char *src, int src_len, int src_cs,
                     char *dst, int dst_size, int dst_cs, int *out_len);
+
+/* odv_ja16.c (Oracle JA16SJIS / JA16EUC and their TILDE / YEN variants) */
+int odv_ja16_is_table_charset(int cs);
+int odv_ja16_to_utf8(const unsigned char *src, int src_len, int cs,
+                     char *dst, int dst_size, int *out_len);
+int odv_utf8_to_ja16(const unsigned char *src, int src_len, int cs,
+                     char *dst, int dst_size, int *out_len);
 
 /* odv_xml.c */
 typedef void (*xml_tag_callback)(const char *tag, const char *value, int depth, void *ctx);

@@ -87,9 +87,9 @@ static const char *extract_identifier(const char *p, char *out, int max_len)
 
     Maps a charset indicator byte from the EXP header to an internal constant.
     The byte is the low 8 bits of the Oracle NLS_CHARACTERSET ID.
-    Byte ranges:
-      0x30-0x3f -> JA16EUC                 (e.g. JA16EUC=830=0x33E)
-      0x40-0x4f -> JA16SJIS                (e.g. JA16SJIS=832=0x340)
+    Byte ranges (fallback for ids id_to_charset() does not know):
+      0x30-0x3f -> EUC-JP, Windows CP20932 (e.g. JA16EUC=830=0x33E)
+      0x40-0x4f -> Shift_JIS, Windows CP932 (e.g. JA16SJIS=832=0x340)
       0x50-0x5f -> ZHS16GBK (Simplified Chinese, includes CGB231280/GB18030)
       0x60-0x6f -> UTF8                    (e.g. AL32UTF8=873=0x369)
       0xd0-0xdf -> UTF16                   (e.g. AL16UTF16=2000=0x7D0)
@@ -97,8 +97,8 @@ static const char *extract_identifier(const char *p, char *out, int max_len)
  ---------------------------------------------------------------------------*/
 static int byte_to_charset(unsigned char b)
 {
-    if (b >= 0x30 && b <= 0x3f) return CHARSET_EUC;
-    if (b >= 0x40 && b <= 0x4f) return CHARSET_SJIS;
+    if (b >= 0x30 && b <= 0x3f) return CHARSET_EUC_CP20932;
+    if (b >= 0x40 && b <= 0x4f) return CHARSET_SJIS_CP932;
     if (b >= 0x50 && b <= 0x5f) return CHARSET_GBK;
     if (b >= 0x60 && b <= 0x6f) return CHARSET_UTF8;
     if (b >= 0xd0 && b <= 0xdf) return CHARSET_UTF16LE;
@@ -127,12 +127,12 @@ static int id_to_charset(int id)
     case 31:   return CHARSET_US8;         /* WE8ISO8859P1 */
     case 46:   return CHARSET_ISO8859P15;  /* WE8ISO8859P15 */
     case 178:  return CHARSET_WIN1252;     /* WE8MSWIN1252 */
-    case 830:                              /* JA16EUC */
-    case 831:                              /* JA16EUCYEN */
-    case 837:  return CHARSET_EUC;         /* JA16EUCTILDE */
-    case 832:                              /* JA16SJIS */
-    case 834:                              /* JA16SJISYEN */
-    case 838:  return CHARSET_SJIS;        /* JA16SJISTILDE */
+    case 830:  return CHARSET_EUC;         /* JA16EUC */
+    case 831:  return CHARSET_EUC_YEN;     /* JA16EUCYEN */
+    case 837:  return CHARSET_EUC_TILDE;   /* JA16EUCTILDE */
+    case 832:  return CHARSET_SJIS;        /* JA16SJIS */
+    case 834:  return CHARSET_SJIS_YEN;    /* JA16SJISYEN */
+    case 838:  return CHARSET_SJIS_TILDE;  /* JA16SJISTILDE */
     case 852:                              /* ZHS16GBK */
     case 854:  return CHARSET_GBK;         /* ZHS32GB18030 (treated as GBK) */
     case 871:                              /* UTF8 (CESU-8) */
@@ -1588,7 +1588,8 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     case COL_TIMESTAMP:
     case COL_TIMESTAMP_TZ:
     case COL_TIMESTAMP_LTZ:
-        rc = decode_oracle_timestamp(data, data_len, tmp, sizeof(tmp), s->date_format, s->custom_date_format, col->precision);
+        /* TSTZ: local time + offset / region; SQL export gets the raw bytes (odv_tz.c, M-09) */
+        rc = odv_decode_timestamp_value(s, col->type, data, data_len, tmp, sizeof(tmp), col->precision);
         if (rc == ODV_OK) {
             set_value_string(val, tmp, (int)strlen(tmp));
         } else {

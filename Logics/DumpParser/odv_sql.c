@@ -951,6 +951,25 @@ static void ODV_CALL sql_row_callback(
                 break;
             }
         } else if (ctx->session && i < ctx->session->table.col_count &&
+                   (ctx->session->table.columns[i].type == COL_TIMESTAMP_TZ ||
+                    ctx->session->table.columns[i].type == COL_TIMESTAMP_LTZ) &&
+                   col_values[i][0] == '#') {
+            /* TSTZ / TSLTZ delivered as raw bytes (s->tz_raw_values, M-09): Oracle gets
+               FROM_TZ(...) that keeps the instant and the offset / region whatever the
+               loading session's time zone; other dialects get the text they got before. */
+            char tzsql[256];
+            int is_expr = 0;
+            if (odv_tz_sql_value(ctx->session, ctx->session->table.columns[i].type,
+                                 ctx->session->table.columns[i].precision, col_values[i],
+                                 ctx->dbms_type, tzsql, (int)sizeof(tzsql), &is_expr) != ODV_OK)
+                fputs("NULL", ctx->fp);
+            else if (is_expr)
+                fputs(tzsql, ctx->fp);
+            else if (tzsql[0] == '\0')
+                fputs("NULL", ctx->fp);
+            else
+                sql_write_string(ctx->fp, tzsql, ctx->dbms_type);
+        } else if (ctx->session && i < ctx->session->table.col_count &&
                    (ctx->session->table.columns[i].type == COL_DATE ||
                     ctx->session->table.columns[i].type == COL_TIMESTAMP ||
                     ctx->session->table.columns[i].type == COL_TIMESTAMP_TZ ||
@@ -1172,6 +1191,9 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         }
     }
 
+    /* TSTZ / TSLTZ values reach sql_row_callback as raw bytes (M-09) */
+    s->tz_raw_values = 1;
+
     switch (s->dump_type) {
     case DUMP_EXPDP:
         rc = parse_expdp_dump(s, 0);
@@ -1189,6 +1211,7 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         break;
     }
 
+    s->tz_raw_values = 0;
     fclose(ctx.fp);
 
     /* Restore original state */

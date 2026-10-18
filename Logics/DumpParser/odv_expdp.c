@@ -590,10 +590,9 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
     case COL_TIMESTAMP:
     case COL_TIMESTAMP_TZ:
     case COL_TIMESTAMP_LTZ:
-        decode_oracle_timestamp(v->data, v->data_len,
-                                decode_buf, sizeof(decode_buf),
-                                s->date_format, s->custom_date_format,
-                                col->precision);
+        /* TSTZ: local time + offset / region; SQL export gets the raw bytes (odv_tz.c, M-09) */
+        odv_decode_timestamp_value(s, col->type, v->data, v->data_len,
+                                   decode_buf, sizeof(decode_buf), col->precision);
         set_value_string(v, decode_buf, (int)strlen(decode_buf));
         v->type = col->type;
         break;
@@ -2077,6 +2076,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                 invalidate_meta_cache();
 
                 parse_xml_ddl(ddl_buf, end_pos, ddl_xml_callback, &dc);
+                odv_tz_capture_dbtz_xml(s, ddl_buf, end_pos);   /* <DBTIMEZONE> for TSLTZ SQL (M-09) */
 
                 /* Record DDL position for fast seek on next parse */
                 s->table.ddl_offset = cur_ddl_pos;
