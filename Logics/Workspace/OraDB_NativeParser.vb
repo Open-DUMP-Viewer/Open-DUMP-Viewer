@@ -43,7 +43,10 @@ Public Class Open_NativeParser
 
 #Region "コールバックデリゲート"
     ''' <summary>
-    ''' 行データ配送コールバック (1行ごとに呼ばれる)
+    ''' 行データ配送コールバック (1行ごとに呼ばれる。DLL の ODV_ROW_CALLBACK_EX)
+    ''' colValues(i) は colLens(i) バイトの UTF-8 (0x00 を含みうる)。colLens(i) = -1 は NULL、0 は空 (NULL ではない)。
+    ''' 値を NUL 終端で読む旧形式 (ODV_ROW_CALLBACK) では 0x00 の位置で値が切れ、先頭が 0x00 の値は NULL と
+    ''' 区別できなかった (M-22)。DLL と一緒に配布するので、こちらは長さ付きの形だけを使う
     ''' </summary>
     <UnmanagedFunctionPointer(CallingConvention.StdCall)>
     Public Delegate Sub RowCallback(
@@ -52,6 +55,7 @@ Public Class Open_NativeParser
         colCount As Integer,
         colNames As IntPtr,
         colValues As IntPtr,
+        colLens As IntPtr,
         userData As IntPtr
     )
 
@@ -103,8 +107,9 @@ Public Class Open_NativeParser
     Private Shared Function odv_set_dump_file(session As IntPtr, <MarshalAs(UnmanagedType.LPUTF8Str)> path As String) As Integer
     End Function
 
+    ' 長さ付きの行コールバック (M-22)
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
-    Private Shared Function odv_set_row_callback(session As IntPtr, cb As RowCallback, userData As IntPtr) As Integer
+    Private Shared Function odv_set_row_callback_ex(session As IntPtr, cb As RowCallback, userData As IntPtr) As Integer
     End Function
 
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
@@ -393,7 +398,10 @@ Public Class Open_NativeParser
 
         ''' <summary>
         ''' テーブルのフルキー (IntPtr版) — ポインタ値でテーブル切替を高速検出
-        ''' ポインタが変わらなければ同じテーブル（DLL側はバッファ再利用）
+        ''' ポインタが変わらなければ同じテーブル（DLL側はバッファ再利用）。
+        ''' DLL は名前をセッションごとの 2 つの枠に交互に置くので、表が変わると表名のポインタは必ず変わる
+        ''' (odv_api.h の ODV_ROW_CALLBACK_EX)。以前は全セッション共有の 1 つのバッファで、別スレッドの解析が
+        ''' 書き換えても同じポインタのままだったため、最初に読んだ別の表名で全行が格納された (M-25)
         ''' </summary>
         Public Function TableKey(schemaPtr As IntPtr, tablePtr As IntPtr) As String
             ' ポインタが前回と同じなら高速パス
@@ -536,7 +544,7 @@ Public Class Open_NativeParser
         ctx.ExpectedRowCount = expectedRowCount
         Dim gcHandle As GCHandle = GCHandle.Alloc(ctx)
 
-        ' コールバックデリゲートをフィールドに保持（GC回収防止）
+        ' コールバックデリゲート（GC回収防止は Finally の GC.KeepAlive。ローカル変数に置くだけでは守られない）
         Dim rowCb As New RowCallback(AddressOf OnRowCallback)
         Dim progCb As New ProgressCallback(AddressOf OnProgressCallback)
 
@@ -560,7 +568,7 @@ Public Class Open_NativeParser
 
             ' コールバック設定
             Dim userData As IntPtr = GCHandle.ToIntPtr(gcHandle)
-            odv_set_row_callback(session, rowCb, userData)
+            odv_set_row_callback_ex(session, rowCb, userData)
             odv_set_progress_callback(session, progCb, userData)
 
             ' テーブルフィルタ設定（DLL側で文字セット変換後に比較）
@@ -600,6 +608,11 @@ Public Class Open_NativeParser
             If gcHandle.IsAllocated Then
                 gcHandle.Free()
             End If
+            ' DLL が呼び返す間はデリゲートを生かしておく。ローカル変数は最後に使った所 (odv_set_*_callback) で
+            ' GC の対象になり、解析中に回収されると "callback was made on a garbage collected delegate" で
+            ' プロセスごと落ちる (並行解析の試験で再現。GC が走るほど起きやすい)
+            GC.KeepAlive(rowCb)
+            GC.KeepAlive(progCb)
         End Try
     End Function
 
@@ -671,6 +684,9 @@ Public Class Open_NativeParser
             If gcHandle.IsAllocated Then
                 gcHandle.Free()
             End If
+            ' DLL が呼び返す間はデリゲートを生かしておく (ParseDump と同じ)
+            GC.KeepAlive(tableCb)
+            GC.KeepAlive(progCb)
         End Try
     End Function
 
@@ -876,6 +892,8 @@ Public Class Open_NativeParser
             If gcHandle.IsAllocated Then
                 gcHandle.Free()
             End If
+            ' DLL が呼び返す間はデリゲートを生かしておく (ParseDump と同じ)
+            GC.KeepAlive(progCb)
         End Try
     End Function
 #End Region
@@ -889,10 +907,12 @@ Public Class Open_NativeParser
     ''' - スキーマ名/テーブル名はインターン化して重複排除
     ''' - Dictionary初期容量をカラム数に合わせて確保（リハッシュ防止）
     ''' - 空文字列はString.Emptyを共有
+    ''' 値は長さで読む (0x00 を含む値も欠けない)。NULL は Nothing、空 (NULL ではない) は String.Empty (M-22)
     ''' </summary>
     Private Shared Sub OnRowCallback(schemaPtr As IntPtr, tablePtr As IntPtr,
                                      colCount As Integer, colNamesPtr As IntPtr,
-                                     colValuesPtr As IntPtr, userData As IntPtr)
+                                     colValuesPtr As IntPtr, colLensPtr As IntPtr,
+                                     userData As IntPtr)
         Try
             Dim gcHandle As GCHandle = GCHandle.FromIntPtr(userData)
             Dim ctx = DirectCast(gcHandle.Target, ParseContext)
@@ -942,14 +962,17 @@ Public Class Open_NativeParser
             End If
 
             ' 行データを文字列配列に変換して追加（位置インデックスで格納）
+            ' 値は長さで読む: NUL 終端で読むと 0x00 の位置で切れ、先頭が 0x00 の値が空 = NULL になっていた (M-22)
             Dim row As String() = New String(colCount - 1) {}
             For i As Integer = 0 To colCount - 1
                 Dim valPtr As IntPtr = Marshal.ReadIntPtr(colValuesPtr, i * IntPtr.Size)
-                If valPtr = IntPtr.Zero Then
-                    row(i) = Nothing
+                Dim valLen As Integer = Marshal.ReadInt32(colLensPtr, i * 4)
+                If valPtr = IntPtr.Zero OrElse valLen < 0 Then
+                    row(i) = Nothing                ' NULL
+                ElseIf valLen = 0 Then
+                    row(i) = String.Empty           ' 空 (NULL ではない)
                 Else
-                    Dim s = Marshal.PtrToStringUTF8(valPtr)
-                    row(i) = If(String.IsNullOrEmpty(s), Nothing, s)
+                    row(i) = Marshal.PtrToStringUTF8(valPtr, valLen)
                 End If
             Next
 

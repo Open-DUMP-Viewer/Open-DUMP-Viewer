@@ -542,6 +542,17 @@ typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     void *user_data
 );
 
+/* Values with their lengths, NULL as col_lens[i] = -1 (see odv_api.h, M-22) */
+typedef void (ODV_CALL *ODV_ROW_CALLBACK_EX)(
+    const char *schema,
+    const char *table,
+    int col_count,
+    const char **col_names,
+    const char **col_values,
+    const int *col_lens,
+    void *user_data
+);
+
 typedef void (ODV_CALL *ODV_PROGRESS_CALLBACK)(
     int64_t rows_processed,
     const char *current_table,
@@ -562,6 +573,28 @@ typedef void (ODV_CALL *ODV_TABLE_CALLBACK)(
     int64_t data_offset,         /* File position of table DDL (for fast seek) */
     void *user_data
 );
+
+/* Table / column names converted to the output charset for the callbacks
+   (odv_record.c). One per session (M-25): it used to be a single static in
+   odv_record.c, so sessions parsing at the same time in different threads
+   overwrote each other's names. Two slots are used in turn so that a table
+   change between two delivered rows always changes the pointers handed to
+   the row callback; the progress callback's name does not move them. */
+typedef struct {
+    char    schema[ODV_OBJNAME_LEN * 4 + 1];
+    char    name[ODV_OBJNAME_LEN * 4 + 1];
+    char    col_names[ODV_MAX_COLUMNS][ODV_OBJNAME_LEN * 4 + 1];
+} ODV_META_SLOT;
+
+typedef struct {
+    ODV_META_SLOT slot[2];
+    int     cur;                                /* slot in use */
+    char    progress_name[ODV_OBJNAME_LEN * 4 + 1]; /* table name for progress_cb */
+    char    src_schema[ODV_OBJNAME_LEN + 1];    /* detect change */
+    char    src_name[ODV_OBJNAME_LEN + 1];      /* detect change */
+    int     col_count;
+    int     valid;
+} ODV_META_CACHE;
 
 /* Main session structure */
 struct _odv_session {
@@ -608,8 +641,10 @@ struct _odv_session {
     ODV_RECORD      record;
     unsigned char   read_buf[ODV_EXP_READ_BUF_LEN];
 
-    /* Callbacks */
+    /* Callbacks. At most one of row_cb / row_cb_ex is set (row_ud is for
+       whichever it is). */
     ODV_ROW_CALLBACK        row_cb;
+    ODV_ROW_CALLBACK_EX     row_cb_ex;
     void                   *row_ud;
     ODV_PROGRESS_CALLBACK   progress_cb;
     void                   *progress_ud;
@@ -668,6 +703,10 @@ struct _odv_session {
     int64_t         lob_files_written;     /* Count of files written */
     int64_t         lob_files_failed;      /* Count of LOB rows that could not be written (H-07) */
     int             lob_column_missing;    /* 1 = the table had no such LOB column (M-27) */
+
+    /* Per-session state that used to be static (M-25) */
+    ODV_META_CACHE *meta;                  /* names for the callbacks; allocated on first use */
+    char            constraints_json[8192];/* odv_get_table_constraints_json() result */
 };
 
 /*---------------------------------------------------------------------------
@@ -723,8 +762,8 @@ int  set_value_string(ODV_VALUE *v, const char *str, int len);
 int  ensure_value_buf(ODV_VALUE *v, int needed);
 int  deliver_row(ODV_SESSION *s);
 void odv_report_progress(ODV_SESSION *s, ODV_VFILE *fp);
-void invalidate_meta_cache(void);
-void update_meta_cache(ODV_SESSION *s);
+void invalidate_meta_cache(ODV_SESSION *s);
+void free_meta_cache(ODV_SESSION *s);
 
 /* table_list growth (odv_api.c). Makes room for one more entry at
  * s->table_list[s->table_count] (zero-filled when first allocated, but a slot

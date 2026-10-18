@@ -18,14 +18,16 @@
 /*---------------------------------------------------------------------------
     csv_needs_escape
 
-    Returns 1 if the value contains characters requiring CSV escaping.
+    Returns 1 if the value (len bytes) contains characters requiring CSV
+    escaping. Values are read by their length: a value may contain 0x00
+    bytes, which used to end it (M-22).
  ---------------------------------------------------------------------------*/
-static int csv_needs_escape(const char *val, char delimiter)
+static int csv_needs_escape(const char *val, size_t len, char delimiter)
 {
-    while (*val) {
-        if (*val == delimiter || *val == '"' || *val == '\n' || *val == '\r')
+    size_t i;
+    for (i = 0; i < len; i++) {
+        if (val[i] == delimiter || val[i] == '"' || val[i] == '\n' || val[i] == '\r')
             return 1;
-        val++;
     }
     return 0;
 }
@@ -33,27 +35,36 @@ static int csv_needs_escape(const char *val, char delimiter)
 /*---------------------------------------------------------------------------
     csv_write_escaped
 
-    Writes a value to the file, wrapping in double-quotes and escaping
-    embedded double-quotes (by doubling them) when necessary.
+    Writes a value (len bytes) to the file, wrapping in double-quotes and
+    escaping embedded double-quotes (by doubling them) when necessary.
  ---------------------------------------------------------------------------*/
-static void csv_write_escaped(FILE *fp, const char *val, char delimiter)
+static void csv_write_escaped(FILE *fp, const char *val, size_t len, char delimiter)
 {
-    if (!csv_needs_escape(val, delimiter)) {
-        fputs(val, fp);
+    size_t i, run = 0;
+
+    if (!csv_needs_escape(val, len, delimiter)) {
+        fwrite(val, 1, len, fp);
         return;
     }
 
     fputc('"', fp);
-    while (*val) {
-        if (*val == '"') {
+    for (i = 0; i < len; i++) {
+        if (val[i] == '"') {
+            /* the run up to and including this quote, then the second quote */
+            fwrite(val + i - run, 1, run + 1, fp);
             fputc('"', fp);
-            fputc('"', fp);
+            run = 0;
         } else {
-            fputc(*val, fp);
+            run++;
         }
-        val++;
     }
+    if (run) fwrite(val + len - run, 1, run, fp);
     fputc('"', fp);
+}
+
+static void csv_write_name(FILE *fp, const char *name, char delimiter)
+{
+    csv_write_escaped(fp, name, strlen(name), delimiter);
 }
 
 /*---------------------------------------------------------------------------
@@ -80,7 +91,7 @@ typedef struct {
 static void ODV_CALL csv_row_callback(
     const char *schema, const char *table,
     int col_count, const char **col_names, const char **col_values,
-    void *user_data)
+    const int *col_lens, void *user_data)
 {
     CSV_CONTEXT *ctx = (CSV_CONTEXT *)user_data;
     int i;
@@ -100,7 +111,7 @@ static void ODV_CALL csv_row_callback(
         if (ctx->write_header) {
             for (i = 0; i < col_count; i++) {
                 if (i > 0) fputc(ctx->delimiter, ctx->fp);
-                csv_write_escaped(ctx->fp, col_names[i], ctx->delimiter);
+                csv_write_name(ctx->fp, col_names[i], ctx->delimiter);
             }
             fputc('\n', ctx->fp);
         }
@@ -111,19 +122,20 @@ static void ODV_CALL csv_row_callback(
                 if (i > 0) fputc(ctx->delimiter, ctx->fp);
                 if (i < ctx->session->table.col_count &&
                     ctx->session->table.columns[i].type_str[0]) {
-                    csv_write_escaped(ctx->fp, ctx->session->table.columns[i].type_str,
-                                      ctx->delimiter);
+                    csv_write_name(ctx->fp, ctx->session->table.columns[i].type_str,
+                                   ctx->delimiter);
                 }
             }
             fputc('\n', ctx->fp);
         }
     }
 
-    /* Write data row */
+    /* Write data row. NULL and an empty value are both an empty field; a
+       value is written whole by its length, 0x00 bytes included (M-22). */
     for (i = 0; i < col_count; i++) {
         if (i > 0) fputc(ctx->delimiter, ctx->fp);
-        if (col_values[i] && col_values[i][0] != '\0') {
-            csv_write_escaped(ctx->fp, col_values[i], ctx->delimiter);
+        if (col_values[i] && col_lens[i] > 0) {
+            csv_write_escaped(ctx->fp, col_values[i], (size_t)col_lens[i], ctx->delimiter);
         }
     }
     fputc('\n', ctx->fp);
@@ -146,6 +158,7 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
 {
     CSV_CONTEXT ctx;
     ODV_ROW_CALLBACK saved_cb;
+    ODV_ROW_CALLBACK_EX saved_cb_ex;
     void *saved_ud;
     int rc;
 
@@ -169,8 +182,10 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
 
     /* Save and replace row callback */
     saved_cb = s->row_cb;
+    saved_cb_ex = s->row_cb_ex;
     saved_ud = s->row_ud;
-    s->row_cb = csv_row_callback;
+    s->row_cb = NULL;
+    s->row_cb_ex = csv_row_callback;
     s->row_ud = &ctx;
 
     /* Re-parse dump to stream rows */
@@ -183,6 +198,7 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
         if (rc != ODV_OK) {
             fclose(ctx.fp);
             s->row_cb = saved_cb;
+            s->row_cb_ex = saved_cb_ex;
             s->row_ud = saved_ud;
             return rc;
         }
@@ -209,6 +225,7 @@ int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_pa
 
     /* Restore original callback */
     s->row_cb = saved_cb;
+    s->row_cb_ex = saved_cb_ex;
     s->row_ud = saved_ud;
 
     return rc;

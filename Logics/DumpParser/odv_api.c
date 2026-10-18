@@ -194,6 +194,7 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
     session->partition_list = NULL;
     free(session->seek_list);
     session->seek_list = NULL;
+    free_meta_cache(session);
 
     /* Free LOB buffer if allocated */
     if (session->state.lob_buf) {
@@ -405,6 +406,7 @@ ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path)
     s->table_count = 0;
     s->total_rows = 0;
     s->cancelled = 0;
+    invalidate_meta_cache(s);   /* names are converted with this dump's charset */
 
     return ODV_OK;
 }
@@ -413,6 +415,17 @@ ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, v
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->row_cb = cb;
+    s->row_cb_ex = NULL;
+    s->row_ud = user_data;
+    return ODV_OK;
+}
+
+/* Values with their lengths and NULL as -1 (M-22). Replaces odv_set_row_callback. */
+ODV_API int ODV_CALL odv_set_row_callback_ex(ODV_SESSION *s, ODV_ROW_CALLBACK_EX cb, void *user_data)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    s->row_cb_ex = cb;
+    s->row_cb = NULL;
     s->row_ud = user_data;
     return ODV_OK;
 }
@@ -1213,22 +1226,22 @@ ODV_API int ODV_CALL odv_get_table_entry(ODV_SESSION *s, int index,
 }
 
 /* Build constraints JSON for a table_list entry (EXPDP metadata).
- * Returns pointer to static buffer (overwritten on each call). */
+ * Returns a buffer of the session, overwritten by the next call on it. It
+ * used to be one static buffer for every session, so a call in another
+ * thread could overwrite the result being read (M-25). */
 ODV_API const char * ODV_CALL odv_get_table_constraints_json(ODV_SESSION *s, int index)
 {
-    static char json_buf[8192];
+    static const char empty_json[] = "[]";
+    char *json_buf;
     int pos = 0, i;
 
-    if (!s || index < 0 || index >= s->table_count) {
-        json_buf[0] = '['; json_buf[1] = ']'; json_buf[2] = '\0';
-        return json_buf;
-    }
+    if (!s || index < 0 || index >= s->table_count)
+        return empty_json;
 
     ODV_TABLE_ENTRY *e = &s->table_list[index];
-    if (e->meta_constraint_count == 0) {
-        json_buf[0] = '['; json_buf[1] = ']'; json_buf[2] = '\0';
-        return json_buf;
-    }
+    if (e->meta_constraint_count == 0)
+        return empty_json;
+    json_buf = s->constraints_json;
 
     /* Reserve one byte for the closing ']' so the loop can never consume the
        space it needs. snprintf() returns the length it *would* have written,
@@ -1248,7 +1261,7 @@ ODV_API const char * ODV_CALL odv_get_table_constraints_json(ODV_SESSION *s, int
         }
         esc_name[ei] = '\0';
 
-        remain = (int)sizeof(json_buf) - pos - 2;  /* keep room for "]\0" */
+        remain = (int)sizeof(s->constraints_json) - pos - 2;  /* keep room for "]\0" */
         n = snprintf(json_buf + pos, (size_t)(remain + 1),
             "%s{\"type\":%d,\"name\":\"%s\",\"columns\":[]}",
             (i > 0) ? "," : "", mc->type, esc_name);

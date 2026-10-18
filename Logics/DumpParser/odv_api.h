@@ -84,10 +84,23 @@ typedef struct _odv_session ODV_SESSION;
 #define ODV_SQL_ALL            0x0Fu  /* All of the above */
 
 /*---------------------------------------------------------------------------
+    Threads
+
+    Sessions are independent of each other: different sessions may be used
+    from different threads at the same time (each keeps its own state; the
+    DLL holds no state shared between sessions). One session must not be
+    used by two threads at once.
+ ---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
     Callback Types
  ---------------------------------------------------------------------------*/
 
-/* Row data delivery callback (called per row during parse) */
+/* Row data delivery callback (called per row during parse).
+   Each value is a NUL-terminated string, so a value that contains a 0x00
+   byte appears cut at it, and a NULL value is passed as "" (as is a value
+   that starts with 0x00). Use ODV_ROW_CALLBACK_EX (odv_set_row_callback_ex)
+   to receive every value whole, with NULL told apart. */
 typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char *schema,
     const char *table,
@@ -96,6 +109,28 @@ typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char **col_values,
     void *user_data
 );
+
+/* Row data delivery callback with value lengths (odv_set_row_callback_ex).
+   col_values[i] points to col_lens[i] bytes: the value as UTF-8 text (or the
+   hex / placeholder text of a binary column), which may contain 0x00 bytes.
+   Read it by its length, not up to a 0x00.
+   col_lens[i] == -1 (with col_values[i] == NULL) means the value is NULL;
+   0 means an empty value that is not NULL.
+   schema, table and col_names (NUL-terminated) and the arrays are valid until
+   the callback returns. When a row belongs to another table than the
+   previous row, its schema / table / col_names pointers differ from the
+   previous row's, so a caller may cache the names by pointer (rows of the
+   same table usually keep the same pointers, but may also get new ones). */
+typedef void (ODV_CALL *ODV_ROW_CALLBACK_EX)(
+    const char *schema,
+    const char *table,
+    int col_count,
+    const char **col_names,
+    const char **col_values,
+    const int *col_lens,
+    void *user_data
+);
+#define ODV_HAS_ROW_CALLBACK_EX 1
 
 /* Progress notification callback
    rows_processed: total rows processed so far
@@ -143,7 +178,9 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session);
    character may appear in them; a string that is not valid UTF-8 is taken as
    the ANSI code page, as before. A path longer than 1024 bytes is refused. */
 ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path);
+/* A session has one row callback: setting either form replaces the other. */
 ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data);
+ODV_API int ODV_CALL odv_set_row_callback_ex(ODV_SESSION *s, ODV_ROW_CALLBACK_EX cb, void *user_data);
 ODV_API int ODV_CALL odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data);
 ODV_API int ODV_CALL odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data);
 

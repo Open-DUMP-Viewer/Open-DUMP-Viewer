@@ -42,10 +42,21 @@ Open_DumpParser.dll (C ネイティブ, x64)
 ### コールバック方式
 
 ```
-ODV_ROW_CALLBACK(schema, table, col_count, col_names[], col_values[], user_data)
-  → P/Invoke経由で VB.NET の OnRowCallback に到達
+ODV_ROW_CALLBACK_EX(schema, table, col_count, col_names[], col_values[], col_lens[], user_data)
+  → P/Invoke経由で VB.NET の OnRowCallback に到達 (odv_set_row_callback_ex)
   → Dictionary(Of String, Object) として行データを蓄積
 ```
+
+- **値は長さで読む**。`col_lens[i]` が値のバイト長で、値は 0x00 を含みうる。`-1` が NULL、`0` は NULL でない空。
+  NUL 終端で読む旧形式 `ODV_ROW_CALLBACK`（`odv_set_row_callback`）は互換のためだけに残してあり、0x00 の位置で
+  値が切れ、NULL と先頭が 0x00 の値を区別できない（M-22）。製品と DLL 内の CSV / SQL 出力は長さ付きだけを使う
+- **セッションは互いに独立**。別々のセッションを別スレッドで同時に使ってよい（表名・列名の変換結果もセッションごと。
+  かつての static な共有キャッシュは、並行解析で別のダンプ・別の表の名前を行に付けた: M-25）。1 つのセッションを
+  2 つのスレッドで同時に使ってはならない。DLL に static / グローバルな可変状態を足さないこと
+- 行コールバックの schema / table / col_names のポインタは、前の行と別の表の行では必ず変わる（VB の `TableKey` は
+  ポインタで表の切り替えを見ている）
+- P/Invoke に渡したデリゲートは、DLL が呼び返す間 `GC.KeepAlive` などで生かしておく（ローカル変数に置くだけでは
+  解析中に回収され、プロセスごと落ちる）
 
 ## Project Structure
 

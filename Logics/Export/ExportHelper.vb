@@ -72,11 +72,18 @@ Public Module ExportHelper
     ''' 使う) で、文字列リテラル中の生の改行は空行・'/' だけの行・行末 ';' などで文を壊し、
     ''' 生の CR は黙って落ちるため。'' は Oracle では NULL で NULL||x=x なので、値の先頭・末尾の
     ''' CHR 断片も正しく連結される。他の方言 (既定) は従来どおり ' の二重化のみ。
+    ''' 値の中の U+0000 (ダンプの 0x00。M-22 で値が切れずに届くようになった) は文字列リテラルに書けないので、
+    ''' Oracle は '…'||CHR(0)||'…'、他の方言は CONCAT('…', CHAR(0), '…') (PostgreSQL は CHR(0)。PostgreSQL の
+    ''' text は U+0000 を持てず、流すとその行がエラーになる = 黙って別の値にしない) で書く。DLL の SQL 出力と同じ形。
     ''' </summary>
     Public Function EscapeSqlString(value As String, Optional dbmsType As Integer = -1) As String
         If value Is Nothing Then Return "NULL"
         If dbmsType <> DBMS_ORACLE Then
-            Return "'" & value.Replace("'", "''") & "'"
+            If value.IndexOf(ChrW(0)) < 0 Then
+                Return "'" & value.Replace("'", "''") & "'"
+            End If
+            Dim nul = If(dbmsType = DBMS_POSTGRES, "', CHR(0), '", "', CHAR(0), '")
+            Return "CONCAT('" & value.Replace("'", "''").Replace(vbNullChar, nul) & "')"
         End If
         Dim sb As New StringBuilder("'")
         For Each ch In value
@@ -87,6 +94,8 @@ Public Module ExportHelper
                     sb.Append("'||CHR(10)||'")
                 Case ChrW(13)
                     sb.Append("'||CHR(13)||'")
+                Case ChrW(0)
+                    sb.Append("'||CHR(0)||'")
                 Case Else
                     sb.Append(ch)
             End Select

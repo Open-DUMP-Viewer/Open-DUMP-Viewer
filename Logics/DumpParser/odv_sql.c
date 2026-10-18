@@ -42,16 +42,32 @@ typedef struct {
 } SQL_CONTEXT;
 
 /*---------------------------------------------------------------------------
-    Helper: write SQL-escaped string value
+    Helper: write SQL-escaped string value (len bytes)
     Escapes single quotes by doubling them.
+
+    The value is read by its length, so a 0x00 byte inside it is kept (it
+    used to end the value, M-22). A string literal cannot carry one: Oracle
+    gets '...'||CHR(0)||'...' as for CR / LF below; the other dialects get
+    CONCAT('...', CHAR(0), '...') (CHR(0) for PostgreSQL, whose text type
+    cannot hold U+0000 at all, so loading that row fails there with "null
+    character not permitted" rather than storing a different value).
  ---------------------------------------------------------------------------*/
-static void sql_write_string(FILE *fp, const char *val, int dbms)
+static void sql_write_string_n(FILE *fp, const char *val, size_t len, int dbms)
 {
+    size_t i;
+    int concat = (dbms != DBMS_ORACLE && memchr(val, 0, len) != NULL);
+
+    if (concat) fputs("CONCAT(", fp);
     fputc('\'', fp);
-    while (*val) {
+    for (i = 0; i < len; i++, val++) {
         if (*val == '\'') {
             fputc('\'', fp);
             fputc('\'', fp);
+        } else if (*val == '\0') {
+            if (dbms == DBMS_ORACLE)
+                fputs("'||CHR(0)||'", fp);
+            else
+                fputs(dbms == DBMS_POSTGRES ? "', CHR(0), '" : "', CHAR(0), '", fp);
         } else if (dbms == DBMS_ORACLE && (*val == '\n' || *val == '\r')) {
             /* SQL*Plus is line-oriented: a literal newline in a string breaks
                the statement on a blank line, a lone '/' line, a line ending in
@@ -66,9 +82,15 @@ static void sql_write_string(FILE *fp, const char *val, int dbms)
                scope here; backslashes are written verbatim. */
             fputc(*val, fp);
         }
-        val++;
     }
     fputc('\'', fp);
+    if (concat) fputc(')', fp);
+}
+
+/* A NUL-terminated text (comment, date, time zone value) */
+static void sql_write_string(FILE *fp, const char *val, int dbms)
+{
+    sql_write_string_n(fp, val, strlen(val), dbms);
 }
 
 /*---------------------------------------------------------------------------
@@ -249,10 +271,13 @@ static int parse_number_prec_scale(const char *paren, int *prec, int *scale)
     - NUMBER(p, negative_scale) → adjusted NUMERIC for non-Oracle targets
     - FLOAT(n) → binary precision to IEEE float mapping
     - INTERVAL, LONG RAW, XMLTYPE, ROWID, BFILE, etc.
+    The text is built in the caller's result[] (it was one static buffer
+    shared by every session, M-25), or is a string literal.
  ---------------------------------------------------------------------------*/
-static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
+#define SQL_TYPE_BUF 256
+static const char *map_oracle_to_target_type(const char *oracle_type, int dbms,
+                                             char result[SQL_TYPE_BUF])
 {
-    static char result[256];
     char base[64];
     const char *paren;
     int i;
@@ -288,11 +313,11 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             parse_number_prec_scale(paren, &prec, &scale);
             if (prec > 38 && scale == 0) {
                 /* This was originally FLOAT(n) encoded as NUMBER(n) by EXPDP */
-                snprintf(result, sizeof(result), "FLOAT(%d)", prec);
+                snprintf(result, SQL_TYPE_BUF, "FLOAT(%d)", prec);
                 return result;
             }
         }
-        snprintf(result, sizeof(result), "%s", oracle_type);
+        snprintf(result, SQL_TYPE_BUF, "%s", oracle_type);
         return result;
     }
 
@@ -309,17 +334,17 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
     if (dbms == DBMS_POSTGRES) {
         /* VARCHAR2 / NVARCHAR2 → VARCHAR */
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "VARCHAR%s", paren); return result; }
             return "VARCHAR(255)";
         }
         /* NUMBER */
         if (strcmp(base, "NUMBER") == 0) {
             if (has_prec && prec > 38 && scale == 0) return "DOUBLE PRECISION"; /* FLOAT */
             if (has_prec && scale < 0) {
-                snprintf(result, sizeof(result), "NUMERIC(%d,0)", prec + (-scale));
+                snprintf(result, SQL_TYPE_BUF, "NUMERIC(%d,0)", prec + (-scale));
                 return result;
             }
-            if (paren) { snprintf(result, sizeof(result), "NUMERIC%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "NUMERIC%s", paren); return result; }
             return "NUMERIC";
         }
         /* FLOAT (from EXP parser) — binary precision */
@@ -338,9 +363,9 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             if (strstr(oracle_type, "WITH TIME ZONE") ||
                 strstr(oracle_type, "WITH LOCAL TIME ZONE")) {
                 /* PG: WITH LOCAL TIME ZONE → WITH TIME ZONE */
-                snprintf(result, sizeof(result), "TIMESTAMP(%d) WITH TIME ZONE", ts_prec);
+                snprintf(result, SQL_TYPE_BUF, "TIMESTAMP(%d) WITH TIME ZONE", ts_prec);
             } else {
-                snprintf(result, sizeof(result), "TIMESTAMP(%d)", ts_prec);
+                snprintf(result, SQL_TYPE_BUF, "TIMESTAMP(%d)", ts_prec);
             }
             return result;
         }
@@ -353,7 +378,7 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE PRECISION";
         /* CHAR / NCHAR */
         if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
         /* INTERVAL: by prefix, since a precision splits the name
@@ -372,16 +397,16 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
        ================================================================= */
     if (dbms == DBMS_MYSQL) {
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "VARCHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "VARCHAR%s", paren); return result; }
             return "VARCHAR(255)";
         }
         if (strcmp(base, "NUMBER") == 0) {
             if (has_prec && prec > 38 && scale == 0) return "DOUBLE";
             if (has_prec && scale < 0) {
-                snprintf(result, sizeof(result), "DECIMAL(%d,0)", prec + (-scale));
+                snprintf(result, SQL_TYPE_BUF, "DECIMAL(%d,0)", prec + (-scale));
                 return result;
             }
-            if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "DECIMAL%s", paren); return result; }
             return "DECIMAL(38,10)";
         }
         if (strcmp(base, "FLOAT") == 0) {
@@ -397,9 +422,9 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             int ts_prec = paren ? atoi(paren + 1) : 0;
             if (ts_prec > 6) ts_prec = 6;
             if (ts_prec > 0) {
-                snprintf(result, sizeof(result), "DATETIME(%d)", ts_prec);
+                snprintf(result, SQL_TYPE_BUF, "DATETIME(%d)", ts_prec);
             } else {
-                snprintf(result, sizeof(result), "DATETIME");
+                snprintf(result, SQL_TYPE_BUF, "DATETIME");
             }
             return result;
         }
@@ -409,7 +434,7 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
         if (strcmp(base, "BINARY_FLOAT") == 0) return "FLOAT";
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "DOUBLE";
         if (strcmp(base, "CHAR") == 0 || strcmp(base, "NCHAR") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "CHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "CHAR%s", paren); return result; }
             return "CHAR(1)";
         }
         if (strncmp(base, "INTERVAL", 8) == 0) return "VARCHAR(64)";   /* by prefix (M-20) */
@@ -425,22 +450,22 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
        ================================================================= */
     if (dbms == DBMS_SQLSERVER) {
         if (strcmp(base, "VARCHAR2") == 0 || strcmp(base, "NVARCHAR2") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "NVARCHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "NVARCHAR%s", paren); return result; }
             return "NVARCHAR(255)";
         }
         if (strcmp(base, "NUMBER") == 0) {
             if (has_prec && prec > 38 && scale == 0) return "FLOAT";  /* FLOAT(53) */
             if (has_prec && scale < 0) {
-                snprintf(result, sizeof(result), "DECIMAL(%d,0)", prec + (-scale));
+                snprintf(result, SQL_TYPE_BUF, "DECIMAL(%d,0)", prec + (-scale));
                 return result;
             }
-            if (paren) { snprintf(result, sizeof(result), "DECIMAL%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "DECIMAL%s", paren); return result; }
             return "DECIMAL(38,10)";
         }
         if (strcmp(base, "FLOAT") == 0) {
             if (paren) {
                 int bp = atoi(paren + 1);
-                snprintf(result, sizeof(result), "FLOAT(%d)", bp <= 24 ? 24 : 53);
+                snprintf(result, SQL_TYPE_BUF, "FLOAT(%d)", bp <= 24 ? 24 : 53);
                 return result;
             }
             return "FLOAT";
@@ -450,26 +475,26 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
             int ts_prec = paren ? atoi(paren + 1) : 7;
             if (ts_prec > 7) ts_prec = 7; /* SQL Server max = 7 */
             if (strstr(oracle_type, "WITH TIME ZONE")) {
-                snprintf(result, sizeof(result), "DATETIMEOFFSET(%d)", ts_prec);
+                snprintf(result, SQL_TYPE_BUF, "DATETIMEOFFSET(%d)", ts_prec);
             } else {
-                snprintf(result, sizeof(result), "DATETIME2(%d)", ts_prec);
+                snprintf(result, SQL_TYPE_BUF, "DATETIME2(%d)", ts_prec);
             }
             return result;
         }
         if (strcmp(base, "CLOB") == 0 || strcmp(base, "NCLOB") == 0 || strcmp(base, "LONG") == 0) return "NVARCHAR(MAX)";
         if (strcmp(base, "BLOB") == 0 || strcmp(base, "LONG RAW") == 0) return "VARBINARY(MAX)";
         if (strcmp(base, "RAW") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "VARBINARY%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "VARBINARY%s", paren); return result; }
             return "VARBINARY(MAX)";
         }
         if (strcmp(base, "BINARY_FLOAT") == 0) return "REAL";
         if (strcmp(base, "BINARY_DOUBLE") == 0) return "FLOAT";
         if (strcmp(base, "CHAR") == 0) {
-            if (paren) { snprintf(result, sizeof(result), "NCHAR%s", paren); return result; }
+            if (paren) { snprintf(result, SQL_TYPE_BUF, "NCHAR%s", paren); return result; }
             return "NCHAR(1)";
         }
         if (strcmp(base, "NCHAR") == 0) {
-            snprintf(result, sizeof(result), "%s", oracle_type);
+            snprintf(result, SQL_TYPE_BUF, "%s", oracle_type);
             return result;
         }
         if (strncmp(base, "INTERVAL", 8) == 0) return "NVARCHAR(64)";  /* by prefix (M-20) */
@@ -481,7 +506,7 @@ static const char *map_oracle_to_target_type(const char *oracle_type, int dbms)
     }
 
     /* Unknown DBMS: return as-is */
-    snprintf(result, sizeof(result), "%s", oracle_type);
+    snprintf(result, SQL_TYPE_BUF, "%s", oracle_type);
     return result;
 }
 
@@ -582,7 +607,8 @@ static void write_create_table(SQL_CONTEXT *ctx, const char *schema,
 
         if (i < ctx->session->table.col_count &&
             ctx->session->table.columns[i].type_str[0]) {
-            fputs(map_oracle_to_target_type(ctx->session->table.columns[i].type_str, dbms), fp);
+            char tbuf[SQL_TYPE_BUF];
+            fputs(map_oracle_to_target_type(ctx->session->table.columns[i].type_str, dbms, tbuf), fp);
         } else {
             fputs("VARCHAR(255)", fp);
         }
@@ -881,7 +907,7 @@ static void build_insert_prefix(SQL_CONTEXT *ctx, const char *schema,
 static void ODV_CALL sql_row_callback(
     const char *schema, const char *table,
     int col_count, const char **col_names, const char **col_values,
-    void *user_data)
+    const int *col_lens, void *user_data)
 {
     SQL_CONTEXT *ctx = (SQL_CONTEXT *)user_data;
     int i;
@@ -919,8 +945,16 @@ static void ODV_CALL sql_row_callback(
     for (i = 0; i < col_count; i++) {
         if (i > 0) fputs(", ", ctx->fp);
 
-        if (!col_values[i] || col_values[i][0] == '\0') {
+        if (!col_values[i] || col_lens[i] < 0) {
             fputs("NULL", ctx->fp);
+        } else if (col_lens[i] == 0) {
+            /* Empty but not NULL (M-22 keeps them apart; Oracle reads '' as
+               NULL anyway). No dump in the test set has such a value. */
+            fputs("''", ctx->fp);
+        } else if (memchr(col_values[i], 0, (size_t)col_lens[i]) != NULL) {
+            /* A value holding 0x00 (M-22): only text values can, and the
+               branches below read their value up to the first 0x00. */
+            sql_write_string_n(ctx->fp, col_values[i], (size_t)col_lens[i], ctx->dbms_type);
         } else if (ctx->session && i < ctx->session->table.col_count &&
                    (ctx->session->table.columns[i].type == COL_BIN_FLOAT ||
                     ctx->session->table.columns[i].type == COL_BIN_DOUBLE) &&
@@ -1111,6 +1145,7 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
 {
     SQL_CONTEXT ctx;
     ODV_ROW_CALLBACK saved_row_cb;
+    ODV_ROW_CALLBACK_EX saved_row_cb_ex;
     void *saved_row_ud;
     ODV_TABLE_CALLBACK saved_table_cb;
     void *saved_table_ud;
@@ -1156,11 +1191,13 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
 
     /* Save and replace callbacks */
     saved_row_cb = s->row_cb;
+    saved_row_cb_ex = s->row_cb_ex;
     saved_row_ud = s->row_ud;
     saved_table_cb = s->table_cb;
     saved_table_ud = s->table_ud;
 
-    s->row_cb = sql_row_callback;
+    s->row_cb = NULL;
+    s->row_cb_ex = sql_row_callback;   /* values with their lengths (M-22) */
     s->row_ud = &ctx;
 
     /* Hook table_cb for zero-row table DDL and per-table INDEX/COMMENT flush */
@@ -1184,6 +1221,7 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
         if (rc != ODV_OK) {
             fclose(ctx.fp);
             s->row_cb = saved_row_cb;
+            s->row_cb_ex = saved_row_cb_ex;
             s->row_ud = saved_row_ud;
             s->table_cb = saved_table_cb;
             s->table_ud = saved_table_ud;
@@ -1216,6 +1254,7 @@ int write_sql_file(ODV_SESSION *s, const char *table_name,
 
     /* Restore original state */
     s->row_cb = saved_row_cb;
+    s->row_cb_ex = saved_row_cb_ex;
     s->row_ud = saved_row_ud;
     s->table_cb = saved_table_cb;
     s->table_ud = saved_table_ud;

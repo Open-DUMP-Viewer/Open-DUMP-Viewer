@@ -2118,7 +2118,7 @@ static int parse_tablet(ODV_SESSION *s, const MASTER_TT *tt, TABLET_CTX *t)
     memset(&s->table, 0, sizeof(ODV_TABLE));
     s->table.dump_charset = s->dump_charset;
     s->table.os_charset = s->out_charset;
-    invalidate_meta_cache();
+    invalidate_meta_cache(s);
     t->dc.session = s;
     parse_xml_events(tt->xml, tt->xml_len, tablet_xml_event, t);
     if (!t->done || !s->table.name[0]) return ODV_ERROR_FORMAT;
@@ -3542,7 +3542,7 @@ static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk)
         memset(&s->table, 0, sizeof(ODV_TABLE));   /* saved keeps the pointers */
         s->table.dump_charset = s->dump_charset;
         s->table.os_charset = s->out_charset;
-        invalidate_meta_cache();
+        invalidate_meta_cache(s);
         parse_xml_ddl(buf + 2, end - 2, ddl_xml_callback, &dc);
         if (s->table.name[0] && master_columns(&s->table, lk)) {
             ODV_PROGRESS_CALLBACK cb = s->progress_cb;
@@ -3566,7 +3566,7 @@ static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk)
     memcpy(&s->table, saved, sizeof(ODV_TABLE));
     free(saved);
     free(buf);
-    invalidate_meta_cache();
+    invalidate_meta_cache(s);
     odv_vseek(fp, pos, SEEK_SET);
     s->stream_cut = cut;
     return ok;
@@ -3740,7 +3740,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                 memset(&s->table, 0, sizeof(ODV_TABLE));
                 s->table.dump_charset = s->dump_charset;
                 s->table.os_charset = s->out_charset;
-                invalidate_meta_cache();
+                invalidate_meta_cache(s);
 
                 parse_xml_ddl(ddl_buf, end_pos, ddl_xml_callback, &dc);
                 odv_tz_capture_dbtz_xml(s, ddl_buf, end_pos);   /* <DBTIMEZONE> for TSLTZ SQL (M-09) */

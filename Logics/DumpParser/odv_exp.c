@@ -3915,7 +3915,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                                 odv_strcpy(s->table.schema, current_schema,
                                            ODV_OBJNAME_LEN);
                             s->table.record_count = 0;
-                            invalidate_meta_cache();
+                            invalidate_meta_cache(s);
                             pending_table = 1;
                             if (defer.active)
                                 defer.cur = defer_new_table(&defer, s->table.schema,
