@@ -1944,7 +1944,8 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
 
     Moves fp just past the next FF FF (the table-data end marker) at or after
     the current position: the resynchronisation used when a table's row data
-    cannot be read (and to step over a table that a filter leaves out). It
+    cannot be read (a filter steps over a table by its rows instead, see
+    exp_skip_rows). It
     used to read two bytes and seek one back for every byte. The MSVC CRT
     discards its read buffer on every fseek, so each byte re-read the 64 KB
     buffer: a long stretch without FF FF (a corrupt or crafted dump, or a
@@ -2098,10 +2099,18 @@ static int exp_read_long_parts(ODV_VFILE *fp, int first, int direct, int keep,
           (or 0x0000 row terminator if all LOB columns in this row are NULL)
         - For each non-NULL LOB column (in declaration order):
             chunk stream — see read_one_lob_column().
+
+    list_only: 0 = decode and deliver the rows, 1 = only count them,
+    EXP_ROWS_SKIP = step over them (counted like 1, with progress reported
+    while going; see exp_skip_rows).
  ---------------------------------------------------------------------------*/
+#define EXP_ROWS_SKIP 2
+
 static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
                              int list_only, const int *wire_col)
 {
+    int skip = (list_only == EXP_ROWS_SKIP);
+    unsigned int skip_tick = 0;
     unsigned char len_buf[2];
     unsigned char *col_buf = NULL;
     int col_buf_size = 0;
@@ -2162,10 +2171,17 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
     non_null_lob_count = 0;
 
 
+    if (skip) list_only = 1;
+
     while (!s->cancelled) {
         int cix;            /* table column of this value (-1: past the table) */
         int ctype;          /* its type (-1: none) */
         int long_done = 0;  /* 1 = value already read (LONG in parts) */
+
+        /* Stepping over a table for a filter delivers nothing, so report
+           progress as it goes (the callback fires only when % changes). */
+        if (skip && (++skip_tick & 0xFFF) == 0)
+            odv_report_progress(s, fp);
 
         /* Read 2-byte length prefix */
         if (odv_vread(len_buf, 1, 2, fp) != 2) {
@@ -3372,6 +3388,121 @@ static int parse_exp_object_rows(ODV_SESSION *s, ODV_VFILE *fp,
 }
 
 /*---------------------------------------------------------------------------
+    exp_skip_rows
+
+    Steps over the rows of a table or partition that the table / partition
+    filter leaves out. Used when a table is opened or exported without a
+    data offset (a partitioned table as a whole, the TablePreview export /
+    LOB extraction contexts) and for the other partitions of a table opened
+    by partition. It used to search for the first FF FF, but FF FF also
+    occurs inside row data — a RAW / LONG RAW / BLOB value, or a value
+    ending in FF followed by a 255-byte column's length FF 00 — and the rest
+    of the table was then read as DDL text, where words in the values could
+    pass for statements. The rows are now read by their structure, exactly
+    as when the table is listed, without decoding, delivering or LOB
+    extraction; a structure that cannot be read falls back to the same
+    FF FF search. The table's row count is left as it was.
+ ---------------------------------------------------------------------------*/
+static int exp_skip_rows(ODV_SESSION *s, ODV_VFILE *fp, int64_t start,
+                         int obj_table, const int *wire_col)
+{
+    int saved_extract = s->lob_extract_mode;
+    int64_t saved_count = s->table.record_count;
+    int rc;
+
+    s->lob_extract_mode = 0;
+    rc = obj_table ? parse_exp_object_rows(s, fp, start, 1)
+                   : parse_exp_records(s, fp, start, EXP_ROWS_SKIP, wire_col);
+    s->lob_extract_mode = saved_extract;
+    s->table.record_count = saved_count;
+    return rc;
+}
+
+/*---------------------------------------------------------------------------
+    exp_ddl_follows (H-11 (3) / NEW-3)
+
+    The 21c exp with DIRECT=Y writes no 0xFFFF after the metadata of a table
+    or partition that has no rows (no segment): the next DDL line follows the
+    4-byte block at once, beginning with its 0x0a. That line can be any record
+    exp writes after a table — statistics (ANALSTATS), CREATE INDEX, ALTER /
+    CALTER TABLE, COMMENT, GRANT, PARTITION / ENDPARTITION, the next TABLE,
+    ENDTABLE … — and a fixed list of a few of them missed ANALSTATS, CALTER,
+    TABLE and ENDTABLE, so the 0x0a was read as row data and everything up to
+    the next 0xFFFF, i.e. the following table or tables, vanished.
+
+    Decided from the row layout instead: a direct-path row starts with the
+    first value's 2-byte length, and 0x0a followed by an upper-case letter
+    would make that length at least 0x410a (16,650) bytes. When the first
+    value (in INSERT order) cannot be that long — every type but LONG / LONG
+    RAW and a VARCHAR2 / NVARCHAR2 / RAW declared longer than 4,162
+    characters (extended MAX_STRING_SIZE) — those bytes are a DDL line. Only
+    for such a long-capable first column does the line also have to begin
+    with one of the record words exp writes (collected from the 11g / 21c /
+    23ai dumps).
+ ---------------------------------------------------------------------------*/
+
+/* The most bytes exp writes for one value of col; INT_MAX when unbounded or
+   unknown. Generous (4 bytes per character) where the unit is characters. */
+static int exp_value_max_bytes(const ODV_COLUMN *col)
+{
+    switch (col->type) {
+    case COL_NUMBER: case COL_FLOAT:        return 32;
+    case COL_DATE:                          return 7;
+    case COL_TIMESTAMP: case COL_TIMESTAMP_TZ: case COL_TIMESTAMP_LTZ:
+                                            return 13;
+    case COL_INTERVAL_YM: case COL_INTERVAL_DS:
+                                            return 11;
+    case COL_BIN_FLOAT: case COL_BIN_DOUBLE: return 8;
+    case COL_ROWID:                         return 4000;
+    case COL_CHAR: case COL_NCHAR:          return 2000 * 4;
+    case COL_VARCHAR: case COL_NVARCHAR: case COL_RAW:
+        if (col->length > 0 && col->length <= 32767)
+            return col->length * 4;
+        return INT_MAX;
+    default:                                /* LONG / LONG RAW / other */
+        return INT_MAX;
+    }
+}
+
+/* True if p (n bytes) begins with a word exp starts a DDL record line with. */
+static int exp_ddl_word(const unsigned char *p, size_t n)
+{
+    static const char *const words[] = {
+        "TABLE", "ENDTABLE", "CREATE", "ALTER", "CALTER", "INSERT",
+        "ANALSTATS", "ANALCOMPUTE", "ANALYZE", "GRANT", "COMMENT", "AUDIT",
+        "PARTITION", "SUBPARTITION", "ENDPARTITION", "COMPARTITION",
+        "ENDCOMPARTITION", "CONNECT", "PROCACTION", "BEGINTYPE", "ENDTYPE",
+        "FOREIGNTYPE", "EXIT", "REM"
+    };
+    size_t k = 0, i;
+    while (k < n && p[k] >= 'A' && p[k] <= 'Z') k++;
+    if (k >= 6 && memcmp(p, "METRIC", 6) == 0)
+        return 1;                   /* METRICSU…, METRICEU …, METRICST… */
+    if (k == 0 || (k < n && p[k] != ' ' && p[k] != '"' && p[k] != 0x0A))
+        return 0;
+    for (i = 0; i < sizeof(words) / sizeof(words[0]); i++)
+        if (strlen(words[i]) == k && memcmp(p, words[i], k) == 0)
+            return 1;
+    return 0;
+}
+
+/* look: the n bytes after a plain table's 4-byte metadata block. */
+static int exp_ddl_follows(const ODV_SESSION *s, const int *wire_col,
+                           const unsigned char *look, size_t n)
+{
+    int first_len;
+
+    if (n < 2 || look[0] != 0x0A || look[1] < 'A' || look[1] > 'Z')
+        return 0;
+    first_len = 0x0A | ((int)look[1] << 8);
+    if (s->table.col_count > 0 && wire_col[0] >= 0 &&
+        wire_col[0] < s->table.col_count &&
+        exp_value_max_bytes(&s->table.columns[wire_col[0]]) < first_len)
+        return 1;
+    return exp_ddl_word(look + 1, n - 1);
+}
+
+/*---------------------------------------------------------------------------
     exp_insert_columns (M-01)
 
     Reads the column list of the INSERT INTO "T" ("A", "B", ...) statement in
@@ -4228,7 +4359,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                        with no rows, where no 0xFFFF is written) the 0x0a that
                        opens the next DDL line. `c` is the first padding byte. */
                     unsigned char pad[3];
-                    unsigned char look[16];
+                    unsigned char look[32];
                     int64_t p;
                     size_t n;
                     if (odv_vread(pad, 1, 3, fp) != 3) {
@@ -4245,21 +4376,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                         step = 2; wlen = 0;
                         break;
                     }
-                    if (s->dump_type == DUMP_EXP_DIRECT && look[0] == 0x0A &&
-                        (starts_with_ci((const char *)look + 1, "CREATE ") ||
-                         starts_with_ci((const char *)look + 1, "ALTER ") ||
-                         starts_with_ci((const char *)look + 1, "INSERT ") ||
-                         starts_with_ci((const char *)look + 1, "CONNECT ") ||
-                         starts_with_ci((const char *)look + 1, "COMMENT ") ||
-                         starts_with_ci((const char *)look + 1, "GRANT ") ||
-                         starts_with_ci((const char *)look + 1, "PARTITION ") ||
-                         starts_with_ci((const char *)look + 1, "PARTITION\"") ||
-                         starts_with_ci((const char *)look + 1, "SUBPARTITION") ||
-                         starts_with_ci((const char *)look + 1, "REM ") ||
-                         starts_with_ci((const char *)look + 1, "METRIC"))) {
+                    if (s->dump_type == DUMP_EXP_DIRECT &&
+                        exp_ddl_follows(s, wire_col, look, n)) {
                         /* 21c direct: a table/partition with no rows. The next
                            DDL line begins at this 0x0a. Leave fp there so step 2
-                           reads it instead of treating it as a row (H-11 (3)). */
+                           reads it instead of treating it as a row (H-11 (3),
+                           NEW-3). */
                         pending_row_count = 0;
                         step = 2; wlen = 0;
                         break;
@@ -4285,9 +4407,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                 if (found_row) {
                     {
                         if (list_only && s->filter_active && s->pass_flg) {
-                            /* Filtered out in list_only: skip records entirely */
-                            /* Scan forward to find 0xFFFF end marker */
-                            if (exp_skip_to_table_end(s, fp) == 0) goto done;
+                            /* Filtered out in list_only: step over the rows
+                               by their structure (not to the first FF FF) */
+                            rc = exp_skip_rows(s, fp, rec_start, obj_table, wire_col);
                             pending_row_count = 0;
                         } else if (!s->filter_active || !s->pass_flg) {
                             /* Parse records (list_only=count only, full=deliver) */
@@ -4297,8 +4419,9 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                                                     wire_col);
                             pending_row_count = s->table.record_count;
                         } else {
-                            /* Filtered out in full parse: skip */
-                            if (exp_skip_to_table_end(s, fp) == 0) goto done;
+                            /* Filtered out in full parse: step over the rows
+                               by their structure (not to the first FF FF) */
+                            rc = exp_skip_rows(s, fp, rec_start, obj_table, wire_col);
                             pending_row_count = 0;
                         }
                         /* Update address to match new file position */
