@@ -596,19 +596,35 @@ static int vf_read_head(const char *path, unsigned char *buf, int n)
     return got;
 }
 
-/* Parse the exp header's block-size field (4th 0x0A/0x00-delimited field after
-   the "EXPORT:Vnn.nn.nn" signature) and the start of the charset region
-   (record 7), the byte just past the 7th delimiter.  The 2-byte big-endian
-   volume number sits at cs_start+6 (right after the 6-byte charset region).
-   *block_size / *cs_start are set to 0 / -1 when not found. */
-static void exp_header_info(const unsigned char *hdr, int len,
-                            int *block_size, int *cs_start)
+/* Offset of the "EXPORT:" signature in an exp header, looked for in the first
+   0x20 bytes as odv_detect does; -1 when absent.  A direct-path export puts
+   "D\n" in front of it (03 <cs hi> <cs lo> 'D' 0x0A "EXPORT:..."), so the
+   header's fields are counted from here, never from a fixed offset. */
+static int exp_sig_pos(const unsigned char *hdr, int len)
 {
-    int i, field = 0, fs = 3, bs = 0, cs = -1;
+    int i;
+    for (i = 0; i + 7 <= len && i + 7 <= 0x20; i++) {
+        if (memcmp(hdr + i, "EXPORT:", 7) == 0) return i;
+    }
+    return -1;
+}
+
+/* The 0x0A/0x00-delimited fields of an exp header, counted from the
+   "EXPORT:Vnn.nn.nn" signature (field 0): field 3 is the block size, and the
+   charset region (record 7) starts just past the 7th delimiter.  The 2-byte
+   big-endian volume number sits at cs_start+6 (right after the 6-byte charset
+   region) and the FILESIZE (8 bytes big-endian) at cs_start+8.
+   *block_size / *cs_start are set to 0 / -1 when not found. */
+static void exp_header_fields(const unsigned char *hdr, int len,
+                              int *block_size, int *cs_start)
+{
+    int i, field = 0, fs, bs = 0, cs = -1;
+    int sig = exp_sig_pos(hdr, len);
     *block_size = 0;
     *cs_start = -1;
-    if (len < 4 || hdr[0] != 0x03) return;
-    for (i = 3; i < len; i++) {
+    if (sig < 0) return;
+    fs = sig;
+    for (i = sig; i < len; i++) {
         if (hdr[i] == 0x0A || hdr[i] == 0x00) {
             if (field == 3) {            /* field 3 text [fs,i) = block size */
                 int j, v = 0, any = 0;
@@ -629,23 +645,36 @@ static void exp_header_info(const unsigned char *hdr, int len,
     *cs_start = cs;
 }
 
+/* exp_header_fields for a file that starts like the exp dumps the split
+   layout was measured on (first byte 0x03; conventional and direct alike). */
+static void exp_header_info(const unsigned char *hdr, int len,
+                            int *block_size, int *cs_start)
+{
+    *block_size = 0;
+    *cs_start = -1;
+    if (len < 4 || hdr[0] != 0x03) return;
+    exp_header_fields(hdr, len, block_size, cs_start);
+}
+
 /* 1 if `cand_head` looks like volume `seq` of the same split set as
-   `f0_head`.  exp: EXP signature + volume number == seq.  expdp: same leading
-   DataPump block type and job-id region [6,34) as the first file. */
+   `f0_head`.  exp: EXP signature at the same place as in the first file (both
+   direct or both conventional), the same block size (each later volume is cut
+   at it) and volume number == seq.  expdp: same leading DataPump block type
+   and job-id region [6,34) as the first file. */
 static int vf_candidate_ok(const unsigned char *f0_head, int f0_len,
                            const unsigned char *cand_head, int cand_len,
                            int dump_type, int seq)
 {
     if (dump_type == DUMP_EXP || dump_type == DUMP_EXP_DIRECT) {
-        int i, found = 0, bs, cs;
+        int bs, cs, f0_bs, f0_cs;
         if (cand_len < 64) return 0;
         if (cand_head[0] < 0x01 || cand_head[0] > 0x05) return 0;
-        for (i = 3; i + 7 <= 0x20 && i + 7 <= cand_len; i++) {
-            if (memcmp(cand_head + i, "EXPORT:", 7) == 0) { found = 1; break; }
-        }
-        if (!found) return 0;
+        if (exp_sig_pos(cand_head, cand_len) < 0 ||
+            exp_sig_pos(cand_head, cand_len) != exp_sig_pos(f0_head, f0_len))
+            return 0;
         exp_header_info(cand_head, cand_len, &bs, &cs);
-        if (cs < 0 || cs + 8 > cand_len) return 0;
+        exp_header_info(f0_head, f0_len, &f0_bs, &f0_cs);
+        if (cs < 0 || cs + 8 > cand_len || bs != f0_bs) return 0;
         {
             int vol = ((int)cand_head[cs + 6] << 8) | (int)cand_head[cs + 7];
             return (vol == seq);
@@ -740,24 +769,15 @@ static int exp_tail_state(const char *path, int64_t size)
     unsigned char hdr[256], tail[5];
     unsigned char *buf;
     FILE *fp;
-    int hn, i, field = 0, cs = -1, state = ODV_TAIL_COMPLETE;
+    int hn, i, bs = 0, cs = -1, state = ODV_TAIL_COMPLETE;
     uint64_t filesize = 0;
     int64_t end = size, last = -1;
 
     fp = odv_fopen_path(path, "rb");
     if (!fp) return ODV_TAIL_COMPLETE;            /* cannot tell: say nothing */
     hn = vf_pread(fp, 0, hdr, (int)sizeof(hdr));
-    for (i = 0; hn > 0 && i + 7 <= hn && i + 7 <= 0x20; i++) {
-        if (memcmp(hdr + i, "EXPORT:", 7) == 0) {
-            int k;
-            for (k = i; k < hn; k++) {           /* fields from "EXPORT:" */
-                if (hdr[k] == 0x0A || hdr[k] == 0x00) {
-                    if (++field == 7) { cs = k + 1; break; }
-                }
-            }
-            break;
-        }
-    }
+    if (hn > 0)
+        exp_header_fields(hdr, hn, &bs, &cs);     /* fields from "EXPORT:" */
     if (cs >= 0 && cs + 16 <= hn)
         filesize = vf_be(hdr + cs + 8, 8);
 
