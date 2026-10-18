@@ -233,6 +233,9 @@ typedef struct {
     int    seg_col;              /* EXPDP SEGCOL_NUM (storage slot; 0 = not stored) */
     char   type_str[64];         /* "VARCHAR2(100)" etc. */
     int    not_null;             /* 1=NOT NULL constraint */
+    int    not_null_pk;          /* 1=NOT NULL only through the primary key (expdp
+                                    TABLE_T, SQL export): not written as the
+                                    column's own NOT NULL */
     char   default_val[256];     /* DEFAULT value expression (see ODV_TEXT) */
     char   comment[512];         /* Column comment (COMMENT ON COLUMN) (see ODV_TEXT) */
     char  *default_long;         /* full DEFAULT when longer than default_val[], else NULL */
@@ -262,6 +265,9 @@ typedef struct {
     int    deferrable;           /* 1 = DEFERRABLE */
     int    initially_deferred;   /* 1 = INITIALLY DEFERRED */
     int    disabled;             /* 1 = created DISABLE */
+    int    unique_index;         /* UNIQUE that is a unique index (CREATE UNIQUE
+                                    INDEX), not a constraint (the SQL export
+                                    writes it as an index, before the key) */
 } ODV_CONSTRAINT;
 
 /* Table definition */
@@ -340,7 +346,21 @@ typedef struct {
     unsigned char  *data;        /* Decoded string/binary data */
     int             data_len;
     int             buf_size;    /* Allocated buffer size */
+    int             flags;       /* ODV_VFLAG_*; cleared by set_value_string /
+                                    set_value_null / reset_record */
 } ODV_VALUE;
+
+/* ODV_VALUE.flags. A marker (%VARRAY%, %JSON%, exp %BLOB% ...) is display text
+   that stands for a value the parser could not decode; the export writers must
+   not write it as the value (a real string value may read "%BLOB%" too, so the
+   writers look at the flag, never at the text). */
+#define ODV_VFLAG_MARKER   0x01  /* data is a marker, not the value */
+#define ODV_VFLAG_CUT      0x02  /* the value is longer than could be kept: not whole */
+
+/* The export writers (CSV / SQL) get LOB / LONG / JSON / VECTOR values whole
+   (s->full_values), up to this many source bytes (512 MiB: the hex text of a
+   binary value then stays below INT_MAX). A longer value is ODV_VFLAG_CUT. */
+#define ODV_FULL_VALUE_MAX (512 * 1024 * 1024)
 
 /* Record (one row of data) */
 typedef struct {
@@ -596,6 +616,12 @@ typedef struct {
     int     valid;
 } ODV_META_CACHE;
 
+/* Internal: DDL that exp writes after the last table (foreign keys,
+   function-based / DESC indexes) for a table already read, handed to the SQL
+   export (s->late_ddl). The texts are in the dump character set. */
+typedef void (*ODV_LATE_DDL_FN)(ODV_SESSION *s, const char *schema, const char *table,
+                                const ODV_CONSTRAINT *c, void *user_data);
+
 /* Main session structure */
 struct _odv_session {
     /* Dump file info */
@@ -693,6 +719,36 @@ struct _odv_session {
     int             tz_raw_values;         /* Internal: 1 while write_sql_file parses; TSTZ/TSLTZ
                                               values are then delivered as "#<hex bytes>" */
 
+    /* Export writers (internal, set by write_csv_file / write_sql_file) */
+    int             full_values;           /* 1 = keep LOB / LONG / JSON / VECTOR values whole
+                                              (ODV_FULL_VALUE_MAX), not the 4096-byte preview */
+    int             want_ddl_meta;         /* 1 = EXPDP: take constraints / DEFAULTs / comments /
+                                              indexes from the master table (odv_expdp.c) */
+    void           *ddl_meta;              /* EXPDP: that metadata while a parse runs */
+    void           *ddl_meta_cache;        /* EXPDP: the same, kept for the session (the master
+                                              table is read once per dump, not once per
+                                              table / partition of a per-table export);
+                                              freed by odv_expdp_meta_release() */
+    ODV_LATE_DDL_FN late_ddl;              /* EXP: DDL written after the last table */
+    void           *late_ddl_ud;
+
+    /* Where the DDL of a table kept apart from the table is (odv_get_table_ddl_hint
+       / odv_set_ddl_hint): EXP the DDL written after the last table, EXPDP the
+       master-table rows of the table, its comments and indexes */
+    char          **ddl_hint_str;          /* list: the distinct hints (heap strings) */
+    int             ddl_hint_nstr;
+    int            *ddl_hint_of;           /* list: per table_list entry, index into
+                                              ddl_hint_str or -1 */
+    int             ddl_hint_nof;
+    char           *ddl_hint_in;           /* odv_set_ddl_hint: for the filtered exports */
+
+    /* odv_set_value_mode / odv_read_table_ddl */
+    int             value_mode;            /* ODV_VALUES_* (0 = preview, the default) */
+    int             export_lens;           /* 1 while odv_parse_dump delivers values in
+                                              ODV_VALUES_EXPORT (markers as length -2 / -3) */
+    int             ddl_only;              /* 1 while odv_read_table_ddl parses: the table's
+                                              definition only, its DDL in the callback */
+
     /* LOB extraction options */
     int             lob_extract_mode;      /* 1=extracting LOB files */
     char            lob_column[ODV_OBJNAME_LEN + 1];   /* Target LOB column name */
@@ -759,6 +815,9 @@ void free_record(ODV_RECORD *rec);
 void reset_record(ODV_RECORD *rec);
 int  set_value_null(ODV_VALUE *v);
 int  set_value_string(ODV_VALUE *v, const char *str, int len);
+int  set_value_marker(ODV_VALUE *v, const char *marker);
+void odv_expdp_meta_release(ODV_SESSION *s);
+int  set_value_empty(ODV_VALUE *v);
 int  ensure_value_buf(ODV_VALUE *v, int needed);
 int  deliver_row(ODV_SESSION *s);
 void odv_report_progress(ODV_SESSION *s, ODV_VFILE *fp);
@@ -785,7 +844,23 @@ int     odv_table_list_find(ODV_SESSION *s, const char *schema, const char *name
  * odv_table_free_text releases every *_long of a table and its constraint
  * array (counts reset); call it before reusing or zeroing the table. */
 int     odv_text_set(char *fixed, size_t cap, char **longp, const char *src, size_t len);
+/* One more zeroed constraint of type `type` at the end of t's array (grown on
+ * demand up to ODV_MAX_CONSTRAINTS); NULL when that is not possible. */
+ODV_CONSTRAINT *odv_table_add_constraint(ODV_TABLE *t, int type);
 void    odv_table_free_text(ODV_TABLE *t);
+
+/* DDL hints of the listed tables (odv_api.c, see odv_get_table_ddl_hint).
+ * odv_ddl_hints_clear drops them; odv_ddl_hint_add keeps a copy of a hint and
+ * returns its index (-1 when memory runs out); odv_ddl_hint_set_entry gives
+ * table_list entry `entry` the hint `idx` (-1 = none). */
+void    odv_ddl_hints_clear(ODV_SESSION *s);
+int     odv_ddl_hint_add(ODV_SESSION *s, const char *hint);
+void    odv_ddl_hint_set_entry(ODV_SESSION *s, int entry, int idx);
+
+/* The table's constraints, comments (type 5) and notes (type 6) as the
+ * table callback's constraints_json (odv_exp.c); heap, NULL when memory runs
+ * out. Names are converted from the dump's charset to the output charset. */
+char   *odv_serialize_constraints_json(ODV_SESSION *s);
 
 /* Virtual multi-file read stream (odv_api.c; see ODV_VFILE). For a single,
  * non-split dump these behave exactly like fopen/fread/fseek/ftell/fclose on
@@ -824,6 +899,16 @@ int decode_interval_ym(const unsigned char *buf, int len, char *out, int out_siz
 int decode_interval_ds(const unsigned char *buf, int len, char *out, int out_size);
 
 /* odv_tz.c */
+/* Broken-down date / time for the SQL writers. year is Oracle's (no year 0:
+   -1 is 1 BC). */
+typedef struct {
+    int      year;
+    int      mon, day, hour, min, sec;
+    uint32_t nano;
+} ODV_TS_PARTS;
+int  odv_tz_sql_parts(ODV_SESSION *s, int col_type, const char *value,
+                      ODV_TS_PARTS *local, ODV_TS_PARTS *utc,
+                      int32_t *offset_secs, int *has_offset);
 int  odv_decode_timestamp_value(ODV_SESSION *s, int col_type,
                                 const unsigned char *buf, int len,
                                 char *out, int out_size, int ts_precision);

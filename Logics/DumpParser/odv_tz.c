@@ -700,6 +700,75 @@ int odv_tz_sql_value(ODV_SESSION *s, int col_type, int ts_precision,
 /*---------------------------------------------------------------------------
     DBTIMEZONE of the source database
  ---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------
+    odv_tz_sql_parts
+
+    A TSTZ / TSLTZ value in raw form ("#<hex>") broken down for the SQL
+    dialects other than Oracle (TYPE_MAPPING_SPEC 4.4): the wall-clock time
+    with its UTC offset, and the same instant in UTC.
+      TSTZ   local = the value's own wall clock, offset = its offset (a region
+             value: the region's offset at that instant)
+      TSLTZ  local = the DBTIMEZONE wall clock, offset = DBTIMEZONE's offset
+             (*has_offset = 0 when the dump does not say DBTIMEZONE)
+    Returns ODV_ERROR when the value is not in raw form or not decodable.
+ ---------------------------------------------------------------------------*/
+static void parts_from_tm(const TZ_TM *t, ODV_TS_PARTS *p)
+{
+    p->year = (int)t->year;
+    p->mon = t->mon;
+    p->day = t->day;
+    p->hour = t->hour;
+    p->min = t->min;
+    p->sec = t->sec;
+    p->nano = t->nano;
+}
+
+int odv_tz_sql_parts(ODV_SESSION *s, int col_type, const char *value,
+                     ODV_TS_PARTS *local, ODV_TS_PARTS *utc,
+                     int32_t *offset_secs, int *has_offset)
+{
+    unsigned char b[TSTZ_LEN];
+    int len;
+    TZ_TM t, u;
+
+    if (!s || !value || !local || !utc || !offset_secs || !has_offset)
+        return ODV_ERROR_INVALID_ARG;
+    len = hex_decode(value, b, (int)sizeof(b));
+    if (len < 7) return ODV_ERROR;
+    *offset_secs = 0;
+    *has_offset = 0;
+    if (col_type == COL_TIMESTAMP_TZ) {
+        TSTZ_VAL v;
+        if (len < TSTZ_LEN || tstz_parse(b, len, &v) != ODV_OK || v.kind == TZK_UNKNOWN)
+            return ODV_ERROR;
+        tstz_local(&v, &t);
+        *offset_secs = tstz_offset_secs(&v);
+        *has_offset = 1;
+        parts_from_tm(&t, local);
+        parts_from_tm(&v.utc, utc);
+        return ODV_OK;
+    }
+    if (tm_from_bytes(b, len, &t) != ODV_OK) return ODV_ERROR;
+    parts_from_tm(&t, local);
+    parts_from_tm(&t, utc);
+    if (col_type == COL_TIMESTAMP_LTZ && dbtz_usable(s->db_timezone)) {
+        int minutes = 0, rid;
+        int64_t ls = tm_to_secs(&t);
+        if (parse_offset(s->db_timezone, &minutes)) {
+            *offset_secs = minutes * 60;
+            *has_offset = 1;
+        } else if ((rid = region_id_by_name(s->db_timezone)) != 0) {
+            *offset_secs = region_offset_at_local(rid, ls);
+            *has_offset = 1;
+        }
+        if (*has_offset) {
+            tm_from_secs(ls - *offset_secs, t.nano, &u);
+            parts_from_tm(&u, utc);
+        }
+    }
+    return ODV_OK;
+}
+
 static int tz_text_char(unsigned char c)
 {
     return isalnum(c) || c == '/' || c == '_' || c == '+' || c == '-' || c == ':';

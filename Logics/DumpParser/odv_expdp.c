@@ -698,21 +698,30 @@ static void notify_table(ODV_SESSION *s, int64_t row_count)
         const char *col_defaults[ODV_MAX_COLUMNS];
         int i;
 
+        char *cjson = NULL;
+
         for (i = 0; i < s->table.col_count && i < ODV_MAX_COLUMNS; i++) {
             convert_name(s->table.columns[i].name, s->dump_charset, s->out_charset,
                          conv_col_names_buf[i], sizeof(conv_col_names_buf[i]));
             col_names[i] = conv_col_names_buf[i];
             col_types[i] = s->table.columns[i].type_str;
             col_not_nulls[i] = s->table.columns[i].not_null;
+            /* odv_read_table_ddl: 2 = NOT NULL only through the primary key */
+            if (s->ddl_only && s->table.columns[i].not_null && s->table.columns[i].not_null_pk)
+                col_not_nulls[i] = 2;
             col_defaults[i] = ODV_TEXT(s->table.columns[i].default_val,
                                        s->table.columns[i].default_long);
         }
+        /* odv_read_table_ddl: the DDL from the master table, in the form the
+           list gives for an exp table (the list itself reads none of it) */
+        if (s->ddl_only) cjson = odv_serialize_constraints_json(s);
 
         s->table_cb(conv_schema, conv_name,
                      s->table.col_count, col_names, col_types,
                      col_not_nulls, col_defaults,
-                     0, "[]",
+                     cjson ? s->table.constraint_count : 0, cjson ? cjson : "[]",
                      row_count, s->table.ddl_offset, s->table_ud);
+        free(cjson);
     }
 
     /* Add to internal table list (store converted names) */
@@ -1652,7 +1661,7 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         if (v->data_len == 1 && v->data && (v->data[0] == 0 || v->data[0] == 1))
             set_value_string(v, v->data[0] ? "TRUE" : "FALSE", v->data[0] ? 4 : 5);
         else
-            set_value_string(v, "%BOOLEAN%", 9);
+            set_value_marker(v, "%BOOLEAN%");
         v->type = col->type;
         break;
 
@@ -1664,7 +1673,7 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         if (v->data && bfile_to_text(s, v->data, v->data_len, &sb) == ODV_OK && sb.p)
             set_value_string(v, sb.p, sb.len);
         else
-            set_value_string(v, "%BFILE%", 7);
+            set_value_marker(v, "%BFILE%");
         sb_free(&sb);
         v->type = col->type;
         break;
@@ -1735,7 +1744,7 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         if (v->data && v->data_len < v->buf_size) v->data[v->data_len] = '\0';
         if (col->type == COL_LONG && v->data && v->data_len > 0 &&
             long_form(s, v->data, v->data_len) == 0) {
-            set_value_string(v, "%LONG%", 6);
+            set_value_marker(v, "%LONG%");
         } else if (col->type == COL_LONG && v->data &&
                    long_form(s, v->data, v->data_len) == 2) {
             /* External-table LONG is stored as UTF-16BE (direct-path LONG is
@@ -1764,6 +1773,532 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         break;
     }
 }
+
+/*===========================================================================
+    Table DDL for the SQL export (M-17)
+
+    The rows' table definition (STRMTABLE_T) has the columns only. The rest
+    of a table's DDL is in the metadata Data Pump writes:
+      - the master table's TABLE row: XML_CLOB = TABLE_T (never compressed)
+        with the constraints (CON1_LIST: CHECK / PRIMARY KEY / UNIQUE,
+        CON2_LIST: FOREIGN KEY) and every column's NOT_NULL / DEFAULT_VAL;
+      - the COMMENT and INDEX objects: separate documents at the master row's
+        DUMP_POSITION (1-based 4 KB block of file DUMP_FILEID). Plain XML only
+        with COMPRESSION=NONE; by default (COMPRESSION=METADATA_ONLY) Oracle's
+        own compressed form ("KGC"), which is not readable here: the table
+        then gets a note instead of silently missing them.
+    Collected once per SQL export (s->want_ddl_meta) by reading the master
+    table out of turn, and put into s->table as each table is read
+    (meta_apply), so the SQL of an expdp table carries what the exp one does.
+    Measured on 11.2 / 21c / 23.26 dumps (cases/smoke, meta/m_ddl, m_ddl2,
+    opts/dpopt dpnc): FLAGS 0x1 DEFERRABLE, 0x2 INITIALLY DEFERRED, 0x8
+    system-generated name; ENABLED 0 = DISABLE; REFACT 1 = ON DELETE CASCADE,
+    2 = ON DELETE SET NULL.
+ ===========================================================================*/
+typedef struct {
+    char  name[ODV_OBJNAME_LEN + 1];
+    int   not_null;
+    int   nn_con;       /* the NOT NULL is a constraint of its own (<CON> CONTYPE 7);
+                           NOT_NULL without it comes from the primary key */
+    char *dflt;
+    char *comment;
+} TM_COL;
+
+typedef struct {
+    char            schema[ODV_OBJNAME_LEN + 1];   /* UTF-8, as in the XML */
+    char            name[ODV_OBJNAME_LEN + 1];
+    TM_COL         *cols;
+    int             ncols, ccols;
+    ODV_CONSTRAINT *cons;
+    int             ncons, ccons;
+    char           *comment;
+    int             hidden_cmt;    /* comments only in compressed metadata */
+    int             hidden_idx;    /* indexes only in compressed metadata */
+    char           *notes;         /* '\n'-terminated lines */
+    int             next;          /* hash chain */
+} TMETA;
+
+typedef struct {
+    TMETA *t;
+    int    n, cap;
+    int   *bucket;
+    int    nbucket;
+    /* COMMENT / INDEX objects found in the master table */
+    struct TM_OBJ { int is_index; char schema[ODV_OBJNAME_LEN + 1];
+                    char name[ODV_OBJNAME_LEN + 1]; int64_t pos, len; int fid; } *obj;
+    int    nobj, cobj;
+    /* collected for one table's export only (the session's filter, kept to
+     * tell whether the cache serves the next export) */
+    int    filtered;
+    char   fschema[ODV_OBJNAME_LEN + 1], ftable[ODV_OBJNAME_LEN + 1];
+} EXPDP_META;
+
+static unsigned int tm_hash(const char *a, const char *b)
+{
+    unsigned int h = 2166136261u;
+    while (*a) { h ^= (unsigned char)*a++; h *= 16777619u; }
+    h ^= 0x1f; h *= 16777619u;
+    while (*b) { h ^= (unsigned char)*b++; h *= 16777619u; }
+    return h;
+}
+
+static TMETA *tm_find(EXPDP_META *m, const char *schema, const char *name, int create)
+{
+    unsigned int h;
+    int i;
+    if (!m) return NULL;
+    if (!m->bucket) {
+        m->bucket = (int *)malloc(4096 * sizeof(int));
+        if (!m->bucket) return NULL;
+        m->nbucket = 4096;
+        for (i = 0; i < 4096; i++) m->bucket[i] = -1;
+    }
+    h = tm_hash(schema, name) & (unsigned int)(m->nbucket - 1);
+    for (i = m->bucket[h]; i >= 0; i = m->t[i].next)
+        if (strcmp(m->t[i].name, name) == 0 && strcmp(m->t[i].schema, schema) == 0)
+            return &m->t[i];
+    if (!create) return NULL;
+    if (m->n >= m->cap) {
+        int nc = m->cap ? m->cap * 2 : 64;
+        TMETA *nt = (TMETA *)realloc(m->t, (size_t)nc * sizeof(TMETA));
+        if (!nt) return NULL;
+        m->t = nt;
+        m->cap = nc;
+    }
+    i = m->n++;
+    memset(&m->t[i], 0, sizeof(TMETA));
+    odv_strcpy(m->t[i].schema, schema, ODV_OBJNAME_LEN);
+    odv_strcpy(m->t[i].name, name, ODV_OBJNAME_LEN);
+    m->t[i].next = m->bucket[h];
+    m->bucket[h] = i;
+    return &m->t[i];
+}
+
+static char *tm_strdup(const char *s)
+{
+    size_t n = strlen(s);
+    char *p = (char *)malloc(n + 1);
+    if (p) memcpy(p, s, n + 1);
+    return p;
+}
+
+static void tm_note(TMETA *t, const char *msg)
+{
+    size_t old = t->notes ? strlen(t->notes) : 0, n = strlen(msg);
+    char *nn;
+    if (t->notes && strstr(t->notes, msg)) return;
+    nn = (char *)realloc(t->notes, old + n + 2);
+    if (!nn) return;
+    memcpy(nn + old, msg, n);
+    nn[old + n] = '\n';
+    nn[old + n + 1] = '\0';
+    t->notes = nn;
+}
+
+static TM_COL *tm_col(TMETA *t, const char *name, int create)
+{
+    int i;
+    for (i = 0; i < t->ncols; i++)
+        if (strcmp(t->cols[i].name, name) == 0) return &t->cols[i];
+    if (!create) return NULL;
+    if (t->ncols >= t->ccols) {
+        int nc = t->ccols ? t->ccols * 2 : 16;
+        TM_COL *np = (TM_COL *)realloc(t->cols, (size_t)nc * sizeof(TM_COL));
+        if (!np) return NULL;
+        t->cols = np;
+        t->ccols = nc;
+    }
+    memset(&t->cols[t->ncols], 0, sizeof(TM_COL));
+    odv_strcpy(t->cols[t->ncols].name, name, ODV_OBJNAME_LEN);
+    return &t->cols[t->ncols++];
+}
+
+static ODV_CONSTRAINT *tm_add_con(TMETA *t)
+{
+    if (t->ncons >= t->ccons) {
+        int nc = t->ccons ? t->ccons * 2 : 8;
+        ODV_CONSTRAINT *np;
+        if (nc > ODV_MAX_CONSTRAINTS) return NULL;
+        np = (ODV_CONSTRAINT *)realloc(t->cons, (size_t)nc * sizeof(ODV_CONSTRAINT));
+        if (!np) return NULL;
+        t->cons = np;
+        t->ccons = nc;
+    }
+    memset(&t->cons[t->ncons], 0, sizeof(ODV_CONSTRAINT));
+    return &t->cons[t->ncons++];
+}
+
+static void meta_free(EXPDP_META *m);
+
+/* The session's DDL metadata (s->ddl_meta_cache): at session end / another dump */
+void odv_expdp_meta_release(ODV_SESSION *s)
+{
+    if (!s) return;
+    meta_free((EXPDP_META *)s->ddl_meta_cache);
+    s->ddl_meta_cache = NULL;
+    s->ddl_meta = NULL;
+}
+
+static void meta_free(EXPDP_META *m)
+{
+    int i, j;
+    if (!m) return;
+    for (i = 0; i < m->n; i++) {
+        TMETA *t = &m->t[i];
+        for (j = 0; j < t->ncols; j++) { free(t->cols[j].dflt); free(t->cols[j].comment); }
+        free(t->cols);
+        for (j = 0; j < t->ncons; j++) {
+            free(t->cons[j].condition_long);
+            free(t->cons[j].index_expr_long);
+        }
+        free(t->cons);
+        free(t->comment);
+        free(t->notes);
+    }
+    free(m->t);
+    free(m->bucket);
+    free(m->obj);
+    free(m);
+}
+
+/* --- TABLE_T: constraints, NOT NULL, DEFAULT ---------------------------- */
+#define TM_DEPTH 12
+
+typedef struct {
+    EXPDP_META    *m;
+    char           path[TM_DEPTH][24];
+    char           schema[ODV_OBJNAME_LEN + 1], name[ODV_OBJNAME_LEN + 1];
+    /* column being read */
+    char           cname[ODV_OBJNAME_LEN + 1];
+    int            cnn, cnn_con;
+    char          *cdflt;
+    /* constraints being read: kept until the table's names are known */
+    ODV_CONSTRAINT con;
+    int            con_type;       /* CONTYPE */
+    int            con_enabled, con_flags, con_refact, con_has_enabled;
+    ODV_CONSTRAINT *cons;
+    int            ncons, ccons;
+    TM_COL         *cols;
+    int            ncols, ccols;
+} TM_TCTX;
+
+static void tmt_keep_col(TM_TCTX *x)
+{
+    TM_COL *c;
+    if (!x->cname[0]) { free(x->cdflt); x->cdflt = NULL; return; }
+    if (x->ncols >= x->ccols) {
+        int nc = x->ccols ? x->ccols * 2 : 16;
+        TM_COL *np = (TM_COL *)realloc(x->cols, (size_t)nc * sizeof(TM_COL));
+        if (!np) { free(x->cdflt); x->cdflt = NULL; return; }
+        x->cols = np;
+        x->ccols = nc;
+    }
+    c = &x->cols[x->ncols++];
+    memset(c, 0, sizeof(*c));
+    odv_strcpy(c->name, x->cname, ODV_OBJNAME_LEN);
+    c->not_null = x->cnn;
+    c->nn_con = x->cnn_con;
+    c->dflt = x->cdflt;
+    x->cdflt = NULL;
+}
+
+static void tmt_keep_con(TM_TCTX *x)
+{
+    ODV_CONSTRAINT *c = &x->con;
+    int type;
+    switch (x->con_type) {
+    case 1: type = CONSTRAINT_CHECK; break;
+    case 2: type = CONSTRAINT_PK; break;
+    case 3: type = CONSTRAINT_UNIQUE; break;
+    case 4: type = CONSTRAINT_FK; break;
+    default: type = -1; break;
+    }
+    if (type < 0 || (type != CONSTRAINT_CHECK && c->col_count == 0) ||
+        (type == CONSTRAINT_CHECK && !ODV_TEXT(c->condition, c->condition_long)[0])) {
+        free(c->condition_long);
+        memset(c, 0, sizeof(*c));
+        return;
+    }
+    {
+        /* hidden columns (object tables, XMLTYPE storage): not ours to write */
+        int j;
+        for (j = 0; j < c->col_count; j++)
+            if (strncmp(c->columns[j], "SYS_NC", 6) == 0) {
+                free(c->condition_long);
+                memset(c, 0, sizeof(*c));
+                return;
+            }
+    }
+    c->type = type;
+    c->deferrable = (x->con_flags & 0x1) ? 1 : 0;
+    c->initially_deferred = (x->con_flags & 0x2) ? 1 : 0;
+    c->disabled = (x->con_has_enabled && x->con_enabled == 0) ? 1 : 0;
+    if (x->con_refact == 1) odv_strcpy(c->delete_rule, "CASCADE", (int)sizeof(c->delete_rule) - 1);
+    else if (x->con_refact == 2) odv_strcpy(c->delete_rule, "SET NULL", (int)sizeof(c->delete_rule) - 1);
+    if (x->ncons >= x->ccons) {
+        int nc = x->ccons ? x->ccons * 2 : 8;
+        ODV_CONSTRAINT *np = (ODV_CONSTRAINT *)realloc(x->cons, (size_t)nc * sizeof(ODV_CONSTRAINT));
+        if (!np) { free(c->condition_long); memset(c, 0, sizeof(*c)); return; }
+        x->cons = np;
+        x->ccons = nc;
+    }
+    x->cons[x->ncons++] = *c;
+    memset(c, 0, sizeof(*c));
+}
+
+#define TMP_AT(d, nm) (strcmp(x->path[d], nm) == 0)
+
+static void tmt_event(int kind, const char *tag, const char *value, int depth, void *ctx)
+{
+    TM_TCTX *x = (TM_TCTX *)ctx;
+    if (depth < 1 || depth >= TM_DEPTH) return;
+    if (kind == XML_EV_OPEN) {
+        odv_strcpy(x->path[depth], tag, sizeof(x->path[depth]) - 1);
+        if (depth == 5 && TMP_AT(3, "TABLE_T") && TMP_AT(4, "COL_LIST")) {
+            x->cname[0] = '\0';
+            x->cnn = x->cnn_con = 0;
+            free(x->cdflt);
+            x->cdflt = NULL;
+        } else if (depth == 5 && TMP_AT(3, "TABLE_T") &&
+                   (TMP_AT(4, "CON1_LIST") || TMP_AT(4, "CON2_LIST"))) {
+            free(x->con.condition_long);
+            memset(&x->con, 0, sizeof(x->con));
+            x->con_type = 0;
+            x->con_enabled = x->con_flags = x->con_refact = x->con_has_enabled = 0;
+        }
+        return;
+    }
+    if (kind != XML_EV_CLOSE || !TMP_AT(3, "TABLE_T") || strcmp(x->path[depth], tag) != 0)
+        return;
+    if (!value) value = "";
+
+    if (depth == 5 && TMP_AT(4, "SCHEMA_OBJ")) {
+        if (strcmp(tag, "NAME") == 0) odv_strcpy(x->name, value, ODV_OBJNAME_LEN);
+        else if (strcmp(tag, "OWNER_NAME") == 0) odv_strcpy(x->schema, value, ODV_OBJNAME_LEN);
+        return;
+    }
+    if (TMP_AT(4, "COL_LIST") && depth >= 5 && TMP_AT(5, "COL_LIST_ITEM")) {
+        if (depth == 5) tmt_keep_col(x);
+        else if (depth == 6 && strcmp(tag, "NAME") == 0) odv_strcpy(x->cname, value, ODV_OBJNAME_LEN);
+        else if (depth == 6 && strcmp(tag, "NOT_NULL") == 0) x->cnn = atoi(value) != 0;
+        else if (depth == 7 && TMP_AT(6, "CON") && strcmp(tag, "CONTYPE") == 0 && atoi(value) == 7)
+            x->cnn_con = 1;
+        else if (depth == 6 && (strcmp(tag, "DEFAULT_VAL") == 0 || strcmp(tag, "DEFAULT_VALC") == 0)) {
+            /* a DEFAULT longer than 4000 bytes is in DEFAULT_VALC (a CLOB)
+               instead of DEFAULT_VAL (cases/meta/m_long C_LDEF, 9396 bytes) */
+            free(x->cdflt);
+            x->cdflt = tm_strdup(value);
+        }
+        return;
+    }
+    if ((TMP_AT(4, "CON1_LIST") || TMP_AT(4, "CON2_LIST")) && depth >= 5 &&
+        (TMP_AT(5, "CON1_LIST_ITEM") || TMP_AT(5, "CON2_LIST_ITEM"))) {
+        ODV_CONSTRAINT *c = &x->con;
+        if (depth == 5) { tmt_keep_con(x); return; }
+        if (depth == 6) {
+            if (strcmp(tag, "NAME") == 0) odv_strcpy(c->name, value, ODV_OBJNAME_LEN);
+            else if (strcmp(tag, "CONTYPE") == 0) x->con_type = atoi(value);
+            else if (strcmp(tag, "ENABLED") == 0) { x->con_enabled = atoi(value); x->con_has_enabled = 1; }
+            else if (strcmp(tag, "FLAGS") == 0) x->con_flags = atoi(value);
+            else if (strcmp(tag, "REFACT") == 0) x->con_refact = atoi(value);
+            else if (strcmp(tag, "CONDITION") == 0)
+                odv_text_set(c->condition, sizeof(c->condition), &c->condition_long,
+                             value, strlen(value));
+            return;
+        }
+        if (depth == 7 && TMP_AT(6, "SCHEMA_OBJ")) {      /* FK: the referenced table */
+            if (strcmp(tag, "NAME") == 0) odv_strcpy(c->ref_table, value, ODV_OBJNAME_LEN);
+            else if (strcmp(tag, "OWNER_NAME") == 0) odv_strcpy(c->ref_schema, value, ODV_OBJNAME_LEN);
+            return;
+        }
+        if (depth == 9 && strcmp(tag, "NAME") == 0 && TMP_AT(8, "COL")) {
+            if (TMP_AT(6, "COL_LIST") && TMP_AT(7, "COL_LIST_ITEM")) {
+                if (c->col_count < ODV_MAX_CONSTRAINT_COLS)
+                    odv_strcpy(c->columns[c->col_count++], value, ODV_OBJNAME_LEN);
+            } else if (TMP_AT(6, "SRC_COL_LIST") && TMP_AT(7, "SRC_COL_LIST_ITEM")) {
+                if (c->col_count < ODV_MAX_CONSTRAINT_COLS)
+                    odv_strcpy(c->columns[c->col_count++], value, ODV_OBJNAME_LEN);
+            } else if (TMP_AT(6, "TGT_COL_LIST") && TMP_AT(7, "TGT_COL_LIST_ITEM")) {
+                if (c->ref_col_count < ODV_MAX_CONSTRAINT_COLS)
+                    odv_strcpy(c->ref_columns[c->ref_col_count++], value, ODV_OBJNAME_LEN);
+            }
+        }
+    }
+}
+
+/* A TABLE_T document (UTF-8) -> the table's entry in m */
+static void meta_add_tablet(EXPDP_META *m, const char *xml, int len)
+{
+    TM_TCTX *x = (TM_TCTX *)calloc(1, sizeof(TM_TCTX));
+    TMETA *t;
+    int i;
+    if (!x) return;
+    x->m = m;
+    parse_xml_events(xml, len, tmt_event, x);
+    if (x->name[0] && (t = tm_find(m, x->schema, x->name, 1)) != NULL) {
+        for (i = 0; i < x->ncols; i++) {
+            TM_COL *c = tm_col(t, x->cols[i].name, 1);
+            if (!c) { free(x->cols[i].dflt); continue; }
+            c->not_null = x->cols[i].not_null;
+            c->nn_con = x->cols[i].nn_con;
+            free(c->dflt);
+            c->dflt = x->cols[i].dflt;
+        }
+        for (i = 0; i < x->ncons; i++) {
+            ODV_CONSTRAINT *c = tm_add_con(t);
+            if (!c) { free(x->cons[i].condition_long); continue; }
+            *c = x->cons[i];
+        }
+    } else {
+        for (i = 0; i < x->ncols; i++) free(x->cols[i].dflt);
+        for (i = 0; i < x->ncons; i++) free(x->cons[i].condition_long);
+    }
+    free(x->cols);
+    free(x->cons);
+    free(x->cdflt);
+    free(x->con.condition_long);
+    free(x);
+}
+
+/* --- COMMENT_T / INDEX_T (plain metadata documents) --------------------- */
+typedef struct {
+    EXPDP_META *m;
+    char  path[TM_DEPTH][24];
+    char  bschema[ODV_OBJNAME_LEN + 1], bname[ODV_OBJNAME_LEN + 1];
+    char  colname[ODV_OBJNAME_LEN + 1];
+    char *cmnt;
+    char  iname[ODV_OBJNAME_LEN + 1];
+    int   iprop, ihidden;
+    ODV_CONSTRAINT idx;
+} TM_OCTX;
+
+static void tmo_event(int kind, const char *tag, const char *value, int depth, void *ctx)
+{
+    TM_OCTX *x = (TM_OCTX *)ctx;
+    int is_cmt, is_idx;
+    if (depth < 1 || depth >= TM_DEPTH) return;
+    if (kind == XML_EV_OPEN) {
+        odv_strcpy(x->path[depth], tag, sizeof(x->path[depth]) - 1);
+        if (depth == 3) {
+            x->bschema[0] = x->bname[0] = x->colname[0] = x->iname[0] = '\0';
+            free(x->cmnt);
+            x->cmnt = NULL;
+            x->iprop = x->ihidden = 0;
+            memset(&x->idx, 0, sizeof(x->idx));
+        }
+        return;
+    }
+    if (kind != XML_EV_CLOSE || strcmp(x->path[depth], tag) != 0) return;
+    if (!value) value = "";
+    is_cmt = TMP_AT(3, "COMMENT_T");
+    is_idx = TMP_AT(3, "INDEX_T");
+    if (!is_cmt && !is_idx) return;
+    if (depth == 5 && TMP_AT(4, "BASE_OBJ")) {
+        if (strcmp(tag, "NAME") == 0) odv_strcpy(x->bname, value, ODV_OBJNAME_LEN);
+        else if (strcmp(tag, "OWNER_NAME") == 0) odv_strcpy(x->bschema, value, ODV_OBJNAME_LEN);
+        return;
+    }
+    if (is_cmt && depth == 4) {
+        if (strcmp(tag, "COLNAME") == 0) odv_strcpy(x->colname, value, ODV_OBJNAME_LEN);
+        else if (strcmp(tag, "CMNT") == 0) { free(x->cmnt); x->cmnt = tm_strdup(value); }
+        return;
+    }
+    if (is_idx && depth == 5 && TMP_AT(4, "SCHEMA_OBJ") && strcmp(tag, "NAME") == 0) {
+        odv_strcpy(x->iname, value, ODV_OBJNAME_LEN);
+        return;
+    }
+    if (is_idx && depth == 4 && strcmp(tag, "PROPERTY") == 0) { x->iprop = atoi(value); return; }
+    if (is_idx && depth == 7 && TMP_AT(4, "COL_LIST") && TMP_AT(5, "COL_LIST_ITEM") &&
+        TMP_AT(6, "COL") && strcmp(tag, "NAME") == 0) {
+        if (strncmp(value, "SYS_NC", 6) == 0) x->ihidden = 1;
+        if (x->idx.col_count < ODV_MAX_CONSTRAINT_COLS)
+            odv_strcpy(x->idx.columns[x->idx.col_count++], value, ODV_OBJNAME_LEN);
+        return;
+    }
+    if (depth == 3) {
+        TMETA *t = x->bname[0] ? tm_find(x->m, x->bschema, x->bname, 0) : NULL;
+        if (!t) return;
+        if (is_cmt && x->cmnt) {
+            if (x->colname[0]) {
+                TM_COL *c = tm_col(t, x->colname, 1);
+                if (c) { free(c->comment); c->comment = x->cmnt; x->cmnt = NULL; }
+            } else {
+                free(t->comment);
+                t->comment = x->cmnt;
+                x->cmnt = NULL;
+            }
+        } else if (is_idx && x->idx.col_count > 0) {
+            if (x->ihidden) {
+                char msg[ODV_OBJNAME_LEN + 160];
+                snprintf(msg, sizeof(msg), "Index \"%s\" is on expressions, which the dump's "
+                         "metadata does not give in SQL form; it was not written", x->iname);
+                tm_note(t, msg);
+            } else {
+                ODV_CONSTRAINT *c = tm_add_con(t);
+                if (c) {
+                    *c = x->idx;
+                    c->type = (x->iprop & 0x1) ? CONSTRAINT_UNIQUE : CONSTRAINT_INDEX;
+                    c->unique_index = (x->iprop & 0x1) ? 1 : 0;
+                    odv_strcpy(c->name, x->iname, ODV_OBJNAME_LEN);
+                }
+            }
+        }
+    }
+}
+
+#undef TMP_AT
+
+/* The documents of the COMMENT / INDEX objects (after the master table was
+ * read): plain XML is taken, compressed metadata is noted on its table. */
+static void meta_read_objects(ODV_SESSION *s, ODV_VFILE *fp, EXPDP_META *m)
+{
+    int i, j;
+    int64_t keep = odv_vtell(fp);
+    int cut = s->stream_cut;
+    for (i = 0; i < m->nobj; i++) {
+        struct TM_OBJ *o = &m->obj[i];
+        int64_t at;
+        char *buf;
+        int dup = 0, n;
+        if (o->pos <= 0 || o->len <= 0 || o->len > 64 * 1024 * 1024) continue;
+        for (j = 0; j < i; j++)
+            if (m->obj[j].pos == o->pos && m->obj[j].fid == o->fid) { dup = 1; break; }
+        if (dup) continue;
+        if (o->fid < 1 || o->fid > fp->nfiles) continue;
+        at = (o->pos - 1) * ODV_DUMP_BLOCK_LEN;
+        {
+            const ODV_VSEG *sg = &fp->seg[o->fid - 1];
+            if (at < sg->skip || at - sg->skip >= sg->avail) continue;
+            at = sg->logstart + (at - sg->skip);
+        }
+        buf = (char *)malloc((size_t)o->len + 1);
+        if (!buf) continue;
+        odv_vseek(fp, at, SEEK_SET);
+        n = (int)odv_vread(buf, 1, (size_t)o->len, fp);
+        if (n > 5 && memcmp(buf, "<?xml", 5) == 0) {
+            TM_OCTX x;
+            memset(&x, 0, sizeof(x));
+            x.m = m;
+            buf[n] = '\0';
+            parse_xml_events(buf, n, tmo_event, &x);
+            free(x.cmnt);
+        } else {
+            /* compressed (or unreadable): every object of this document */
+            for (j = i; j < m->nobj; j++) {
+                TMETA *t;
+                if (m->obj[j].pos != o->pos || m->obj[j].fid != o->fid) continue;
+                t = tm_find(m, m->obj[j].schema, m->obj[j].name, 0);
+                if (!t) continue;
+                if (m->obj[j].is_index) t->hidden_idx = 1;
+                else t->hidden_cmt = 1;
+            }
+        }
+        free(buf);
+    }
+    odv_vseek(fp, keep, SEEK_SET);
+    s->stream_cut = cut;
+}
+
 
 /*===========================================================================
     The master table (M-02)
@@ -1812,6 +2347,8 @@ typedef struct {
 typedef struct {
     int        c_type, c_schema, c_name, c_part, c_sub, c_rows, c_dlen, c_size, c_xml;
     int        c_umeth;
+    int        c_bschema, c_bname, c_pos, c_fid;   /* base object / document position */
+    EXPDP_META *meta;       /* collect the tables' DDL (SQL export, M-17) */
     int        td_only;     /* keep only the TABLE_DATA rows (unload method lookup) */
     MASTER_TD *td;
     int        ntd, ctd;
@@ -1821,6 +2358,21 @@ typedef struct {
     int       *enext;       /* per table_list entry: the next entry of the
                                same table, or -1 (master_link_entries) */
     int        nenext;
+    unsigned char need[ODV_MAX_COLUMNS];   /* the columns master_row reads (the
+                               others, about 90 of them, are not decoded) */
+    int64_t    row_at;      /* position of the current row's first piece */
+    int        one_row;     /* read one row (at a hinted position) and stop */
+    int        rows_read;
+    /* list: the rows of each table's DDL (TABLE, its COMMENT / INDEX rows),
+       for the DDL hints (odv_get_table_ddl_hint) */
+    int        want_hints;
+    struct MHINT { char schema[ODV_OBJNAME_LEN + 1]; char name[ODV_OBJNAME_LEN + 1];
+                   int64_t at; } *hint;
+    int        nhint, chint;
+    int        target_missing;  /* filtered full parse: the target's rows were not
+                                   read (a partition without rows, whose entry
+                                   points at the master table): its table
+                                   callback from the master (master_apply) */
 } MASTER_CTX;
 
 /* Link the table_list entries that share a schema and name, in list order:
@@ -1894,6 +2446,19 @@ static int master_columns(ODV_TABLE *t, MASTER_CTX *mc)
     mc->c_size   = find_column(t, "SIZE_ESTIMATE");
     mc->c_xml    = find_column(t, "XML_CLOB");
     mc->c_umeth  = find_column(t, "UNLOAD_METHOD");
+    mc->c_bschema = find_column(t, "BASE_OBJECT_SCHEMA");
+    mc->c_bname  = find_column(t, "BASE_OBJECT_NAME");
+    mc->c_pos    = find_column(t, "DUMP_POSITION");
+    mc->c_fid    = find_column(t, "DUMP_FILEID");
+    memset(mc->need, 0, sizeof(mc->need));
+    {
+        const int cols[14] = { mc->c_type, mc->c_schema, mc->c_name, mc->c_part, mc->c_sub,
+                               mc->c_rows, mc->c_dlen, mc->c_size, mc->c_xml, mc->c_umeth,
+                               mc->c_bschema, mc->c_bname, mc->c_pos, mc->c_fid };
+        int i;
+        for (i = 0; i < 14; i++)
+            if (cols[i] >= 0 && cols[i] < ODV_MAX_COLUMNS) mc->need[cols[i]] = 1;
+    }
     return mc->c_type >= 0 && mc->c_schema >= 0 && mc->c_name >= 0 &&
            mc->c_part >= 0 && mc->c_rows >= 0 && mc->c_dlen >= 0 &&
            find_column(t, "PROCESS_ORDER") >= 0 && mc->c_xml >= 0 &&
@@ -1922,6 +2487,93 @@ static void master_row(ODV_SESSION *s)
     MASTER_CTX *mc = (MASTER_CTX *)s->state.master;
     const char *type = mval(s, mc->c_type);
     const char *name = mval(s, mc->c_name);
+
+    mc->rows_read++;
+    if (mc->want_hints && mc->row_at >= 0) {
+        /* the position of the rows that carry a table's DDL (TABLE_T, and its
+           COMMENT / INDEX documents' places) for odv_get_table_ddl_hint */
+        int is_tab = (strcmp(type, "TABLE") == 0);
+        /* only the rows the export takes (see below): a TABLE row with its
+           TABLE_T (a partitioned table has one more TABLE row per partition,
+           without one), a COMMENT / INDEX row with its document's place */
+        if (is_tab) {
+            const ODV_VALUE *v = &s->record.values[mc->c_xml];
+            if (v->is_null || !v->data || v->data_len < 16) is_tab = -1;
+        } else if (mc->c_pos < 0 || mnum(s, mc->c_pos, 0) <= 0 || mnum(s, mc->c_dlen, 0) <= 0) {
+            is_tab = -1;
+        }
+        if (is_tab == 1 || (is_tab == 0 && (strcmp(type, "COMMENT") == 0 || strcmp(type, "INDEX") == 0) &&
+                            mc->c_bname >= 0)) {
+            const char *on = is_tab ? name : mval(s, mc->c_bname);
+            const char *os = is_tab ? mval(s, mc->c_schema)
+                                    : (mc->c_bschema >= 0 ? mval(s, mc->c_bschema) : "");
+            if (on[0]) {
+                if (mc->nhint >= mc->chint) {
+                    int nc = mc->chint ? mc->chint * 2 : 256;
+                    struct MHINT *np = (struct MHINT *)realloc(mc->hint, (size_t)nc * sizeof(*np));
+                    if (np) { mc->hint = np; mc->chint = nc; }
+                }
+                if (mc->nhint < mc->chint) {
+                    struct MHINT *h = &mc->hint[mc->nhint++];
+                    odv_strcpy(h->schema, os, ODV_OBJNAME_LEN);
+                    odv_strcpy(h->name, on, ODV_OBJNAME_LEN);
+                    h->at = mc->row_at;
+                }
+            }
+        }
+    }
+
+    if (mc->meta) {
+        /* The tables' DDL for the SQL export (M-17): TABLE_T now, the
+         * COMMENT / INDEX documents after the master table was read.
+         * One table's export (a filter) takes only that table's: the
+         * TABLE_T of the others is neither converted nor parsed. */
+        if (mc->meta->filtered) {
+            int is_tab = (strcmp(type, "TABLE") == 0);
+            if (is_tab || strcmp(type, "COMMENT") == 0 || strcmp(type, "INDEX") == 0) {
+                const char *on = is_tab ? name : (mc->c_bname >= 0 ? mval(s, mc->c_bname) : "");
+                const char *os = is_tab ? mval(s, mc->c_schema)
+                                        : (mc->c_bschema >= 0 ? mval(s, mc->c_bschema) : "");
+                if ((s->filter_table[0] && odv_stricmp(on, s->filter_table) != 0) ||
+                    (s->filter_schema[0] && odv_stricmp(os, s->filter_schema) != 0))
+                    return;
+            }
+        }
+        if (strcmp(type, "TABLE") == 0 && name[0]) {
+            ODV_VALUE *v = &s->record.values[mc->c_xml];
+            if (!v->is_null && v->data && v->data_len >= 16) {
+                int xl = 0;
+                char *xml = utf16be_to_utf8(v->data, v->data_len, &xl);
+                if (xml) {
+                    meta_add_tablet(mc->meta, xml, xl);
+                    free(xml);
+                }
+            }
+            return;
+        }
+        if ((strcmp(type, "COMMENT") == 0 || strcmp(type, "INDEX") == 0) &&
+            mc->c_pos >= 0 && mc->c_bname >= 0) {
+            EXPDP_META *m = mc->meta;
+            if (m->nobj >= m->cobj) {
+                int nc = m->cobj ? m->cobj * 2 : 64;
+                struct TM_OBJ *np = (struct TM_OBJ *)realloc(m->obj, (size_t)nc * sizeof(*np));
+                if (!np) return;
+                m->obj = np;
+                m->cobj = nc;
+            }
+            {
+                struct TM_OBJ *o = &m->obj[m->nobj];
+                o->is_index = (type[0] == 'I');
+                odv_strcpy(o->schema, mc->c_bschema >= 0 ? mval(s, mc->c_bschema) : "", ODV_OBJNAME_LEN);
+                odv_strcpy(o->name, mval(s, mc->c_bname), ODV_OBJNAME_LEN);
+                o->pos = mnum(s, mc->c_pos, 0);
+                o->len = mnum(s, mc->c_dlen, 0);
+                o->fid = mc->c_fid >= 0 ? (int)mnum(s, mc->c_fid, 1) : 1;
+                if (o->pos > 0 && o->len > 0 && o->name[0]) m->nobj++;
+            }
+            return;
+        }
+    }
 
     if (!name[0]) return;
     if (strcmp(type, "TABLE_DATA") == 0) {
@@ -1983,6 +2635,7 @@ static void master_free(MASTER_CTX *mc)
     free(mc->tt);
     free(mc->td);
     free(mc->enext);
+    free(mc->hint);
     memset(mc, 0, sizeof(*mc));
 }
 
@@ -2127,6 +2780,132 @@ static int parse_tablet(ODV_SESSION *s, const MASTER_TT *tt, TABLET_CTX *t)
     for (i = 0; i < s->table.col_count; i++)
         tt_name_to_dump_cs(s, s->table.columns[i].name);
     return ODV_OK;
+}
+
+/* UTF-8 (metadata) text -> the dump charset the session keeps DDL text in */
+static void meta_text_set(ODV_SESSION *s, char *fixed, size_t cap, char **longp, const char *src)
+{
+    size_t n = strlen(src);
+    while (n > 0 && (src[n - 1] == '\n' || src[n - 1] == '\r')) n--;
+    if (s->dump_charset != CHARSET_UTF8 && s->dump_charset != CHARSET_UNKNOWN && n > 0) {
+        int out_len = 0;
+        char *tmp = (char *)malloc(n * 4 + 16);
+        if (tmp && convert_charset(src, (int)n, CHARSET_UTF8, tmp, (int)(n * 4 + 16),
+                                   s->dump_charset, &out_len) == ODV_OK) {
+            odv_text_set(fixed, cap, longp, tmp, (size_t)out_len);
+            free(tmp);
+            return;
+        }
+        free(tmp);
+    }
+    odv_text_set(fixed, cap, longp, src, n);
+}
+
+static void meta_name_to_dump(ODV_SESSION *s, char *dst, const char *src)
+{
+    odv_strcpy(dst, src, ODV_OBJNAME_LEN);
+    tt_name_to_dump_cs(s, dst);
+}
+
+/* Put the collected DDL of s->table's table into s->table */
+static void meta_apply(ODV_SESSION *s)
+{
+    EXPDP_META *m = (EXPDP_META *)s->ddl_meta;
+    char cs[ODV_OBJNAME_LEN * 4 + 1], cn[ODV_OBJNAME_LEN * 4 + 1];
+    TMETA *t;
+    int i, j;
+
+    if (!m || !s->table.name[0]) return;
+    convert_name(s->table.schema, s->dump_charset, CHARSET_UTF8, cs, sizeof(cs));
+    convert_name(s->table.name, s->dump_charset, CHARSET_UTF8, cn, sizeof(cn));
+    t = tm_find(m, cs, cn, 0);
+    if (!t) return;
+
+    for (i = 0; i < s->table.col_count; i++) {
+        ODV_COLUMN *col = &s->table.columns[i];
+        char nm[ODV_OBJNAME_LEN * 4 + 1];
+        TM_COL *mc;
+        convert_name(col->name, s->dump_charset, CHARSET_UTF8, nm, sizeof(nm));
+        mc = tm_col(t, nm, 0);
+        if (!mc) continue;
+        if (mc->not_null) col->not_null = 1;
+        if (mc->dflt && mc->dflt[0])
+            meta_text_set(s, col->default_val, sizeof(col->default_val), &col->default_long, mc->dflt);
+        if (mc->comment && mc->comment[0])
+            meta_text_set(s, col->comment, sizeof(col->comment), &col->comment_long, mc->comment);
+    }
+    if (t->comment && t->comment[0])
+        meta_text_set(s, s->table.comment, sizeof(s->table.comment), &s->table.comment_long, t->comment);
+    /* A primary-key column is NOT NULL in the dictionary without a NOT NULL
+       constraint of its own: the SQL export leaves it to the key, as the
+       source has it (and as exp's DDL writes it) */
+    for (i = 0; i < t->ncons; i++) {
+        if (t->cons[i].type != CONSTRAINT_PK) continue;
+        for (j = 0; j < t->cons[i].col_count; j++) {
+            TM_COL *mc = tm_col(t, t->cons[i].columns[j], 0);
+            int k;
+            if (!mc || mc->nn_con) continue;
+            for (k = 0; k < s->table.col_count; k++) {
+                char nm[ODV_OBJNAME_LEN * 4 + 1];
+                convert_name(s->table.columns[k].name, s->dump_charset, CHARSET_UTF8, nm, sizeof(nm));
+                if (strcmp(nm, mc->name) == 0) s->table.columns[k].not_null_pk = 1;
+            }
+        }
+    }
+    for (i = 0; i < t->ncons; i++) {
+        const ODV_CONSTRAINT *src = &t->cons[i];
+        ODV_CONSTRAINT *c = odv_table_add_constraint(&s->table, src->type);
+        if (!c) break;
+        *c = *src;
+        c->condition_long = NULL;
+        c->index_expr_long = NULL;
+        c->condition[0] = '\0';
+        meta_name_to_dump(s, c->name, src->name);
+        for (j = 0; j < src->col_count; j++) meta_name_to_dump(s, c->columns[j], src->columns[j]);
+        for (j = 0; j < src->ref_col_count; j++) meta_name_to_dump(s, c->ref_columns[j], src->ref_columns[j]);
+        meta_name_to_dump(s, c->ref_schema, src->ref_schema);
+        meta_name_to_dump(s, c->ref_table, src->ref_table);
+        if (ODV_TEXT(src->condition, src->condition_long)[0])
+            meta_text_set(s, c->condition, sizeof(c->condition), &c->condition_long,
+                          ODV_TEXT(src->condition, src->condition_long));
+    }
+    {
+        /* notes: what could not be read */
+        char *notes = NULL;
+        size_t nl = 0;
+        const char *add[3];
+        int na = 0, k;
+        if (t->hidden_cmt)
+            add[na++] = "The comments of this table are in the dump's compressed metadata "
+                        "(expdp COMPRESSION=METADATA_ONLY, the default), which cannot be read; "
+                        "they were not written";
+        if (t->hidden_idx)
+            add[na++] = "The indexes of this table are in the dump's compressed metadata "
+                        "(expdp COMPRESSION=METADATA_ONLY, the default), which cannot be read; "
+                        "they were not written (primary key and unique constraints were)";
+        if (t->notes) add[na++] = t->notes;
+        for (k = 0; k < na; k++) {
+            size_t n = strlen(add[k]);
+            int nlend = (n > 0 && add[k][n - 1] == '\n');
+            char *np = (char *)realloc(notes, nl + n + 2);
+            if (!np) break;
+            notes = np;
+            memcpy(notes + nl, add[k], n);
+            nl += n;
+            if (!nlend) notes[nl++] = '\n';
+            notes[nl] = '\0';
+        }
+        if (notes) {
+            if (s->table.notes) {
+                size_t ol = strlen(s->table.notes);
+                char *np = (char *)realloc(s->table.notes, ol + nl + 1);
+                if (np) { memcpy(np + ol, notes, nl + 1); s->table.notes = np; }
+                free(notes);
+            } else {
+                s->table.notes = notes;
+            }
+        }
+    }
 }
 
 /* qsort keys: (schema, name) for the TABLE_DATA array; for the rows of one
@@ -2305,6 +3084,9 @@ static void master_apply(ODV_SESSION *s, MASTER_CTX *mc, int list_only)
             todo[t] = list_only && named && ndata == ne;
         } else {
             todo[t] = (ndata == 0);  /* has data, yet none was found: do not claim 0 rows */
+            /* the filtered table, none of whose rows this parse read: its
+               definition (a CSV's header, the SQL's CREATE TABLE), 0 rows */
+            if (!list_only && mc->target_missing) todo[t] = 1;
         }
     }
     free(mc->enext);
@@ -2334,8 +3116,10 @@ static void master_apply(ODV_SESSION *s, MASTER_CTX *mc, int list_only)
         s->table.record_count = 0;
 
         if (!list_only) {
-            notify_table(s, 0);
+            if (s->ddl_meta) meta_apply(s);   /* SQL export: the table's DDL (M-17) */
+            notify_table(s, s->ddl_only ? -1 : 0);
             free(tc.leaves);
+            if (s->ddl_only) break;           /* odv_read_table_ddl: once */
             continue;
         }
         if (nd > 0) {
@@ -2625,6 +3409,7 @@ static void decode_long_value(ODV_SESSION *s, int ac)
     form = long_form(s, v->data, n);
     if (form == 0) {
         set_value_text(v, "%LONG%", 6, col->type);
+        v->flags = ODV_VFLAG_MARKER;
         return;
     }
     if (form == 2 ||
@@ -2674,9 +3459,56 @@ static void decode_body_value(ODV_SESSION *s, int ac, int truncated)
     }
     if (rc == ODV_OK && !sb.err && sb.p)
         set_value_text(v, sb.p, sb.len, col->type);
-    else
+    else {
         set_value_text(v, marker, (int)strlen(marker), col->type);
+        v->flags = ODV_VFLAG_MARKER;
+    }
     sb_free(&sb);
+}
+
+/* A LOB value read whole for the export writers (s->full_values, M-12):
+ * BLOB to upper-case hex, CLOB / NCLOB from UTF-16BE (as Data Pump stores
+ * them) to the output charset. `truncated`: the value was longer than
+ * ODV_FULL_VALUE_MAX and is flagged as not whole. */
+static void decode_lob_full(ODV_SESSION *s, int ac, int truncated)
+{
+    ODV_VALUE *v = &s->record.values[ac];
+    ODV_COLUMN *col = &s->table.columns[ac];
+    int n = v->data_len;
+
+    v->type = col->type;
+    if (!v->data || n <= 0) {
+        /* NULL, or empty but not NULL (EMPTY_CLOB() / EMPTY_BLOB(), set at
+           the column's length byte) */
+        if (!v->data) v->is_null = 1;
+        v->data_len = 0;
+        return;
+    }
+    if (col->type == COL_BLOB) {
+        static const char HX[] = "0123456789ABCDEF";
+        char *hx = (char *)malloc((size_t)n * 2 + 1);
+        int i;
+        if (!hx) { v->flags = ODV_VFLAG_CUT; return; }
+        for (i = 0; i < n; i++) {
+            hx[i * 2]     = HX[v->data[i] >> 4];
+            hx[i * 2 + 1] = HX[v->data[i] & 0x0f];
+        }
+        hx[n * 2] = '\0';
+        set_value_text(v, hx, n * 2, col->type);
+        free(hx);
+    } else {
+        int cap = n * 2 + 16, out_len = 0;
+        char *cb = (char *)malloc((size_t)cap);
+        if (!cb || convert_charset((const char *)v->data, n & ~1, CHARSET_UTF16BE, cb, cap,
+                                   s->out_charset, &out_len) != ODV_OK) {
+            free(cb);
+            v->flags = ODV_VFLAG_CUT;
+            return;
+        }
+        set_value_text(v, cb, out_len, col->type);
+        free(cb);
+    }
+    if (truncated) v->flags = ODV_VFLAG_CUT;
 }
 
 /* Append raw bytes of a LONG / BODY value (or a master-table CLOB) up to cap;
@@ -2707,6 +3539,14 @@ static void append_raw(ODV_VALUE *v, const unsigned char *d, int n, int cap, int
 
 static void master_row(ODV_SESSION *s);
 
+/* A master-table column that master_row does not read: not kept / decoded
+ * (the master has about 100 columns, master_row reads 14 of them) */
+static int master_skips(const ODV_PARSE_STATE *st, int ac)
+{
+    const MASTER_CTX *mc = (const MASTER_CTX *)st->master;
+    return mc && ac >= 0 && ac < ODV_MAX_COLUMNS && !mc->need[ac];
+}
+
 /* A column's value is complete (all its pieces read): decode it. */
 static void close_column(ODV_SESSION *s, int k, int is_master, int decode, const int *trunc)
 {
@@ -2714,6 +3554,7 @@ static void close_column(ODV_SESSION *s, int k, int is_master, int decode, const
     int ac = (k < st->map_count) ? st->non_lob_map[k] : ODV_MAX_COLUMNS;
     int cls;
     if (!decode || ac < 0 || ac >= s->table.col_count) return;
+    if (is_master && master_skips(st, ac)) return;
     cls = data_class(st->map_type[k]);
     if (cls == DCLS_PLAIN) {
         /* NULL (ff) / empty (00) stay as they are, as before */
@@ -2722,8 +3563,11 @@ static void close_column(ODV_SESSION *s, int k, int is_master, int decode, const
     }
     else if (cls == DCLS_BODY && !is_master)
         decode_body_value(s, ac, trunc[ac]);
-    else if (cls == DCLS_LONG && !is_master)
+    else if (cls == DCLS_LONG && !is_master) {
         decode_long_value(s, ac);
+        if (s->full_values && trunc[ac]) s->record.values[ac].flags = ODV_VFLAG_CUT;
+    } else if (cls == DCLS_LOB && !is_master && s->full_values)
+        decode_lob_full(s, ac, trunc[ac]);
     else
         s->record.values[ac].type = s->table.columns[ac].type;   /* LOB preview / raw master CLOB */
 }
@@ -2785,6 +3629,7 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
     int k = 0;               /* row-data stream position of the current column */
     int appending = 0;       /* current column continues a value from the previous piece */
     int col_len = 0, col_rem = 0;
+    int keep_col = 0;        /* the current inline column's bytes are kept */
     int trunc[ODV_MAX_COLUMNS];   /* per display column: LONG / BODY bytes dropped */
 
     /* Initialize parse state */
@@ -2902,6 +3747,8 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                 continue;
             }
             if (b == 0xff) break;          /* end of this table's row data */
+            if (!in_row && is_master)      /* where this row starts (DDL hints) */
+                ((MASTER_CTX *)st->master)->row_at = odv_vtell(fp) - 1;
             flag = (int)b;
             if (flag & 0x10) {             /* 2-byte piece length: skipped */
                 unsigned char lenb[2];
@@ -2957,6 +3804,7 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                 /* NULL / empty (the API does not tell them apart) */
                 if (!appending && ac < s->table.col_count) {
                     if (b == 0xff) set_value_null(&s->record.values[ac]);
+                    else if (cls == DCLS_LOB) set_value_empty(&s->record.values[ac]);   /* EMPTY_CLOB() */
                     else set_value_string(&s->record.values[ac], "", 0);
                     s->record.values[ac].type = s->table.columns[ac].type;
                 }
@@ -2988,7 +3836,9 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                  * net above stays active for these). */
                 col_rem = col_len;
                 data_step = DS_COL_DATA;
-                if (decode && ac < s->table.col_count) {
+                keep_col = decode && ac < s->table.col_count &&
+                           !(is_master && master_skips(st, ac));
+                if (keep_col) {
                     ODV_VALUE *v = &s->record.values[ac];
                     int base = appending ? v->data_len : 0;
                     if (base + col_len + 1 > ODV_VARCHAR_LEN) base = 0;
@@ -3005,6 +3855,7 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                 if (!appending && v) {
                     v->data_len = 0;
                     v->is_null = 1;
+                    v->flags = 0;
                     v->type = s->table.columns[ac].type;
                     if (cls == DCLS_LOB) st->lob_pv_fresh = 1;
                 }
@@ -3016,8 +3867,9 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                     if (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB || t == COL_LONG_RAW)
                         st->expdp_external = 1;
                 }
-                if (!decode && !(s->lob_extract_mode && ac == st->lob_target_abs)) {
-                    /* list only: skip the bytes */
+                if ((!decode || (is_master && master_skips(st, ac))) &&
+                    !(s->lob_extract_mode && ac == st->lob_target_abs)) {
+                    /* list only (or a master column not read): skip the bytes */
                     if (odv_vseek(fp, col_len, SEEK_CUR) != 0) goto END_PARSE;
                     *address += col_len;
                 } else {
@@ -3034,11 +3886,15 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
                             if (rc != ODV_OK) return rc;
                         }
                         if (!decode || !v) continue;
-                        if (cls == DCLS_LOB)
+                        if (cls == DCLS_LOB && !s->full_values)
                             accumulate_lob_preview(s, ac, tmp, got);
                         else
+                            /* The export writers take the whole value
+                             * (s->full_values, M-12): a LOB is not cut to
+                             * the preview, a LONG / body not at their caps */
                             append_raw(v, tmp, got,
                                        is_master ? EXPDP_MASTER_LOB_MAX :
+                                       s->full_values ? ODV_FULL_VALUE_MAX :
                                        cls == DCLS_LONG ? EXPDP_LONG_MAX : EXPDP_BODY_MAX,
                                        &trunc[ac]);
                     }
@@ -3048,7 +3904,7 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
             break;
 
         case DS_COL_DATA:
-            if (decode && ac < s->table.col_count) {
+            if (keep_col) {
                 ODV_VALUE *v = &s->record.values[ac];
                 if (v->data && v->data_len < v->buf_size - 1) {
                     v->data[v->data_len++] = b;
@@ -3096,6 +3952,7 @@ static int parse_expdp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t *address,
         }
         if (is_master) {
             master_row(s);
+            if (((MASTER_CTX *)st->master)->one_row) break;   /* a hinted row */
         } else if (!list_only) {
             rc = deliver_row(s);
             if (rc != ODV_OK) return rc;
@@ -3504,10 +4361,12 @@ static int64_t master_locate(const ODV_VFILE *vf)
     return -1;
 }
 
-/* Read the master table's TABLE_DATA rows into lk (td_only) out of turn.
+/* Read the master table's TABLE_DATA rows into lk (td_only) out of turn —
+ * or, with rows (nrows > 0), only the rows at those positions (a DDL hint).
  * The current table definition, the file position and the progress shown
  * are kept.  Returns 1 when the master was read. */
-static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk)
+static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk,
+                             const int64_t *rows, int nrows)
 {
     int64_t pos = odv_vtell(fp), at = master_locate(fp);
     ODV_TABLE *saved;
@@ -3550,11 +4409,23 @@ static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk)
             int lobx = s->lob_extract_mode;   /* the master is not the LOB's table */
             int64_t addr = at + end;
             odv_vseek(fp, addr, SEEK_SET);
-            lk->td_only = 1;
+            lk->td_only = lk->meta ? 0 : 1;
             s->progress_cb = NULL;
             s->lob_extract_mode = 0;
             s->state.master = lk;
-            parse_expdp_records(s, fp, &addr, 1);
+            if (nrows > 0) {
+                int r;
+                lk->one_row = 1;
+                for (r = 0; r < nrows && !s->cancelled; r++) {
+                    if (rows[r] < at + end || rows[r] >= fp->logsize) continue;
+                    addr = rows[r];
+                    odv_vseek(fp, addr, SEEK_SET);
+                    parse_expdp_records(s, fp, &addr, 1);
+                }
+                lk->one_row = 0;
+            } else {
+                parse_expdp_records(s, fp, &addr, 1);
+            }
             s->state.master = NULL;
             s->lob_extract_mode = lobx;
             s->progress_cb = cb;
@@ -3570,6 +4441,106 @@ static int master_read_aside(ODV_SESSION *s, ODV_VFILE *fp, MASTER_CTX *lk)
     odv_vseek(fp, pos, SEEK_SET);
     s->stream_cut = cut;
     return ok;
+}
+
+/* A DDL hint of an expdp table: "P<size>:" (the dump's size, so a hint of
+ * another file is not used) and the positions of the table's master-table
+ * rows, comma-separated (odv_get_table_ddl_hint). Returns the count (*rows
+ * heap), 0 for no / another kind of hint / another dump. */
+static int hint_rows(const char *h, int64_t logsize, int64_t **rows)
+{
+    int n = 0, cap = 0;
+    int64_t *r = NULL, size = 0;
+    *rows = NULL;
+    if (!h || h[0] != 'P') return 0;
+    h++;
+    while (*h >= '0' && *h <= '9') size = size * 10 + (*h++ - '0');
+    if (*h++ != ':' || size != logsize) return 0;
+    while (*h) {
+        int64_t v = 0;
+        int digits = 0;
+        while (*h >= '0' && *h <= '9' && digits < 18) { v = v * 10 + (*h - '0'); h++; digits++; }
+        if (!digits || (*h && *h != ',')) { free(r); return 0; }
+        if (n >= cap) {
+            int nc = cap ? cap * 2 : 16;
+            int64_t *np;
+            if (nc > 65536) { free(r); return 0; }
+            np = (int64_t *)realloc(r, (size_t)nc * sizeof(int64_t));
+            if (!np) { free(r); return 0; }
+            r = np;
+            cap = nc;
+        }
+        r[n++] = v;
+        if (*h == ',') h++;
+    }
+    *rows = r;
+    return n;
+}
+
+static int mhint_cmp(const void *a, const void *b)
+{
+    const struct MHINT *x = (const struct MHINT *)a, *y = (const struct MHINT *)b;
+    int c = strcmp(x->schema, y->schema);
+    if (!c) c = strcmp(x->name, y->name);
+    if (!c) c = (x->at < y->at) ? -1 : (x->at > y->at);
+    return c;
+}
+
+/* After a list: each entry's DDL hint from the master rows of its table */
+static void master_set_hints(ODV_SESSION *s, MASTER_CTX *mc, int64_t logsize)
+{
+    int i, *first_idx;
+    if (mc->nhint <= 0 || s->table_count <= 0) return;
+    qsort(mc->hint, (size_t)mc->nhint, sizeof(struct MHINT), mhint_cmp);
+    first_idx = (int *)malloc((size_t)s->table_count * sizeof(int));
+    if (!first_idx) return;
+    for (i = 0; i < s->table_count; i++) {
+        ODV_TABLE_ENTRY *e = &s->table_list[i];
+        int f = odv_table_list_find(s, e->schema, e->name);
+        first_idx[i] = -1;
+        if (f >= 0 && f < i) {
+            first_idx[i] = first_idx[f];
+        } else {
+            /* the hint rows of (schema, name): binary search, then the run */
+            int lo = 0, hi = mc->nhint, k;
+            while (lo < hi) {
+                int mid = (lo + hi) / 2;
+                int c = strcmp(mc->hint[mid].schema, e->schema);
+                if (!c) c = strcmp(mc->hint[mid].name, e->name);
+                if (c < 0) lo = mid + 1; else hi = mid;
+            }
+            k = lo;
+            if (k < mc->nhint && strcmp(mc->hint[k].schema, e->schema) == 0 &&
+                strcmp(mc->hint[k].name, e->name) == 0) {
+                size_t cap = 64, len = 0;
+                char *t = (char *)malloc(cap);
+                int ok = (t != NULL);
+                if (ok) len = (size_t)snprintf(t, cap, "P%lld:", (long long)logsize);
+                for (; ok && k < mc->nhint && strcmp(mc->hint[k].schema, e->schema) == 0 &&
+                       strcmp(mc->hint[k].name, e->name) == 0; k++) {
+                    char num[32];
+                    int nl = snprintf(num, sizeof(num), "%s%lld", t[len - 1] != ':' ? "," : "",
+                                      (long long)mc->hint[k].at);
+                    if (len + (size_t)nl + 1 > cap) {
+                        char *nt;
+                        while (len + (size_t)nl + 1 > cap) cap *= 2;
+                        nt = (char *)realloc(t, cap);
+                        if (!nt) { ok = 0; break; }
+                        t = nt;
+                    }
+                    memcpy(t + len, num, (size_t)nl);
+                    len += (size_t)nl;
+                }
+                if (ok) {
+                    t[len] = '\0';
+                    first_idx[i] = odv_ddl_hint_add(s, t);
+                }
+                free(t);
+            }
+        }
+        if (first_idx[i] >= 0) odv_ddl_hint_set_entry(s, i, first_idx[i]);
+    }
+    free(first_idx);
 }
 
 /* The table has a LONG column (whose bytes depend on the unload method). */
@@ -3661,6 +4632,61 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
     s->total_rows = 0;
     s->expdp_xml_prefix = -1;   /* captured from the first table-def block */
 
+    /* SQL export: the tables' constraints, DEFAULTs, comments and indexes
+     * from the master table, read out of turn before the rows (M-17) */
+    s->ddl_meta = NULL;
+    if (!list_only && s->want_ddl_meta) {
+        EXPDP_META *c = (EXPDP_META *)s->ddl_meta_cache;
+        int filtered = s->filter_active && (s->filter_table[0] || s->filter_schema[0]);
+        /* the cache serves when it has every table, or was made for the
+           same table (one table's export takes only that table's) */
+        if (c && (!c->filtered || (filtered && strcmp(c->ftable, s->filter_table) == 0 &&
+                                   strcmp(c->fschema, s->filter_schema) == 0))) {
+            s->ddl_meta = c;
+        } else {
+            EXPDP_META *meta = (EXPDP_META *)calloc(1, sizeof(EXPDP_META));
+            odv_expdp_meta_release(s);
+            if (meta) {
+                MASTER_CTX mm;
+                if (filtered) {
+                    meta->filtered = 1;
+                    odv_strcpy(meta->fschema, s->filter_schema, ODV_OBJNAME_LEN);
+                    odv_strcpy(meta->ftable, s->filter_table, ODV_OBJNAME_LEN);
+                }
+                int64_t *hrows = NULL;
+                int nh = filtered ? hint_rows(s->ddl_hint_in, fp->logsize, &hrows) : 0;
+                int ok = 0;
+                memset(&mm, 0, sizeof(mm));
+                mm.meta = meta;
+                if (nh > 0) {
+                    /* the table's rows of the master table only (the list
+                       gave their positions); a hint that does not lead to the
+                       table's TABLE_T is not used */
+                    if (master_read_aside(s, fp, &mm, hrows, nh) && meta->n > 0 &&
+                        mm.rows_read == nh)
+                        ok = 1;
+                    if (!ok) {
+                        meta_free(meta);
+                        master_free(&mm);
+                        meta = (EXPDP_META *)calloc(1, sizeof(EXPDP_META));
+                        memset(&mm, 0, sizeof(mm));
+                        if (meta) {
+                            meta->filtered = 1;
+                            odv_strcpy(meta->fschema, s->filter_schema, ODV_OBJNAME_LEN);
+                            odv_strcpy(meta->ftable, s->filter_table, ODV_OBJNAME_LEN);
+                        }
+                        mm.meta = meta;
+                    }
+                }
+                free(hrows);
+                if (meta && (ok || master_read_aside(s, fp, &mm, NULL, 0)))
+                    meta_read_objects(s, fp, meta);
+                master_free(&mm);
+                s->ddl_meta = s->ddl_meta_cache = meta;
+            }
+        }
+    }
+
     /* Fast seek: if seek_offset is set (from previous list_tables),
        jump directly to the target DDL position instead of scanning from top.
        Align to block boundary because the main loop reads full blocks and
@@ -3736,7 +4762,9 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                 memset(&dc, 0, sizeof(dc));
                 dc.session = s;
 
-                /* Reset table for new definition */
+                /* Reset table for new definition (its heap texts first: the
+                 * SQL export's DDL metadata puts some there) */
+                odv_table_free_text(&s->table);
                 memset(&s->table, 0, sizeof(ODV_TABLE));
                 s->table.dump_charset = s->dump_charset;
                 s->table.os_charset = s->out_charset;
@@ -3747,6 +4775,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 
                 /* Record DDL position for fast seek on next parse */
                 s->table.ddl_offset = cur_ddl_pos;
+                if (s->ddl_meta) meta_apply(s);   /* SQL export: the table's DDL (M-17) */
                 s->state.expdp_method = 0;
 
                 /* Seek to just after </ROWSET> for record data */
@@ -3761,6 +4790,8 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                     (list_only || (s->table_cb && !(s->filter_active && filter_found))) &&
                     master_columns(&s->table, &mc)) {
                     mc.ddl_pos = cur_ddl_pos;
+                    mc.want_hints = list_only;
+                    mc.row_at = -1;
                     s->state.master = &mc;
                     rc = parse_expdp_records(s, fp, &address, list_only);
                     s->state.master = NULL;
@@ -3839,6 +4870,12 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                         rc = parse_expdp_records(s, fp, &address, list_only);
                         notify_table(s, s->table.record_count);
                         if (rc != ODV_OK && rc != ODV_ERROR_CANCELLED) { /* non-fatal */ }
+                    } else if (s->ddl_only && s->filter_active && !s->pass_flg) {
+                        /* odv_read_table_ddl: the definition (and the DDL
+                         * from the master table) only */
+                        notify_table(s, -1);
+                        in_ddl = 0;
+                        goto expdp_done;
                     } else if (!s->filter_active || !s->pass_flg) {
                         /* Full parse (no filter or filter matched).  A LONG
                          * needs the unload method (master table). */
@@ -3847,7 +4884,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                                 s->state.expdp_method = master_unload_method(s, &mc);
                             } else {
                                 if (mlk_state == 0)
-                                    mlk_state = master_read_aside(s, fp, &mlk) ? 1 : -1;
+                                    mlk_state = master_read_aside(s, fp, &mlk, NULL, 0) ? 1 : -1;
                                 if (mlk_state > 0)
                                     s->state.expdp_method = master_unload_method(s, &mlk);
                             }
@@ -3917,11 +4954,17 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
 expdp_done:
     /* Tables / partitions without data, and the partition names of the data
      * entries, from the master table (M-02). */
-    if (master_done && !s->cancelled)
+    if (master_done && !s->cancelled) {
+        mc.target_missing = !list_only && s->filter_active && !filter_found &&
+                            (s->filter_table[0] || s->filter_schema[0]);
         master_apply(s, &mc, list_only);
+    }
+    if (list_only && master_done && !s->cancelled)
+        master_set_hints(s, &mc, vf.logsize);
     master_free(&mc);
     master_free(&mlk);
     s->state.expdp_method = 0;
+    s->ddl_meta = NULL;     /* kept in s->ddl_meta_cache for the next export */
 
     /* Post-parse: pull partition names, constraint names and index names out
      * of the master table area. All four byte markers are found in one pass

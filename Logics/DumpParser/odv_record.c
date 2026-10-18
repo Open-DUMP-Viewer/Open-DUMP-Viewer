@@ -51,6 +51,7 @@ void reset_record(ODV_RECORD *rec)
     for (i = 0; i < rec->col_count; i++) {
         rec->values[i].is_null = 1;
         rec->values[i].data_len = 0;
+        rec->values[i].flags = 0;
         /* Keep buffer allocated for reuse */
     }
     rec->col_count = 0;
@@ -87,6 +88,7 @@ int set_value_null(ODV_VALUE *v)
     v->is_null = 1;
     v->data_len = 0;
     v->type = COL_NULL;
+    v->flags = 0;
     return ODV_OK;
 }
 
@@ -94,6 +96,7 @@ int set_value_string(ODV_VALUE *v, const char *str, int len)
 {
     int rc;
     if (!v) return ODV_ERROR_INVALID_ARG;
+    v->flags = 0;
 
     if (!str || len <= 0) {
         v->is_null = 1;
@@ -108,6 +111,32 @@ int set_value_string(ODV_VALUE *v, const char *str, int len)
     v->data[len] = '\0';
     v->data_len = len;
     v->is_null = 0;
+    return ODV_OK;
+}
+
+/* A marker (%VARRAY%, %BLOB%, ...) shown in place of a value that could not
+   be decoded: the text for display, flagged so the export writers do not
+   write it as the value (ODV_VFLAG_MARKER). */
+int set_value_marker(ODV_VALUE *v, const char *marker)
+{
+    int rc = set_value_string(v, marker, (int)strlen(marker));
+    if (rc == ODV_OK) v->flags = ODV_VFLAG_MARKER;
+    return rc;
+}
+
+/* A value that is not NULL but has no content (a LOB written with
+   EMPTY_CLOB() / EMPTY_BLOB()). The row callback shows it as "", as it does
+   NULL; the export writers tell the two apart through is_null. */
+int set_value_empty(ODV_VALUE *v)
+{
+    int rc;
+    if (!v) return ODV_ERROR_INVALID_ARG;
+    rc = ensure_value_buf(v, 1);
+    if (rc != ODV_OK) return rc;
+    v->data[0] = '\0';
+    v->data_len = 0;
+    v->is_null = 0;
+    v->flags = 0;
     return ODV_OK;
 }
 
@@ -269,6 +298,16 @@ int deliver_row(ODV_SESSION *s)
         } else {
             col_values[i] = (const char *)v->data;
             col_lens[i] = v->data_len;
+        }
+        /* ODV_VALUES_EXPORT (odv_set_value_mode): a value with no value form
+           is told apart by its length, not passed as if it were the value */
+        if (s->export_lens && s->row_cb_ex && col_lens[i] >= 0) {
+            if (v->flags & ODV_VFLAG_MARKER) {
+                col_lens[i] = -2;                    /* the placeholder text stays */
+            } else if (v->flags & ODV_VFLAG_CUT) {
+                col_values[i] = NULL;
+                col_lens[i] = -3;
+            }
         }
     }
 

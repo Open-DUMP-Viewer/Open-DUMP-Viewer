@@ -664,6 +664,9 @@ static void jbuf_put_constraint(ODV_JBUF *b, const ODV_CONSTRAINT *c,
     if (c->deferrable)         jbuf_puts(b, ",\"deferrable\":\"DEFERRABLE\"");
     if (c->initially_deferred) jbuf_puts(b, ",\"deferred\":\"DEFERRED\"");
     if (c->disabled)           jbuf_puts(b, ",\"status\":\"DISABLED\"");
+    /* a unique index that is not a constraint (CREATE UNIQUE INDEX): type is
+       UNIQUE, but it is written as an index, before the constraints */
+    if (c->unique_index)       jbuf_puts(b, ",\"unique_index\":1");
 
     jbuf_putc(b, '}');
 }
@@ -728,7 +731,7 @@ static int jbuf_put_notes(ODV_JBUF *b, const char *notes, int src_cs, int dst_cs
     return 1;
 }
 
-static char *serialize_constraints_json(ODV_SESSION *s)
+char *odv_serialize_constraints_json(ODV_SESSION *s)
 {
     ODV_JBUF b;
     ODV_JBUF cm;
@@ -1335,7 +1338,7 @@ static void exp_deliver_current(ODV_SESSION *s, int64_t row_count)
     for (i = 0; i < ncols; i++) not_nulls[i] = s->table.columns[i].not_null;
     strs = exp_pack_strings(s, ncols);
     if (!strs) return;
-    cjson = serialize_constraints_json(s);
+    cjson = odv_serialize_constraints_json(s);
     exp_deliver(s, strs, not_nulls, ncols, s->table.constraint_count, cjson,
                 s->table.is_partition, s->table.partition,
                 row_count, s->table.ddl_offset);
@@ -1674,8 +1677,7 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
            section that follows the row's regular columns and is consumed by
            parse_exp_records()'s LOB section reader. Just set a placeholder;
            do NOT accumulate the locator into the LOB extract buffer. */
-        const char *ph = "%BLOB%";
-        set_value_string(val, ph, (int)strlen(ph));
+        set_value_marker(val, "%BLOB%");
         break;
     }
 
@@ -1709,8 +1711,7 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
 
     case COL_CLOB: {
         /* CLOB locator — actual content read from the LOB section. */
-        const char *ph = "%CLOB%";
-        set_value_string(val, ph, (int)strlen(ph));
+        set_value_marker(val, "%CLOB%");
         break;
     }
 
@@ -1743,14 +1744,12 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
 
     case COL_NCLOB: {
         /* NCLOB locator — actual content read from the LOB section. */
-        const char *ph = "%NCLOB%";
-        set_value_string(val, ph, (int)strlen(ph));
+        set_value_marker(val, "%NCLOB%");
         break;
     }
 
     case COL_BFILE: {
-        const char *ph = "%BFILE%";
-        set_value_string(val, ph, (int)strlen(ph));
+        set_value_marker(val, "%BFILE%");
         break;
     }
 
@@ -1776,6 +1775,17 @@ static int decode_exp_column(ODV_SESSION *s, int col_idx,
     }
 
     default:
+        if (col->type_str[0] == '"') {
+            /* A column of a user-defined type ("OWNER"."TYPE": VARRAY,
+               nested table, object). Its value is the type's internal image
+               (a collection starts 88 01); the type definition is not in the
+               dump, so it is not decoded, and not shown as text either (it
+               used to be: bytes as a string, B_VARR.TAGS). A placeholder, as
+               the expdp path shows (%VARRAY%), flagged as such. */
+            set_value_marker(val, (data_len >= 2 && data[0] == 0x88 && data[1] == 0x01)
+                                  ? "%VARRAY%" : "%OBJECT%");
+            break;
+        }
         /* String types: CHAR, VARCHAR, etc. */
         if (s->table.dump_charset != s->out_charset &&
             s->table.dump_charset != CHARSET_UNKNOWN) {
@@ -1819,6 +1829,62 @@ static int is_lob_type(int t)
     return (t == COL_BLOB || t == COL_CLOB || t == COL_NCLOB || t == COL_BFILE);
 }
 
+/* Appends n bytes to a value kept whole for the export writers, growing
+   its buffer geometrically up to ODV_FULL_VALUE_MAX. */
+static int exp_value_append(ODV_VALUE *v, const unsigned char *d, int n)
+{
+    int need;
+    if (n <= 0) return ODV_OK;
+    if (v->data_len > ODV_FULL_VALUE_MAX - n) return ODV_ERROR_BUFFER_OVER;
+    need = v->data_len + n + 1;
+    if (need > v->buf_size) {
+        int64_t grow = (int64_t)v->buf_size * 2;
+        if (grow < need) grow = need;
+        if (grow > (int64_t)ODV_FULL_VALUE_MAX + 1) grow = (int64_t)ODV_FULL_VALUE_MAX + 1;
+        if (ensure_value_buf(v, (int)grow) != ODV_OK || !v->data) return ODV_ERROR_MALLOC;
+    }
+    memcpy(v->data + v->data_len, d, (size_t)n);
+    v->data_len += n;
+    v->data[v->data_len] = '\0';
+    return ODV_OK;
+}
+
+/* A LOB read whole: BLOB to upper-case hex, CLOB / NCLOB from UTF-16BE (the
+   form exp writes them in, as the LOB extraction files show) to the output
+   charset. A value that could not be kept whole is flagged. */
+static void exp_lob_finish(ODV_SESSION *s, int col_idx, ODV_VALUE *v, int cut)
+{
+    int t = s->table.columns[col_idx].type;
+    int n = v->data_len;
+    if (n <= 0) {
+        set_value_empty(v);              /* EMPTY_CLOB(): no content, not NULL */
+    } else if (t == COL_BLOB) {
+        static const char hex[] = "0123456789ABCDEF";
+        char *hx = (char *)malloc((size_t)n * 2 + 1);
+        int j;
+        if (!hx) { v->flags = ODV_VFLAG_CUT; return; }
+        for (j = 0; j < n; j++) {
+            hx[j * 2]     = hex[(v->data[j] >> 4) & 0x0F];
+            hx[j * 2 + 1] = hex[v->data[j] & 0x0F];
+        }
+        set_value_string(v, hx, n * 2);
+        free(hx);
+    } else {
+        int cap = n * 2 + 16, out_len = 0;
+        char *cb = (char *)malloc((size_t)cap);
+        if (!cb || convert_charset((const char *)v->data, n & ~1, CHARSET_UTF16BE,
+                                   cb, cap, s->out_charset, &out_len) != ODV_OK) {
+            free(cb);
+            v->flags = ODV_VFLAG_CUT;
+            return;
+        }
+        set_value_string(v, cb, out_len);
+        free(cb);
+    }
+    v->type = t;
+    if (cut) v->flags = ODV_VFLAG_CUT;
+}
+
 /*---------------------------------------------------------------------------
     read_one_lob_column
 
@@ -1851,6 +1917,8 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
     int multi_chunk = 0;
     int accumulated = 0;
     int accum_lob_idx = lob_idx;
+    ODV_VALUE *full = NULL;   /* the column's value, when kept whole */
+    int full_cut = 0;
 
     /* odv_lob_accumulate() matches against s->lob_column_index, which
        odv_lob_check_column() set to the target's index among ALL LOB columns
@@ -1873,6 +1941,15 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
 
     if (odv_vread(hdr, 1, 2, fp) != 2) return ODV_ERROR_FREAD;
     first_val = (int)hdr[0] | ((int)hdr[1] << 8);
+
+    /* The export writers take the LOB whole (s->full_values, M-12): the
+       content replaces the placeholder of the locator phase. */
+    if (s->full_values && col_idx >= 0 && col_idx < s->table.col_count) {
+        full = &s->record.values[col_idx];
+        full->data_len = 0;
+        full->is_null = 0;
+        full->flags = 0;
+    }
 
     if (first_val > 0xFF00) {
         /* Extended length: 4-byte total + 4 reserved zero bytes */
@@ -1930,12 +2007,17 @@ static int read_one_lob_column(ODV_SESSION *s, ODV_VFILE *fp,
         if (s->lob_extract_mode && s->lob_column_index >= 0) {
             odv_lob_accumulate(s, accum_lob_idx, *chunk_buf_ptr, chunk_size);
         }
+        if (full && !full_cut) {
+            if (exp_value_append(full, *chunk_buf_ptr, chunk_size) != ODV_OK)
+                full_cut = 1;
+        }
 
         accumulated += chunk_size;
     }
 
-    /* Display placeholder is already set when the locator was decoded
-       in the regular column phase; nothing more to do here for display. */
+    /* Display: the placeholder set when the locator was decoded in the
+       regular column phase. Export: the whole content. */
+    if (full) exp_lob_finish(s, col_idx, full, full_cut);
     return ODV_OK;
 }
 
@@ -2007,13 +2089,13 @@ static int exp_skip_to_table_end(ODV_SESSION *s, ODV_VFILE *fp)
    ODV_EXP_RECORD_LEN when `keep` is set (nothing otherwise, as when only
    rows are counted). Bytes that were wanted but not kept set *dropped.
    Returns 1, 0 at end of file, -1 when out of memory. */
-static int exp_read_part(ODV_VFILE *fp, int n, int keep, unsigned char **buf,
+static int exp_read_part(ODV_VFILE *fp, int n, int keep, int cap, unsigned char **buf,
                          int *buf_size, int *kept, int *dropped)
 {
     int take = 0;
 
     if (keep) {
-        take = ODV_EXP_RECORD_LEN - *kept;
+        take = cap - *kept;
         if (take > n) take = n;
         if (take < 0) take = 0;
     }
@@ -2025,7 +2107,7 @@ static int exp_read_part(ODV_VFILE *fp, int n, int keep, unsigned char **buf,
             int ns = (*buf_size < 4096) ? 4096 : *buf_size;
             unsigned char *nb;
             while (ns < want)
-                ns = (ns > (ODV_EXP_RECORD_LEN + 1) / 2) ? ODV_EXP_RECORD_LEN + 1 : ns * 2;
+                ns = (ns > (cap + 1) / 2) ? cap + 1 : ns * 2;
             nb = (unsigned char *)realloc(*buf, (size_t)ns);
             if (!nb) return -1;
             *buf = nb;
@@ -2052,7 +2134,7 @@ static int exp_read_part(ODV_VFILE *fp, int n, int keep, unsigned char **buf,
    piece's length in a direct-path row) into *buf. Returns the number of
    bytes kept, -1 if the value is cut short or malformed, -2 when out of
    memory. */
-static int exp_read_long_parts(ODV_VFILE *fp, int first, int direct, int keep,
+static int exp_read_long_parts(ODV_VFILE *fp, int first, int direct, int keep, int cap,
                                unsigned char **buf, int *buf_size, int *dropped)
 {
     unsigned char lb[2];
@@ -2069,7 +2151,7 @@ static int exp_read_long_parts(ODV_VFILE *fp, int first, int direct, int keep,
             if (n == 0) break;                  /* 00 00 closes the chunks */
             if (n >= 0xFFFD) return -1;         /* a marker, not a chunk */
         }
-        rc = exp_read_part(fp, n, keep, buf, buf_size, &kept, dropped);
+        rc = exp_read_part(fp, n, keep, cap, buf, buf_size, &kept, dropped);
         if (rc <= 0) return (rc < 0) ? -2 : -1;
         if (direct) {
             if (!(cur & 0x8000)) break;         /* the last piece */
@@ -2177,6 +2259,7 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
         int cix;            /* table column of this value (-1: past the table) */
         int ctype;          /* its type (-1: none) */
         int long_done = 0;  /* 1 = value already read (LONG in parts) */
+        int long_part = 0;  /* 1 = that LONG was longer than kept */
 
         /* Stepping over a table for a filter delivers nothing, so report
            progress as it goes (the callback fires only when % changes). */
@@ -2318,7 +2401,9 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
         if ((ctype == COL_LONG || ctype == COL_LONG_RAW) &&
             (direct_rows ? (col_len & 0x8000) != 0 : col_len == 0xFFFD)) {
             int dropped = 0;
+            /* The export writers take a LONG whole (s->full_values, M-12) */
             int n = exp_read_long_parts(fp, col_len, direct_rows, !list_only,
+                                        s->full_values ? ODV_FULL_VALUE_MAX : ODV_EXP_RECORD_LEN,
                                         &col_buf, &col_buf_size, &dropped);
             if (n == -2) { rc = ODV_ERROR_MALLOC; break; }
             if (n < 0) {
@@ -2326,6 +2411,7 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
                 exp_skip_to_table_end(s, fp);
                 break;
             }
+            if (dropped) long_part = 1;
             if (dropped && !long_cut) {
                 long_cut = 1;
                 snprintf(s->last_error, sizeof(s->last_error),
@@ -2393,8 +2479,9 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
             }
         }
 
-        /* Sanity check: reject absurdly large column lengths */
-        if (col_len < 0 || col_len > ODV_EXP_RECORD_LEN) {
+        /* Sanity check: reject absurdly large column lengths (a LONG read
+           in parts is already bounded by its own cap) */
+        if (col_len < 0 || (!long_done && col_len > ODV_EXP_RECORD_LEN)) {
             /* Corrupt data — try to find 0xFFFF end marker */
             exp_skip_to_table_end(s, fp);
             break;
@@ -2431,6 +2518,8 @@ static int parse_exp_records(ODV_SESSION *s, ODV_VFILE *fp, int64_t data_start,
            only needs the row count. */
         if (!list_only && cix >= 0) {
             decode_exp_column(s, cix, col_buf, col_len);
+            if (long_part && s->full_values)
+                s->record.values[cix].flags = ODV_VFLAG_CUT;   /* not whole */
         }
         col_idx++;
 
@@ -2780,12 +2869,20 @@ static void exp_parse_fk(const char *p, ODV_CONSTRAINT *c)
 #define EXP_TGT_NONE     0
 #define EXP_TGT_PENDING  1
 #define EXP_TGT_LATE     2
+#define EXP_TGT_CB       3   /* SQL export: a table read earlier (s->late_ddl) */
 
 typedef struct {
     ODV_SESSION *s;
     EXP_DEFER   *d;
     int          pending_table;
     const char  *current_schema;
+    char        *late_sch;   /* EXP_TGT_CB: the statement's table */
+    char        *late_nm;
+    int         *late_seen;  /* listing: set when a statement goes to an earlier
+                                table (EXP_TGT_LATE), for the DDL hint */
+    int          pend_other; /* filtered parse: the pending table is not the
+                                filter's (one read past, e.g. while the SQL
+                                export reads on for the late DDL) */
 } EXP_DDLCTX;
 
 static int exp_target(const EXP_DDLCTX *x, const char *sch_in,
@@ -2809,8 +2906,17 @@ static int exp_target(const EXP_DDLCTX *x, const char *sch_in,
         int i = defer_find(x->d, sch[0] ? sch : x->current_schema, nm);
         if (i >= 0 && x->d->tab[i].ready) {
             *late_idx = i;
+            if (x->late_seen) *x->late_seen = 1;
             return EXP_TGT_LATE;
         }
+    }
+    /* A full parse for the SQL export: the foreign keys and function-based
+       / DESC indexes exp writes after the last table go to the writer, which
+       knows the tables it has written (M-17) */
+    if (s->late_ddl && x->late_sch && x->late_nm) {
+        odv_strcpy(x->late_sch, sch[0] ? sch : x->current_schema, ODV_OBJNAME_LEN);
+        odv_strcpy(x->late_nm, nm, ODV_OBJNAME_LEN);
+        return EXP_TGT_CB;
     }
     return EXP_TGT_NONE;
 }
@@ -2830,6 +2936,8 @@ static void exp_commit_constraint(const EXP_DDLCTX *x, int tgt, int idx,
         }
     } else if (tgt == EXP_TGT_LATE) {
         defer_attach(x->s, x->d, idx, c);
+    } else if (tgt == EXP_TGT_CB) {
+        x->s->late_ddl(x->s, x->late_sch, x->late_nm, c, x->s->late_ddl_ud);
     }
     free(c->condition_long);
     free(c->index_expr_long);
@@ -2862,7 +2970,11 @@ static void exp_note(const EXP_DDLCTX *x, int tgt, int idx, const char *fmt, ...
     va_start(ap, fmt);
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
-    snprintf(s->last_error, sizeof(s->last_error), "%s", msg);
+    /* last_error: not for a table the filtered parse does not deliver (the
+       SQL export of one table reads the later tables' DDL too, M-17) */
+    if (!(tgt == EXP_TGT_PENDING && x->pend_other))
+        snprintf(s->last_error, sizeof(s->last_error), "%s", msg);
+    if (tgt == EXP_TGT_CB) return;   /* not the pending table's: last_error only */
     old = *notes ? strlen(*notes) : 0;
     n = strlen(msg);
     nn = (char *)realloc(*notes, old + n + 2);
@@ -2901,6 +3013,7 @@ static void exp_ddl_create_index(const EXP_DDLCTX *x, const char *after)
     if (is_unique) {
         /* UNIQUE INDEX → CONSTRAINT_UNIQUE (may be upgraded to PK later) */
         c.type = CONSTRAINT_UNIQUE;
+        c.unique_index = 1;
         parse_constraint_columns(cp, &c, 0);
         if (c.col_count == 0) return;
     } else {
@@ -2961,6 +3074,7 @@ static void exp_ddl_alter_table(const EXP_DDLCTX *x, const char *word)
                     ODV_CONSTRAINT *e = find_constraint_by_name(s, c.name);
                     if (e) {
                         e->type = CONSTRAINT_PK;
+                        e->unique_index = 0;
                         e->deferrable = c.deferrable;
                         e->initially_deferred = c.initially_deferred;
                         e->disabled = c.disabled;
@@ -2979,8 +3093,18 @@ static void exp_ddl_alter_table(const EXP_DDLCTX *x, const char *word)
             ap = parse_constraint_columns(skip_ws(ap + 6), &c, 0);
             if (!ap || c.col_count == 0) return;
             exp_parse_state(ap, &c);
-            if (tgt == EXP_TGT_PENDING && named && find_constraint_by_name(s, c.name))
-                return;
+            if (tgt == EXP_TGT_PENDING && named) {
+                /* The constraint's index came first as CREATE UNIQUE INDEX "n":
+                   that entry is the constraint (not only an index) */
+                ODV_CONSTRAINT *e = find_constraint_by_name(s, c.name);
+                if (e) {
+                    e->unique_index = 0;
+                    e->deferrable = c.deferrable;
+                    e->initially_deferred = c.initially_deferred;
+                    e->disabled = c.disabled;
+                    return;
+                }
+            }
             exp_commit_constraint(x, tgt, idx, &c);
         } else if (starts_with_ci(ap, "FOREIGN KEY")) {
             /* Named or system-named (ADD FOREIGN KEY (...) REFERENCES ...) (M-34). */
@@ -3622,6 +3746,37 @@ static int exp_object_table(ODV_SESSION *s, const char *word,
 
     DDL statements are terminated by \0 or \n.
  ---------------------------------------------------------------------------*/
+/* The DDL hint of an exp dump (odv_get_table_ddl_hint): "L<size>:-" (no DDL
+ * goes to an earlier table) or "L<size>:<position>:<schema in hex>". Returns 1
+ * when it is one for this dump (size equal). */
+static int exp_hint_parse(const char *h, int64_t logsize, int64_t *pos, char *schema, int *none)
+{
+    int64_t size = 0, p = 0;
+    int n = 0;
+    *pos = -1;
+    *none = 0;
+    schema[0] = '\0';
+    if (!h || h[0] != 'L') return 0;
+    h++;
+    while (*h >= '0' && *h <= '9') size = size * 10 + (*h++ - '0');
+    if (*h++ != ':' || size != logsize) return 0;
+    if (h[0] == '-' && h[1] == '\0') { *none = 1; return 1; }
+    if (!(*h >= '0' && *h <= '9')) return 0;
+    while (*h >= '0' && *h <= '9') p = p * 10 + (*h++ - '0');
+    if (*h++ != ':' || p <= EXP_HEADER_SIZE || p >= logsize) return 0;
+    while (h[0] && h[1] && n < ODV_OBJNAME_LEN) {
+        int hi = isxdigit((unsigned char)h[0]) ? (isdigit((unsigned char)h[0]) ? h[0] - '0' : (toupper((unsigned char)h[0]) - 'A' + 10)) : -1;
+        int lo = isxdigit((unsigned char)h[1]) ? (isdigit((unsigned char)h[1]) ? h[1] - '0' : (toupper((unsigned char)h[1]) - 'A' + 10)) : -1;
+        if (hi < 0 || lo < 0) return 0;
+        schema[n++] = (char)(hi * 16 + lo);
+        h += 2;
+    }
+    if (*h) return 0;
+    schema[n] = '\0';
+    *pos = p;
+    return 1;
+}
+
 static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
 {
     int step;               /* 0=header, 1=mode, 2=ddl, 3=metadata */
@@ -3663,7 +3818,18 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
     int obj_table = 0;      /* 1 = pending table is CREATE TABLE ... OF type */
     int64_t pending_row_count = 0; /* row count to pass when notifying */
     int filter_found = 0;   /* 1=filter target table already processed */
+    int tail_scan = 0;      /* 1=SQL export: past the target, reading the DDL exp
+                               writes after the last table (s->late_ddl, M-17) */
+    char late_sch[ODV_OBJNAME_LEN + 1], late_nm[ODV_OBJNAME_LEN + 1];
     int wire_col[ODV_MAX_COLUMNS]; /* table column of each row value (M-01) */
+    /* The DDL hint (odv_get_table_ddl_hint): where the DDL that goes to an
+       earlier table starts. Listing: the start of the plain statement at or
+       before the first such statement (safe_pos: a statement start where the
+       parse can begin again; -1 after row data until the next one), and the
+       schema in effect there. SQL export: given by odv_set_ddl_hint. */
+    int64_t safe_pos = -1, hint_pos = -1, stmt_pos = 0;
+    char safe_schema[ODV_OBJNAME_LEN + 1], hint_schema[ODV_OBJNAME_LEN + 1];
+    int late_seen = 0, hint_none = 0, want_jump = 0, hint_ok = 0;
 
     memset(&defer, 0, sizeof(defer));
     memset(&otypes, 0, sizeof(otypes));
@@ -3677,6 +3843,15 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
     ddlx.d = &defer;
     ddlx.pending_table = 0;
     ddlx.current_schema = current_schema;
+    late_sch[0] = late_nm[0] = '\0';
+    ddlx.late_sch = late_sch;
+    ddlx.late_nm = late_nm;
+    ddlx.late_seen = list_only ? &late_seen : NULL;
+    ddlx.pend_other = 0;
+    safe_schema[0] = hint_schema[0] = '\0';
+    if (!list_only && s->late_ddl && s->filter_active)
+        hint_ok = exp_hint_parse(s->ddl_hint_in, fp->logsize, &hint_pos, hint_schema,
+                                 &hint_none);
 
     word = (char *)malloc(EXP_DDL_BUF_SIZE);
     if (!word) return ODV_ERROR_MALLOC;
@@ -3827,6 +4002,12 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
 
             handle_ddl:
                 ddlx.pending_table = pending_table;
+                stmt_pos = word_pos;
+                late_seen = 0;
+                if (list_only && !framed && step == 2) {
+                    safe_pos = word_pos;
+                    odv_strcpy(safe_schema, current_schema, ODV_OBJNAME_LEN);
+                }
                 if (word_cut) {
                     /* Not silently: the statement is used only as far as it
                        was read, and a CHECK / DEFAULT left incomplete by the
@@ -3871,7 +4052,14 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                            the case-insensitive filter, so otherwise the open
                            would read that table's rows as the target's (H-13). */
                         if (s->seek_offset > EXP_HEADER_SIZE && filter_found) {
-                            goto done;
+                            /* The SQL export goes on to the end for the
+                               foreign keys / indexes exp writes after the
+                               last table; no other table is read (M-17).
+                               With the list's hint: not when the dump has
+                               none, else from where they start */
+                            if (!s->late_ddl || (hint_ok && hint_none)) goto done;
+                            if (!tail_scan && hint_ok && hint_pos > stmt_pos) want_jump = 1;
+                            tail_scan = 1;
                         }
                         /* Notify previous pending table (with accumulated constraints) */
                         if (pending_table && s->table.name[0] != '\0') {
@@ -3964,11 +4152,16 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                                     if (odv_stricmp(s->table.schema, fs) != 0)
                                         match = 0;
                                 }
+                                if (tail_scan) match = 0;
                                 s->pass_flg = match ? 0 : 1;
+                                ddlx.pend_other = !match;
                                 /* Early exit: target table already processed,
-                                   now a different table appeared → done */
+                                   now a different table appeared → done
+                                   (the SQL export reads on, as above) */
                                 if (filter_found && s->pass_flg) {
-                                    goto done;
+                                    if (!s->late_ddl || (hint_ok && hint_none)) goto done;
+                                    if (!tail_scan && hint_ok && hint_pos > stmt_pos) want_jump = 1;
+                                    tail_scan = 1;
                                 }
                                 if (match && !s->filter_partition[0]) {
                                     /* Only set filter_found here when NOT using
@@ -4078,6 +4271,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                         /* Table name matches — transition to binary metadata.
                            The rows follow the INSERT's column order (M-01). */
                         exp_insert_columns(s, word, wire_col);
+                        safe_pos = -1;   /* row data follows (DDL hint) */
                         step = 3;
                         data_step = 0;
                         meta_col_count = 0;
@@ -4107,6 +4301,29 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                 }
                 framed = 0;
                 wlen = 0;
+                if (late_seen && hint_pos < 0 && list_only) {
+                    /* the first statement of an earlier table: the hint
+                       (none when no statement start precedes it safely) */
+                    hint_pos = safe_pos >= 0 ? safe_pos : -2;
+                    odv_strcpy(hint_schema, safe_schema, ODV_OBJNAME_LEN);
+                }
+                late_seen = 0;
+                if (want_jump && step == 2) {
+                    /* SQL export past its table: on at the hint, where the
+                       DDL exp writes after the last table starts. Nothing in
+                       between can be the table's (the list saw none there) */
+                    want_jump = 0;
+                    odv_vseek(fp, hint_pos, SEEK_SET);
+                    address = hint_pos;
+                    odv_strcpy(current_schema, hint_schema, ODV_OBJNAME_LEN);
+                    pending_table = 0;
+                    pending_row_count = 0;
+                    s->table.name[0] = '\0';
+                    s->pass_flg = 1;
+                    obj_table = 0;
+                    rec_mode = EXP_REC_NONE;
+                    rec_kind = EXP_HDR_ALONE;
+                }
             } else {
                 if (wlen == 0) {
                     word_pos = address - 1;
@@ -4464,6 +4681,23 @@ done:
     if (defer.active) defer_flush(s, &defer);
     defer_free(&defer);
     exp_free_types(&otypes);
+    if (list_only && !s->cancelled && rc == ODV_OK && hint_pos != -2) {
+        /* the DDL hint, the same for every entry: where the DDL that goes to
+           an earlier table starts ("-": the dump has none) */
+        char h[48 + ODV_OBJNAME_LEN * 2];
+        int k, i, n;
+        n = snprintf(h, sizeof(h), "L%lld:", (long long)fp->logsize);
+        if (hint_pos < 0) {
+            snprintf(h + n, sizeof(h) - (size_t)n, "-");
+        } else {
+            n += snprintf(h + n, sizeof(h) - (size_t)n, "%lld:", (long long)hint_pos);
+            for (i = 0; hint_schema[i] && n + 3 < (int)sizeof(h); i++)
+                n += snprintf(h + n, sizeof(h) - (size_t)n, "%02X", (unsigned char)hint_schema[i]);
+        }
+        k = odv_ddl_hint_add(s, h);
+        if (k >= 0)
+            for (i = 0; i < s->table_count; i++) odv_ddl_hint_set_entry(s, i, k);
+    }
 
     free(word);
 

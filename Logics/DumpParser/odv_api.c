@@ -182,6 +182,7 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
     if (!session) return ODV_ERROR_INVALID_ARG;
 
     free_record(&session->record);
+    odv_expdp_meta_release(session);
 
     odv_table_free_text(&session->table);
     free(session->table_list);
@@ -194,6 +195,9 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
     session->partition_list = NULL;
     free(session->seek_list);
     session->seek_list = NULL;
+    odv_ddl_hints_clear(session);
+    free(session->ddl_hint_in);
+    session->ddl_hint_in = NULL;
     free_meta_cache(session);
 
     /* Free LOB buffer if allocated */
@@ -350,6 +354,26 @@ int odv_text_set(char *fixed, size_t cap, char **longp, const char *src, size_t 
     return 1;
 }
 
+ODV_CONSTRAINT *odv_table_add_constraint(ODV_TABLE *t, int type)
+{
+    ODV_CONSTRAINT *c;
+    if (!t) return NULL;
+    if (t->constraint_count >= t->constraint_cap) {
+        int nc = t->constraint_cap ? t->constraint_cap * 2 : 16;
+        ODV_CONSTRAINT *na;
+        if (nc > ODV_MAX_CONSTRAINTS) nc = ODV_MAX_CONSTRAINTS;
+        if (nc <= t->constraint_cap) return NULL;
+        na = (ODV_CONSTRAINT *)realloc(t->constraints, (size_t)nc * sizeof(ODV_CONSTRAINT));
+        if (!na) return NULL;
+        t->constraints = na;
+        t->constraint_cap = nc;
+    }
+    c = &t->constraints[t->constraint_count++];
+    memset(c, 0, sizeof(*c));
+    c->type = type;
+    return c;
+}
+
 void odv_table_free_text(ODV_TABLE *t)
 {
     int i;
@@ -390,6 +414,10 @@ ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path)
         return ODV_ERROR_INVALID_ARG;
     }
     odv_strcpy(s->dump_path, path, ODV_PATH_LEN);
+    odv_expdp_meta_release(s);      /* another dump: its own DDL metadata */
+    odv_ddl_hints_clear(s);         /* ... and its own DDL hints */
+    free(s->ddl_hint_in);
+    s->ddl_hint_in = NULL;
 
     /* Verify file is accessible and get size */
     fp = odv_fopen_path(path, "rb");
@@ -1184,6 +1212,7 @@ ODV_API int ODV_CALL odv_list_tables(ODV_SESSION *s)
     s->cancelled = 0;
     s->table_count = 0;
     s->partition_count = 0;
+    odv_ddl_hints_clear(s);
     op_begin(s);
 
     switch (s->dump_type) {
@@ -1294,20 +1323,158 @@ ODV_API int ODV_CALL odv_parse_dump(ODV_SESSION *s)
     s->total_rows = 0;
     op_begin(s);
 
+    /* ODV_VALUES_EXPORT: the values as the export writers get them (whole
+       LOB / LONG; a marker told apart by its length, see odv_api.h) */
+    s->full_values = (s->value_mode == ODV_VALUES_EXPORT) ? 1 : 0;
+    s->export_lens = s->full_values;
     switch (s->dump_type) {
     case DUMP_EXPDP:
-        return op_finish(s, parse_expdp_dump(s, 0 /* full parse */));
+        rc = parse_expdp_dump(s, 0 /* full parse */);
+        break;
     case DUMP_EXPDP_COMPRESS:
         set_error(s, "Compressed EXPDP dumps (COMPRESSION=ALL) are not supported. "
                      "Please re-export with COMPRESSION=NONE.");
-        return ODV_ERROR_UNSUPPORTED;
+        rc = ODV_ERROR_UNSUPPORTED;
+        break;
     case DUMP_EXP:
     case DUMP_EXP_DIRECT:
-        return op_finish(s, parse_exp_dump(s, 0 /* full parse */));
+        rc = parse_exp_dump(s, 0 /* full parse */);
+        break;
     default:
         set_error(s, "Unknown or unsupported dump format");
-        return ODV_ERROR_FORMAT;
+        rc = ODV_ERROR_FORMAT;
+        break;
     }
+    s->full_values = 0;
+    s->export_lens = 0;
+    return op_finish(s, rc);    /* passes an error through unchanged */
+}
+
+ODV_API int ODV_CALL odv_set_value_mode(ODV_SESSION *s, int mode)
+{
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    if (mode != ODV_VALUES_PREVIEW && mode != ODV_VALUES_EXPORT) return ODV_ERROR_INVALID_ARG;
+    s->value_mode = mode;
+    return ODV_OK;
+}
+
+/*---------------------------------------------------------------------------
+    DDL hints (odv_get_table_ddl_hint / odv_set_ddl_hint)
+
+    A list records, for each entry, where the DDL that the dump keeps apart
+    from the table is: exp writes foreign keys and function-based / DESC
+    indexes after the last table, expdp keeps constraints, DEFAULTs, comments
+    and indexes in the master table. A single-table export given the hint
+    reads only there instead of the rest of the dump / the whole master
+    table. The hints are kept per distinct string; the entries of one table
+    share one.
+ ---------------------------------------------------------------------------*/
+void odv_ddl_hints_clear(ODV_SESSION *s)
+{
+    int i;
+    if (!s) return;
+    for (i = 0; i < s->ddl_hint_nstr; i++) free(s->ddl_hint_str[i]);
+    free(s->ddl_hint_str);
+    free(s->ddl_hint_of);
+    s->ddl_hint_str = NULL;
+    s->ddl_hint_of = NULL;
+    s->ddl_hint_nstr = 0;
+    s->ddl_hint_nof = 0;
+}
+
+int odv_ddl_hint_add(ODV_SESSION *s, const char *hint)
+{
+    char **np, *c;
+    size_t n;
+    if (!s || !hint) return -1;
+    n = strlen(hint);
+    c = (char *)malloc(n + 1);
+    if (!c) return -1;
+    memcpy(c, hint, n + 1);
+    np = (char **)realloc(s->ddl_hint_str, (size_t)(s->ddl_hint_nstr + 1) * sizeof(char *));
+    if (!np) { free(c); return -1; }
+    s->ddl_hint_str = np;
+    s->ddl_hint_str[s->ddl_hint_nstr] = c;
+    return s->ddl_hint_nstr++;
+}
+
+void odv_ddl_hint_set_entry(ODV_SESSION *s, int entry, int idx)
+{
+    if (!s || entry < 0) return;
+    if (entry >= s->ddl_hint_nof) {
+        int nc = s->ddl_hint_nof ? s->ddl_hint_nof : 64, i;
+        int *np;
+        while (nc <= entry) nc *= 2;
+        np = (int *)realloc(s->ddl_hint_of, (size_t)nc * sizeof(int));
+        if (!np) return;
+        for (i = s->ddl_hint_nof; i < nc; i++) np[i] = -1;
+        s->ddl_hint_of = np;
+        s->ddl_hint_nof = nc;
+    }
+    s->ddl_hint_of[entry] = idx;
+}
+
+ODV_API const char * ODV_CALL odv_get_table_ddl_hint(ODV_SESSION *s, int index)
+{
+    int k;
+    if (!s || index < 0 || index >= s->table_count || index >= s->ddl_hint_nof) return "";
+    k = s->ddl_hint_of[index];
+    if (k < 0 || k >= s->ddl_hint_nstr) return "";
+    return s->ddl_hint_str[k];
+}
+
+ODV_API int ODV_CALL odv_set_ddl_hint(ODV_SESSION *s, const char *hint)
+{
+    char *c = NULL;
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    if (hint && hint[0]) {
+        size_t n = strlen(hint);
+        if (n > 1024 * 1024) return ODV_ERROR_INVALID_ARG;
+        c = (char *)malloc(n + 1);
+        if (!c) return ODV_ERROR_MALLOC;
+        memcpy(c, hint, n + 1);
+    }
+    free(s->ddl_hint_in);
+    s->ddl_hint_in = c;
+    return ODV_OK;
+}
+
+/*---------------------------------------------------------------------------
+    odv_read_table_ddl
+
+    The table callback for the filtered table, with its DDL as the SQL export
+    takes it: for an expdp dump the constraints, NOT NULL, DEFAULTs, comments
+    and indexes of the master table (the list does not read them; it gives
+    their position, odv_get_table_ddl_hint). No rows are read.
+ ---------------------------------------------------------------------------*/
+ODV_API int ODV_CALL odv_read_table_ddl(ODV_SESSION *s)
+{
+    int rc;
+
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    if (!s->filter_active || !s->filter_table[0]) {
+        set_error(s, "odv_read_table_ddl needs a table filter (odv_set_table_filter)");
+        return ODV_ERROR_INVALID_ARG;
+    }
+    if (s->dump_type == DUMP_UNKNOWN) {
+        rc = detect_dump_kind(s);
+        if (rc != ODV_OK) return rc;
+    }
+    if (s->dump_type != DUMP_EXPDP) {
+        set_error(s, "odv_read_table_ddl reads expdp dumps; the list of an exp dump "
+                     "already gives the DDL (table callback)");
+        return ODV_ERROR_UNSUPPORTED;
+    }
+
+    s->cancelled = 0;
+    s->total_rows = 0;
+    op_begin(s);
+    s->want_ddl_meta = 1;
+    s->ddl_only = 1;
+    rc = parse_expdp_dump(s, 0);
+    s->ddl_only = 0;
+    s->want_ddl_meta = 0;
+    return op_finish(s, rc);
 }
 
 ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter)
