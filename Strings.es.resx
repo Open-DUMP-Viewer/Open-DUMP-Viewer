@@ -239,6 +239,14 @@ Asegúrese de que Open_DumpParser.dll esté en la misma carpeta que el ejecutabl
   <data name="Analyze_ParseError" xml:space="preserve"><value>Error durante el análisis del archivo Dump: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>Error al obtener la lista de tablas: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>Error durante el análisis de la tabla: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>Este archivo de volcado está truncado (falta el final del archivo).
+
+Las tablas y filas que se muestran o exportan son solo las que se pudieron leer antes del punto en que termina el archivo. No se incluyen las tablas y filas posteriores a ese punto, y es posible que a la última tabla leída le falten filas.
+
+Entre las posibles causas están una transferencia o copia interrumpida, un disco lleno o una exportación fallida. Compruebe el archivo de volcado original.</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>Este volcado está dividido en varios archivos (exportación con FILESIZE u otra opción similar), pero no se encontró el archivo siguiente.
+
+Las tablas y filas que se muestran o exportan son solo las contenidas en los archivos encontrados. Coloque los archivos restantes (…_02.dmp, etc.) en la misma carpeta y vuelva a abrir el primer archivo.</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>La ruta del archivo no está especificada.</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>Archivo no encontrado: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>El archivo debe estar en formato .dmp.</value></data>

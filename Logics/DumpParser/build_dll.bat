@@ -25,7 +25,7 @@ call "%VCVARS%" %ARCH%
 
 set DEFS=/DWINDOWS /DWIN32 /DUTF8 /DODV_DLL_MODE /D_CRT_SECURE_NO_WARNINGS
 set CFLAGS=/O2 /W3 /LD /MT /nologo /utf-8 /std:c11
-set SRCS=odv_api.c odv_detect.c odv_expdp.c odv_exp.c odv_record.c odv_number.c odv_datetime.c odv_charset.c odv_xml.c odv_csv.c odv_sql.c
+set SRCS=odv_api.c odv_detect.c odv_expdp.c odv_exp.c odv_record.c odv_number.c odv_datetime.c odv_charset.c odv_xml.c odv_csv.c odv_sql.c odv_tz.c odv_tzdata.c odv_ja16.c odv_ja16map.c
 set OUTDIR=..\..\bin\Debug\net10.0-windows7.0
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"

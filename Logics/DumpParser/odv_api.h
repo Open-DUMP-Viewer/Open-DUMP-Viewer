@@ -59,6 +59,21 @@ typedef struct _odv_session ODV_SESSION;
 #define ODV_ERR                   -1
 #define ODV_ERR_CANCELLED       -200
 
+/* Success with a warning (odv_list_tables, odv_parse_dump, odv_export_csv,
+   odv_export_sql, odv_extract_lob). The operation read up to where the dump
+   file ends and delivered everything found before that point, but the dump
+   ends early, so tables or rows after that point are missing (and the last
+   table reached may be incomplete). odv_get_last_error() describes it. An
+   operation that finished before reaching that point returns ODV_OK.
+     ODV_WARN_TRUNCATED       the file stops before the dump's own end
+                              (copy or transfer cut short, disk full, or the
+                              export itself failed)
+     ODV_WARN_VOLUME_MISSING  the file is one volume of a dump split with
+                              FILESIZE (or dumpfile=%U), and the volume that
+                              follows it was not found next to it */
+#define ODV_WARN_TRUNCATED         1
+#define ODV_WARN_VOLUME_MISSING    2
+
 /*---------------------------------------------------------------------------
     SQL Export Flags (for odv_set_sql_flags)
  ---------------------------------------------------------------------------*/
@@ -69,10 +84,23 @@ typedef struct _odv_session ODV_SESSION;
 #define ODV_SQL_ALL            0x0Fu  /* All of the above */
 
 /*---------------------------------------------------------------------------
+    Threads
+
+    Sessions are independent of each other: different sessions may be used
+    from different threads at the same time (each keeps its own state; the
+    DLL holds no state shared between sessions). One session must not be
+    used by two threads at once.
+ ---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
     Callback Types
  ---------------------------------------------------------------------------*/
 
-/* Row data delivery callback (called per row during parse) */
+/* Row data delivery callback (called per row during parse).
+   Each value is a NUL-terminated string, so a value that contains a 0x00
+   byte appears cut at it, and a NULL value is passed as "" (as is a value
+   that starts with 0x00). Use ODV_ROW_CALLBACK_EX (odv_set_row_callback_ex)
+   to receive every value whole, with NULL told apart. */
 typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char *schema,
     const char *table,
@@ -81,6 +109,28 @@ typedef void (ODV_CALL *ODV_ROW_CALLBACK)(
     const char **col_values,
     void *user_data
 );
+
+/* Row data delivery callback with value lengths (odv_set_row_callback_ex).
+   col_values[i] points to col_lens[i] bytes: the value as UTF-8 text (or the
+   hex / placeholder text of a binary column), which may contain 0x00 bytes.
+   Read it by its length, not up to a 0x00.
+   col_lens[i] == -1 (with col_values[i] == NULL) means the value is NULL;
+   0 means an empty value that is not NULL.
+   schema, table and col_names (NUL-terminated) and the arrays are valid until
+   the callback returns. When a row belongs to another table than the
+   previous row, its schema / table / col_names pointers differ from the
+   previous row's, so a caller may cache the names by pointer (rows of the
+   same table usually keep the same pointers, but may also get new ones). */
+typedef void (ODV_CALL *ODV_ROW_CALLBACK_EX)(
+    const char *schema,
+    const char *table,
+    int col_count,
+    const char **col_names,
+    const char **col_values,
+    const int *col_lens,
+    void *user_data
+);
+#define ODV_HAS_ROW_CALLBACK_EX 1
 
 /* Progress notification callback
    rows_processed: total rows processed so far
@@ -123,8 +173,14 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session);
     Configuration
  ---------------------------------------------------------------------------*/
 
+/* File paths given to the DLL (dump file, CSV / SQL output file, LOB output
+   directory) are UTF-8. On Windows they are opened through UTF-16, so any
+   character may appear in them; a string that is not valid UTF-8 is taken as
+   the ANSI code page, as before. A path longer than 1024 bytes is refused. */
 ODV_API int ODV_CALL odv_set_dump_file(ODV_SESSION *s, const char *path);
+/* A session has one row callback: setting either form replaces the other. */
 ODV_API int ODV_CALL odv_set_row_callback(ODV_SESSION *s, ODV_ROW_CALLBACK cb, void *user_data);
+ODV_API int ODV_CALL odv_set_row_callback_ex(ODV_SESSION *s, ODV_ROW_CALLBACK_EX cb, void *user_data);
 ODV_API int ODV_CALL odv_set_progress_callback(ODV_SESSION *s, ODV_PROGRESS_CALLBACK cb, void *user_data);
 ODV_API int ODV_CALL odv_set_table_callback(ODV_SESSION *s, ODV_TABLE_CALLBACK cb, void *user_data);
 
@@ -137,6 +193,16 @@ ODV_API int ODV_CALL odv_set_table_filter(ODV_SESSION *s, const char *schema, co
    Use the data_offset value from the table callback to skip DDL scan.
    Set to 0 to disable (default: scan from beginning). */
 ODV_API int ODV_CALL odv_set_data_offset(ODV_SESSION *s, int64_t offset);
+
+/* Open the whole of a partitioned table: pass the data_offset of every one of
+   its entries (with odv_set_table_filter, and no partition filter). The parse
+   reads the entry at each offset in file order, so all partitions are read
+   however the dump interleaves them with other tables (EXPDP). Replaces the
+   single offset of odv_set_data_offset (the smallest is used for EXP, whose
+   partitions all follow one CREATE TABLE). count = 0 / NULL clears it.
+   Without it, a filtered EXPDP parse of a partitioned table reads to the end
+   of the dump rather than stopping at the next table. */
+ODV_API int ODV_CALL odv_set_data_offsets(ODV_SESSION *s, const int64_t *offsets, int count);
 
 /* Set date format for export output.
    fmt: 0=YYYY/MM/DD HH:MI:SS, 1=YYYYMMDD, 2=YYYYMMDDHHMMSS, 3=Custom
@@ -157,6 +223,45 @@ ODV_API int ODV_CALL odv_set_sql_flags(ODV_SESSION *s, uint32_t flags);
 /* Set application version string (displayed in export comments).
    ver: UTF-8 version string e.g. "1.1.0". Pass NULL to clear. */
 ODV_API int ODV_CALL odv_set_app_version(ODV_SESSION *s, const char *ver);
+
+/* The form of the values odv_parse_dump delivers (default ODV_VALUES_PREVIEW).
+   ODV_VALUES_PREVIEW: as shown in the preview — a LOB is its first 4096 bytes
+     (exp: a placeholder such as %CLOB%), a LONG at most 64 KB, and a value
+     that cannot be shown is a placeholder text (%BLOB%, %VARRAY%, ...).
+   ODV_VALUES_EXPORT: as the export writers (odv_export_sql / _csv) take them —
+     LOB / LONG / JSON / VECTOR values whole (up to 512 MiB each). With the
+     length callback (odv_set_row_callback_ex) a value that has no value form
+     is told apart by its length instead of being passed as text:
+       col_lens[i] == -2  no value form: col_values[i] is the placeholder that
+                          the preview shows (NUL-terminated, e.g. "%BLOB%",
+                          "%VARRAY%"), not the value
+       col_lens[i] == -3  the value is longer than 512 MiB and was not kept
+                          (col_values[i] == NULL)
+     (-1 is NULL and 0 an empty value, as always.) The callback without
+     lengths gets the placeholder text as before.
+   Dates are formatted by odv_set_date_format in both modes. */
+#define ODV_VALUES_PREVIEW  0
+#define ODV_VALUES_EXPORT   1
+ODV_API int ODV_CALL odv_set_value_mode(ODV_SESSION *s, int mode);
+
+/* Where the DDL that the dump keeps apart from a table is, for a listed entry
+   (after odv_list_tables; index as in odv_get_table_entry):
+     exp:   the DDL exp writes after the last table (foreign keys, function-based
+            / DESC indexes), the same for every entry of the dump
+     expdp: the master-table rows of the table, its comments and its indexes
+   An opaque ASCII string without spaces; "" when there is none to give. Valid
+   until the session is destroyed, another dump file is set or the list is read
+   again. */
+ODV_API const char * ODV_CALL odv_get_table_ddl_hint(ODV_SESSION *s, int index);
+
+/* Give a single-table export (odv_export_sql with a table filter) or
+   odv_read_table_ddl the hint of that table (odv_get_table_ddl_hint of the
+   same dump): the DDL is then read there instead of from the rest of the dump
+   (exp) / the whole master table (expdp), which takes time proportional to the
+   dump. The output is the same with or without it. A hint that does not fit
+   the dump is ignored (the dump is read as without one). NULL or "" clears it.
+   Kept until set again or another dump file is set. */
+ODV_API int ODV_CALL odv_set_ddl_hint(ODV_SESSION *s, const char *hint);
 
 /*---------------------------------------------------------------------------
     Operations
@@ -187,7 +292,11 @@ ODV_API int ODV_CALL odv_parse_dump(ODV_SESSION *s);
    Common values: ',' (comma), '\t' (tab), ';' (semicolon), '|' (pipe) */
 ODV_API void ODV_CALL odv_set_csv_delimiter(ODV_SESSION *s, char delimiter);
 
-/* Export a specific table to CSV file */
+/* Export a specific table to CSV file (RFC 4180: UTF-8, records end with
+   CRLF, a line break inside a value is kept within the quotes). The header
+   row (and the type row) is written as set by odv_set_csv_options, also for
+   a table or partition without rows. A value that cannot be exported is an
+   empty field, listed in "<output_path>.notes.txt". */
 ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, const char *output_path);
 
 /* Export table(s) to SQL file.
@@ -196,13 +305,31 @@ ODV_API int ODV_CALL odv_export_csv(ODV_SESSION *s, const char *table_name, cons
    Output content is controlled by odv_set_sql_flags(). */
 ODV_API int ODV_CALL odv_export_sql(ODV_SESSION *s, const char *table_name, const char *output_path, int dbms_type);
 
+/* The DDL of one table of an expdp dump, as the SQL export takes it: fires the
+   table callback (odv_set_table_callback) once for the table set with
+   odv_set_table_filter, with
+     col_not_nulls[i]  0 = nullable, 1 = NOT NULL, 2 = NOT NULL only because the
+                       column is in the primary key (the dictionary has no NOT
+                       NULL constraint of its own; a CREATE TABLE writes none)
+     col_defaults[i]   the DEFAULT expression ("" = none)
+     constraints_json  constraints, indexes, comments (type 5) and notes
+                       (type 6) in the form the list gives for an exp table
+     row_count         -1 (rows are not read)
+   The list of an expdp dump does not read these (it reads no TABLE_T of the
+   master table). Use odv_set_data_offset(s) and odv_set_ddl_hint as for the
+   export to make it fast. An exp dump returns ODV_ERROR_UNSUPPORTED: its list
+   already gives the DDL in the table callback. */
+ODV_API int ODV_CALL odv_read_table_ddl(ODV_SESSION *s);
+
 /* Extract LOB column data to individual files.
    schema/table: target table (UTF-8)
    lob_column:   name of the BLOB/CLOB/NCLOB column to extract
    output_dir:   directory to write LOB files to
    filename_col: column whose value is used as filename (NULL=sequential numbering)
    extension:    file extension (NULL="lob")
-   data_offset:  DDL offset for fast seek (0=scan from beginning) */
+   data_offset:  DDL offset for fast seek (0=scan from beginning)
+   Returns ODV_ERROR when the table was found but has no LOB column of that
+   name (nothing could be extracted). */
 ODV_API int ODV_CALL odv_extract_lob(
     ODV_SESSION *s,
     const char *schema, const char *table,
@@ -214,6 +341,11 @@ ODV_API int ODV_CALL odv_extract_lob(
 
 /* Get number of LOB files written by the last odv_extract_lob call */
 ODV_API int64_t ODV_CALL odv_get_lob_files_written(ODV_SESSION *s);
+
+/* Get number of LOB rows the last odv_extract_lob call could not write to a
+   file (e.g. fopen/fwrite failure, or a filename that could not be made safe).
+   Non-zero means the extraction was incomplete even if the call returned OK. */
+ODV_API int64_t ODV_CALL odv_get_lob_files_failed(ODV_SESSION *s);
 
 /* Request cancellation of a running operation */
 ODV_API int ODV_CALL odv_cancel(ODV_SESSION *s);

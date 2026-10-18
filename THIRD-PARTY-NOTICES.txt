@@ -430,7 +430,21 @@ Corporation and is subject to the OTN license terms.
 
 ------------------------------------------------------------------------------
 
-[7] 商標 / Trademarks
+[7] IANA Time Zone Database (tzdata)
+
+解析エンジン (Open_DumpParser.dll) は、TIMESTAMP WITH TIME ZONE の地域の値を現地時刻に
+直すため、IANA Time Zone Database から生成した時差の表 (odv_tzdata.c) を含みます。
+tzdata はパブリックドメインです。
+
+The parsing engine (Open_DumpParser.dll) contains UTC offset tables generated
+from the IANA Time Zone Database (odv_tzdata.c) to show TIMESTAMP WITH TIME ZONE
+region values in local time. The tz database is in the public domain.
+
+      https://www.iana.org/time-zones
+
+------------------------------------------------------------------------------
+
+[8] 商標 / Trademarks
 
 Oracle および Oracle DataPump は Oracle Corporation の商標です。
 Windows および Microsoft は Microsoft Corporation の商標です。

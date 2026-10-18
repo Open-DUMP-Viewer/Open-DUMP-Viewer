@@ -103,12 +103,18 @@
     <ClCompile Include="odv_xml.c" />
     <ClCompile Include="odv_csv.c" />
     <ClCompile Include="odv_sql.c" />
+    <ClCompile Include="odv_tz.c" />
+    <ClCompile Include="odv_tzdata.c" />
+    <ClCompile Include="odv_ja16.c" />
+    <ClCompile Include="odv_ja16map.c" />
   </ItemGroup>
 
   <!-- Header Files -->
   <ItemGroup>
     <ClInclude Include="odv_api.h" />
     <ClInclude Include="odv_types.h" />
+    <ClInclude Include="odv_tzdata.h" />
+    <ClInclude Include="odv_ja16map.h" />
     <ClInclude Include="unistd.h" />
   </ItemGroup>
 

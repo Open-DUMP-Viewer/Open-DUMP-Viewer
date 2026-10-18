@@ -134,6 +134,7 @@ Public Class LobExtractDialog
 
         ' ExportProgressDialogで実行
         Dim extractedCount As Long = 0
+        Dim failedCount As Long = 0
         Dim outputDir = txtOutputDir.Text
 
         Using progress As New ExportProgressDialog()
@@ -150,7 +151,8 @@ Public Class LobExtractDialog
                             End If
                             worker.ReportProgress(pct,
                                 New ExportProgressDialog.ProgressInfo(tbl, rows, 0))
-                        End Sub)
+                        End Sub,
+                        failedCount)
 
                     If filesWritten < 0 Then
                         Throw New Exception(Loc.S("LobExtract_ExtractError"))
@@ -159,8 +161,15 @@ Public Class LobExtractDialog
                 End Sub)
 
             If result Then
-                MessageBox.Show(Loc.SF("LobExtract_ExtractComplete", extractedCount),
-                               Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                If failedCount > 0 Then
+                    ' 一部の行が書き出せなかった (ファイル名が安全化できない・書き込み失敗)。
+                    ' 出力先フォルダの外には書き出していない (H-07)
+                    MessageBox.Show(Loc.SF("LobExtract_ExtractCompleteWithFailures", extractedCount, failedCount),
+                                   Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Else
+                    MessageBox.Show(Loc.SF("LobExtract_ExtractComplete", extractedCount),
+                                   Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                End If
             End If
         End Using
     End Sub

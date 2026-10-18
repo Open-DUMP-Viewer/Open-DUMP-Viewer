@@ -253,6 +253,14 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="Analyze_ParseError" xml:space="preserve"><value>ダンプファイル解析中にエラーが発生しました: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>テーブル一覧取得中にエラーが発生しました: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>テーブル解析中にエラーが発生しました: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>このダンプファイルは途中で切れています（ファイルの終わりが欠けています）。
+
+表示・出力される表と行は、切れた位置までに読み取れた分だけです。切れた位置より後ろの表と行は含まれず、最後に読み取った表は行が欠けている可能性があります。
+
+転送やコピーの中断、ディスク容量の不足、エクスポート自体の失敗などが考えられます。元のダンプファイルを確認してください。</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>このダンプは複数のファイルに分割されていますが（FILESIZE などを指定したエクスポート）、続きのファイルが見つかりません。
+
+表示・出力される表と行は、見つかったファイルに含まれる分だけです。続きのファイル（…_02.dmp など）を同じフォルダに置いてから、1 本目のファイルを開き直してください。</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>ファイルパスが指定されていません。</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>ファイルが見つかりません: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>ファイルは.dmp形式である必要があります。</value></data>
@@ -415,6 +423,9 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="LobExtract_BrowseTitle" xml:space="preserve"><value>LOBファイルの出力先を選択</value></data>
   <data name="LobExtract_ExtractComplete" xml:space="preserve"><value>LOBファイルの抽出が完了しました。
 出力ファイル数: {0}</value></data>
+  <data name="LobExtract_ExtractCompleteWithFailures" xml:space="preserve"><value>LOBファイルの抽出が完了しました。
+出力ファイル数: {0}
+書き出せなかった行数: {1} (ファイル名に使えない値や書き込み失敗のため)</value></data>
   <data name="LobExtract_ExtractError" xml:space="preserve"><value>LOB抽出処理でエラーが発生しました</value></data>
   <data name="LobExtract_SelectLobColumn" xml:space="preserve"><value>LOBカラムを選択してください。</value></data>
   <data name="LobExtract_SelectOutputFolder" xml:space="preserve"><value>出力フォルダを指定してください。</value></data>

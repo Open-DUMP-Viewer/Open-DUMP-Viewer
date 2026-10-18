@@ -1,0 +1,57 @@
+-- AL32UTF8 -> JA16 系の逆変換の端 (表せない文字・不正な UTF-8・TILDE の ～ / 〜)。
+-- 結果は ja16_selftest.c の EDGE_REV に埋め込んだ (2026-10、11.2 / 21c / 23.26 で同じ結果)
+set pagesize 0 linesize 200 feedback off heading off
+select 'SJIS 1F600='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS 00E9='||rawtohex(utl_raw.convert(hextoraw('C3A9'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS FFFD='||rawtohex(utl_raw.convert(hextoraw('EFBFBD'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS FF61='||rawtohex(utl_raw.convert(hextoraw('EFBDA1'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS 005C='||rawtohex(utl_raw.convert(hextoraw('5C7E'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS 00A5='||rawtohex(utl_raw.convert(hextoraw('C2A5'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS E000='||rawtohex(utl_raw.convert(hextoraw('EE8080'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS badutf8='||rawtohex(utl_raw.convert(hextoraw('41FF42'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC 1F600='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC 00E9='||rawtohex(utl_raw.convert(hextoraw('C3A9'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC FFFD='||rawtohex(utl_raw.convert(hextoraw('EFBFBD'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC FF61='||rawtohex(utl_raw.convert(hextoraw('EFBDA1'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC 4E02='||rawtohex(utl_raw.convert(hextoraw('E4B882'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC 6C49='||rawtohex(utl_raw.convert(hextoraw('E6B189'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'EUC 20AC='||rawtohex(utl_raw.convert(hextoraw('E282AC'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS 20AC='||rawtohex(utl_raw.convert(hextoraw('E282AC'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'SJIS 6C49='||rawtohex(utl_raw.convert(hextoraw('E6B189'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJIS FF5E='||rawtohex(utl_raw.convert(hextoraw('EFBD9E'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISTILDE 301C='||rawtohex(utl_raw.convert(hextoraw('E3809C'),'AMERICAN_AMERICA.JA16SJISTILDE','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUC FF5E='||rawtohex(utl_raw.convert(hextoraw('EFBD9E'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCTILDE 301C='||rawtohex(utl_raw.convert(hextoraw('E3809C'),'AMERICAN_AMERICA.JA16EUCTILDE','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISTILDE 1F600='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16SJISTILDE','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCTILDE 1F600='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16EUCTILDE','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUC badutf8='||rawtohex(utl_raw.convert(hextoraw('41FF42'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUC trunc='||rawtohex(utl_raw.convert(hextoraw('41E381'),'AMERICAN_AMERICA.JA16EUC','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJIS trunc='||rawtohex(utl_raw.convert(hextoraw('41E381'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJIS cesu='||rawtohex(utl_raw.convert(hextoraw('EDA0BDEDB880'),'AMERICAN_AMERICA.JA16SJIS','AMERICAN_AMERICA.AL32UTF8')) from dual;
+-- JA16SJISYEN / JA16EUCYEN (2026-10、21c / 23.26 で同じ結果。11.2 XE はこの文字セットを持たない)
+select 'JA16SJISYEN F09F9880='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN EFBFBD='||rawtohex(utl_raw.convert(hextoraw('EFBFBD'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN C2A5='||rawtohex(utl_raw.convert(hextoraw('C2A5'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN 5C='||rawtohex(utl_raw.convert(hextoraw('5C'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN 7E='||rawtohex(utl_raw.convert(hextoraw('7E'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN E280BE='||rawtohex(utl_raw.convert(hextoraw('E280BE'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN 41FF42='||rawtohex(utl_raw.convert(hextoraw('41FF42'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN 41E381='||rawtohex(utl_raw.convert(hextoraw('41E381'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN E28496='||rawtohex(utl_raw.convert(hextoraw('E28496'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN E285A0='||rawtohex(utl_raw.convert(hextoraw('E285A0'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN EFBFA2='||rawtohex(utl_raw.convert(hextoraw('EFBFA2'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN C3A9='||rawtohex(utl_raw.convert(hextoraw('C3A9'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN EFBD9E='||rawtohex(utl_raw.convert(hextoraw('EFBD9E'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16SJISYEN E3809C='||rawtohex(utl_raw.convert(hextoraw('E3809C'),'AMERICAN_AMERICA.JA16SJISYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN F09F9880='||rawtohex(utl_raw.convert(hextoraw('F09F9880'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN EFBFBD='||rawtohex(utl_raw.convert(hextoraw('EFBFBD'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN C2A5='||rawtohex(utl_raw.convert(hextoraw('C2A5'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN 5C='||rawtohex(utl_raw.convert(hextoraw('5C'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN 7E='||rawtohex(utl_raw.convert(hextoraw('7E'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN E280BE='||rawtohex(utl_raw.convert(hextoraw('E280BE'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN 41FF42='||rawtohex(utl_raw.convert(hextoraw('41FF42'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN 41E381='||rawtohex(utl_raw.convert(hextoraw('41E381'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN E285A0='||rawtohex(utl_raw.convert(hextoraw('E285A0'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN C3A9='||rawtohex(utl_raw.convert(hextoraw('C3A9'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN EFBD9E='||rawtohex(utl_raw.convert(hextoraw('EFBD9E'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;
+select 'JA16EUCYEN E3809C='||rawtohex(utl_raw.convert(hextoraw('E3809C'),'AMERICAN_AMERICA.JA16EUCYEN','AMERICAN_AMERICA.AL32UTF8')) from dual;

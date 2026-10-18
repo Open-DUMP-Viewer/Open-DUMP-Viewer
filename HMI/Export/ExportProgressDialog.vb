@@ -82,6 +82,9 @@ Public Class ExportProgressDialog
         _cancelled = False
         _hasReceivedProgress = False
 
+        ' 以前の操作の取り残しは捨て、このエクスポート中に記録された警告だけを後で出す (M-21)
+        Open_NativeParser.TakeAnyDumpWarning()
+
         AddHandler _worker.DoWork, Sub(s, e)
                                        exportAction(DirectCast(s, System.ComponentModel.BackgroundWorker), e)
                                    End Sub
@@ -102,9 +105,17 @@ Public Class ExportProgressDialog
         _elapsedTimer.Stop()
 
         If _exportError IsNot Nothing Then
+            Open_NativeParser.TakeAnyDumpWarning()
             MessageBox.Show(Loc.SF("ExportProgress_ExportError", _exportError.Message), Loc.S("Title_Error"),
                            MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return False
+        End If
+
+        ' 読み取ったダンプが途中で切れていた (分割の続きが無かった) ときは、出力は読めた分だけなので
+        ' 完了の表示の前に知らせる (M-21)。CSV / SQL / Excel / LOB 抽出など、DLL で読み直す出力すべてが通る
+        Dim dumpWarning = Open_NativeParser.TakeAnyDumpWarning()
+        If dumpWarning IsNot Nothing AndAlso Not _cancelled Then
+            MessageBox.Show(dumpWarning, Loc.S("Title_Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
         End If
 
         Return Not _cancelled

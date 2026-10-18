@@ -253,6 +253,14 @@ https://www.odv.dev/
   <data name="Analyze_ParseError" xml:space="preserve"><value>转储文件分析时发生错误: {0}</value></data>
   <data name="Analyze_TableListError" xml:space="preserve"><value>获取表列表时发生错误: {0}</value></data>
   <data name="Analyze_TableError" xml:space="preserve"><value>表分析时发生错误: {0}</value></data>
+  <data name="Dump_TruncatedWarning" xml:space="preserve"><value>此转储文件不完整（文件末尾缺失）。
+
+显示或导出的表和行仅为文件中断位置之前能够读取的部分。中断位置之后的表和行未包含在内，最后读取的表可能缺少部分行。
+
+可能的原因包括传输或复制中断、磁盘空间不足或导出本身失败。请检查原始转储文件。</value></data>
+  <data name="Dump_VolumeMissingWarning" xml:space="preserve"><value>此转储被拆分为多个文件（使用 FILESIZE 等选项导出），但找不到后续文件。
+
+显示或导出的表和行仅为已找到的文件中包含的部分。请将其余文件（…_02.dmp 等）放在同一文件夹中，然后重新打开第一个文件。</value></data>
   <data name="Analyze_FilePathEmpty" xml:space="preserve"><value>未指定文件路径。</value></data>
   <data name="Analyze_FileNotFound" xml:space="preserve"><value>未找到文件: {0}</value></data>
   <data name="Analyze_InvalidFormat" xml:space="preserve"><value>文件必须为 .dmp 格式。</value></data>

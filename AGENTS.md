@@ -42,10 +42,21 @@ Open_DumpParser.dll (C ネイティブ, x64)
 ### コールバック方式
 
 ```
-ODV_ROW_CALLBACK(schema, table, col_count, col_names[], col_values[], user_data)
-  → P/Invoke経由で VB.NET の OnRowCallback に到達
+ODV_ROW_CALLBACK_EX(schema, table, col_count, col_names[], col_values[], col_lens[], user_data)
+  → P/Invoke経由で VB.NET の OnRowCallback に到達 (odv_set_row_callback_ex)
   → Dictionary(Of String, Object) として行データを蓄積
 ```
+
+- **値は長さで読む**。`col_lens[i]` が値のバイト長で、値は 0x00 を含みうる。`-1` が NULL、`0` は NULL でない空。
+  NUL 終端で読む旧形式 `ODV_ROW_CALLBACK`（`odv_set_row_callback`）は互換のためだけに残してあり、0x00 の位置で
+  値が切れ、NULL と先頭が 0x00 の値を区別できない（M-22）。製品と DLL 内の CSV / SQL 出力は長さ付きだけを使う
+- **セッションは互いに独立**。別々のセッションを別スレッドで同時に使ってよい（表名・列名の変換結果もセッションごと。
+  かつての static な共有キャッシュは、並行解析で別のダンプ・別の表の名前を行に付けた: M-25）。1 つのセッションを
+  2 つのスレッドで同時に使ってはならない。DLL に static / グローバルな可変状態を足さないこと
+- 行コールバックの schema / table / col_names のポインタは、前の行と別の表の行では必ず変わる（VB の `TableKey` は
+  ポインタで表の切り替えを見ている）
+- P/Invoke に渡したデリゲートは、DLL が呼び返す間 `GC.KeepAlive` などで生かしておく（ローカル変数に置くだけでは
+  解析中に回収され、プロセスごと落ちる）
 
 ## Project Structure
 
@@ -85,10 +96,16 @@ Open DUMP Viewer for Oracle database/
 │     ├─ odv_record.c                      # レコードバッファ管理
 │     ├─ odv_number.c                      # Oracle NUMBER デコード
 │     ├─ odv_datetime.c                    # DATE/TIMESTAMP デコード
+│     ├─ odv_tz.c                          # TIMESTAMP WITH (LOCAL) TIME ZONE の表示・SQL
+│     ├─ odv_tzdata.c / odv_tzdata.h       # 地域 ID・時差の表（生成物。tools/tzdata）
 │     ├─ odv_charset.c                     # 文字セット変換
+│     ├─ odv_ja16.c                        # JA16SJIS/JA16EUC(+TILDE/YEN) の変換（Oracle の対応表）
+│     ├─ odv_ja16map.c / odv_ja16map.h     # JA16 系の対応表（生成物。tools/ja16map）
 │     ├─ odv_xml.c                         # XMLパーサ（EXPDP用）
 │     ├─ odv_csv.c                         # CSV出力
 │     ├─ odv_sql.c                         # SQL INSERT文生成
+│     ├─ tools/tzdata/                     # tzdata から odv_tzdata.c を作る生成スクリプト
+│     ├─ tools/ja16map/                    # Oracle の変換結果から odv_ja16map.c を作る生成スクリプト
 │     └─ _build.cmd                        # MSVCビルドスクリプト
 ├─ installer/                              # Inno Setup インストーラー
 │  ├─ setup.iss                            # Inno Setup スクリプト（10言語対応）
@@ -144,6 +161,59 @@ dotnet build "Open DUMP Viewer.vbproj" -p:EnableWindowsTargeting=true
 ```
 
 実行はできない（WinForms のランタイムが Windows にしか無い）。ロジック層の動作を確認したい場合は、対象の `.vb` を `net10.0` のコンソールプロジェクトへ `<Compile Include>` でリンクし、WinForms に触れる箇所（`Application.Exit` など）と `Loc` だけをスタブに差し替えれば、実ソースのまま実行して検証できる。
+
+### 生成した表（C ソース）の作り直し
+
+`odv_tzdata.c` と `odv_ja16map.c` は**生成物で、手で直さない**。C のソース一覧（`Makefile`・`build_dll.bat`・
+`Open_DumpParser.vcxproj`・`build-and-release*.yml` の `SRCS`）には、生成物と `odv_tz.c`・`odv_ja16.c` を含める。
+
+#### タイムゾーン（`odv_tzdata.c`）— tzdata の更新時
+
+TIMESTAMP WITH TIME ZONE の地域の値（`Asia/Tokyo` など）を現地時刻で表示するための表。IANA tzdata
+（パブリックドメイン）から作り、生成物の先頭と `odv_tzdata_version` に tzdata の版を記録する。
+
+```bash
+cd Logics/DumpParser/tools/tzdata
+python3 gen_tzdata.py --zoneinfo /usr/share/zoneinfo --check
+```
+
+- 入力: `<zoneinfo>/tzdata.zi`（版と、旧名のリンク = `L` 行）、`<zoneinfo>/<地域>` の TZif、
+  `oracle_tz_regions.txt`（Oracle の地域 ID と地域名。新しい Oracle の版で地域名が増えたら、その DB で
+  `query_regions.sql` を流して追記する。IANA に同じ名前が無いものは 3 列目に対応先を書き、`query_alias.sql` で確かめる）
+- 容量を抑えるため、時差の変わらない遷移を捨て、TZif 末尾の POSIX 規則で再現できる遷移（多くの地域で
+  2007 年前後以降・2037 年以降）は持たずに規則から計算する
+- `--check` は生成した表を C（`odv_tz.c`）で引いた時差を Python の `zoneinfo` と約 216 万点で照合する（gcc が要る）
+- 表示は「現地時刻 + 時差」（時差で持つ値。例 `+14:00`）か「現地時刻 + 地域名 + その時点の時差」（地域で持つ値。
+  例 `America/New_York -04:00`。夏時間の重なりでも一意に読める）。TIMESTAMP WITH LOCAL TIME ZONE は
+  元 DB の DBTIMEZONE での時刻の後ろに DBTIMEZONE を付ける（例 `+00:00`）
+- 表示は IANA の規則による。Oracle 各版の時差ファイルとは規則改定の反映差で一部の時点が異なる
+  （1970〜2030 年の半年刻みで 11.2 が 2.95%・21c が 0.95%・23.26 が 0.23%）。SQL エクスポートは
+  `FROM_TZ(TO_TIMESTAMP('<UTC>', ...), 'UTC') AT TIME ZONE '<地域>'` と UTC の瞬間で書くので、この差に左右されない
+
+#### JA16 系の文字セット（`odv_ja16map.c`）
+
+JA16SJIS / JA16SJISTILDE / JA16SJISYEN / JA16EUC / JA16EUCTILDE / JA16EUCYEN は Windows のコードページではなく、
+**Oracle 自身の変換結果**から作った表で変換する（CP20932 は JIS X 0212 の 3 バイト文字を扱えず、〜 ～ ￠ ￡ ￢
+などの対応も Oracle と違う。YEN 版では Oracle は 0x5C を ¥ (U+00A5) と読む）。
+表は AL32UTF8 の DB で取れる（2026-10 に取得。YEN 版以外は 11.2 / 21c / 23.26 の 3 版、YEN 版は 21c / 23.26 で
+バイト一致。11.2 XE は YEN 版の文字セットを持たない）。
+
+```bash
+cd Logics/DumpParser/tools/ja16map
+python3 make_queries.py forward JA16EUC > q_JA16EUC.sql                 # 6 文字セットぶん
+sqlplus -S system/...@db @q_JA16EUC.sql > map_JA16EUC.txt
+python3 make_queries.py reverse JA16EUC map_JA16EUC.txt > qrev_JA16EUC.sql
+sqlplus -S system/...@db @qrev_JA16EUC.sql > rev_JA16EUC.txt
+python3 gen_ja16map.py --fwd 'dir/map_{cs}.txt' --rev 'dir/rev_{cs}.txt' --check
+```
+
+- 取得した `map_*.txt` / `rev_*.txt` はリポジトリに入れない（生成した表と取得方法だけを置く）
+- `--check` は生成した表で取得結果の全行（順方向・逆方向、約 15 万件）と、`query_edge.sql` /
+  `query_reverse_edge.sql` で取った端の挙動を `convert_charset()` 経由で再現できることを確かめる
+  （`ODV_CHECK_WINE=1` で Windows 版も）
+- TILDE 版・YEN 版は基の表（JA16SJIS / JA16EUC）との違いだけを持つ。JA16SJISYEN の逆変換は NEC 特殊文字
+  （Ⅰ〜Ⅹ № ℡ ㈱）を IBM 拡張のコード（FAxx）にする点も JA16SJIS と違う
+- 名前に SJIS / EUC を含むがこの 6 つ以外の文字セットは、従来どおり CP932 / CP20932 で変換している
 
 ### バージョンポリシー
 

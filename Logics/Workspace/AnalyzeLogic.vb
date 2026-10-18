@@ -47,6 +47,7 @@ Public Class AnalyzeLogic
                 Next
             Next
             COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_AnalysisComplete", totalTables, $"{totalRows:#,0}", $"{elapsed.TotalSeconds:F1}"))
+            ShowDumpWarning(filePath)
 
             Return result
 
@@ -91,6 +92,8 @@ Public Class AnalyzeLogic
 
             COMMON.ResetProgressBar()
             COMMON.Set_StatusLavel_AutoReset(Loc.SF("Status_TableListComplete", tables.Count, $"{elapsed.TotalSeconds:F1}"))
+            ' 途中で切れたダンプ: 読めた表はそのまま一覧に出し、切れていることはここで知らせる (M-21)
+            ShowDumpWarning(filePath)
 
             Return tables
 
@@ -134,6 +137,8 @@ Public Class AnalyzeLogic
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime
             COMMON.ResetProgressBar()
+            ' この表の途中でダンプが切れていた (M-21)
+            ShowDumpWarning(filePath)
 
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
@@ -166,7 +171,8 @@ Public Class AnalyzeLogic
     Public Shared Async Function AnalyzeTableAsync(filePath As String, schemaName As String, tableName As String,
                                                     Optional dataOffset As Long = 0,
                                                     Optional expectedRowCount As Long = 0,
-                                                    Optional partitionName As String = Nothing) As Task(Of List(Of String()))
+                                                    Optional partitionName As String = Nothing,
+                                                    Optional dataOffsets As Long() = Nothing) As Task(Of List(Of String()))
         Try
             ValidateFilePath(filePath)
 
@@ -186,11 +192,13 @@ Public Class AnalyzeLogic
 
             ' バックグラウンドスレッドで解析実行
             Dim result = Await Task.Run(Function()
-                                            Return Open_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount, partitionName)
+                                            Return Open_NativeParser.ParseDump(filePath, progressAction, schemaName, tableName, dataOffset, expectedRowCount, partitionName, dataOffsets)
                                         End Function)
 
             Dim elapsed As TimeSpan = DateTime.Now - startTime
             COMMON.ResetProgressBar()
+            ' この表の途中でダンプが切れていた (M-21)。Await 後なので UI スレッドで表示する
+            ShowDumpWarning(filePath)
 
             ' 結果からテーブルデータを抽出
             If result.ContainsKey(schemaName) AndAlso result(schemaName).ContainsKey(tableName) Then
@@ -216,6 +224,16 @@ Public Class AnalyzeLogic
             Return New List(Of String())()
         End Try
     End Function
+
+    ''' <summary>
+    ''' 直前の解析で記録された警告 (ダンプが途中で切れている・分割の続きが無い) があれば表示する (M-21)。
+    ''' 表と行は表示したうえで、切り詰められた結果であることを利用者に知らせる
+    ''' </summary>
+    Private Shared Sub ShowDumpWarning(filePath As String)
+        Dim msg = Open_NativeParser.TakeDumpWarning(filePath)
+        If msg Is Nothing Then Return
+        MessageBox.Show(msg, Loc.S("Title_Warning"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
+    End Sub
 
     ''' <summary>
     ''' ファイルパスの妥当性をチェック

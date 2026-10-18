@@ -53,10 +53,19 @@ static int get_charset_from_name(const char *name)
 
     if (strstr(name, "UTF8") || strstr(name, "AL32UTF8"))
         return CHARSET_UTF8;
-    if (strstr(name, "JA16SJIS") || strstr(name, "SJIS"))
-        return CHARSET_SJIS;
-    if (strstr(name, "JA16EUC") || strstr(name, "EUC"))
-        return CHARSET_EUC;
+    /* JA16: the TILDE variants map ~ and the YEN variants 0x5C differently,
+       so tell them apart (M-24).  Other names containing SJIS / EUC keep the
+       Windows code page conversion they had before. */
+    if (strstr(name, "JA16SJISTILDE")) return CHARSET_SJIS_TILDE;
+    if (strstr(name, "JA16SJISYEN"))   return CHARSET_SJIS_YEN;
+    if (strstr(name, "JA16SJIS"))      return CHARSET_SJIS;
+    if (strstr(name, "JA16EUCTILDE"))  return CHARSET_EUC_TILDE;
+    if (strstr(name, "JA16EUCYEN"))    return CHARSET_EUC_YEN;
+    if (strstr(name, "JA16EUC"))       return CHARSET_EUC;
+    if (strstr(name, "SJIS"))
+        return CHARSET_SJIS_CP932;
+    if (strstr(name, "EUC"))
+        return CHARSET_EUC_CP20932;
     if (strstr(name, "AL16UTF16"))
         return CHARSET_UTF16LE;
     if (strstr(name, "US7ASCII"))
@@ -99,7 +108,11 @@ int detect_dump_kind(ODV_SESSION *s)
 
     if (!s || s->dump_path[0] == '\0') return ODV_ERROR_INVALID_ARG;
 
-    fp = fopen(s->dump_path, "rb");
+    /* DBTIMEZONE (for TIMESTAMP WITH LOCAL TIME ZONE): exp reads it below,
+       expdp from each table definition (odv_tz_capture_dbtz_xml) */
+    s->db_timezone[0] = '\0';
+
+    fp = odv_fopen_path(s->dump_path, "rb");   /* UTF-8 path (M-26) */
     if (!fp) {
         snprintf(s->last_error, ODV_MSG_LEN, "Cannot open file: %s", s->dump_path);
         return ODV_ERROR_FOPEN;
@@ -137,6 +150,7 @@ int detect_dump_kind(ODV_SESSION *s)
                     s->dump_charset = CHARSET_US8;
             }
 
+            odv_tz_scan_exp_dbtz(s, fp);
             fclose(fp);
             return ODV_OK;
         }
@@ -231,7 +245,10 @@ int detect_dump_kind(ODV_SESSION *s)
     }
 
     if (found_kgc) {
-        s->dump_type = DUMP_EXPDP_COMPRESS;
+        /* A file cut short before its first table definition has no XML
+           either. Its own header says the master table lies past the end, so
+           it is a truncated dump, read (and reported) as such (M-21). */
+        s->dump_type = odv_expdp_cut_short(s) ? DUMP_EXPDP : DUMP_EXPDP_COMPRESS;
         s->dump_charset = get_charset_from_name(charset_buf);
         if (schema_buf[0])
             odv_strcpy(s->table.schema, schema_buf, ODV_OBJNAME_LEN);

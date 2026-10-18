@@ -98,13 +98,10 @@ int decode_oracle_date(const unsigned char *buf, int len, char *out, int out_siz
         return ODV_ERROR_INVALID_ARG;
     }
 
-    /* Decode year: century and year are both offset by 100 */
-    if (buf[0] >= 100) {
-        yyyy = ((int)buf[0] - 100) * 100 + ((int)buf[1] - 100);
-    } else {
-        /* Negative year (BC dates) */
-        yyyy = -((100 - (int)buf[0]) * 100 + ((int)buf[1] - 100));
-    }
+    /* Decode year: century and year are both excess-100, also for a BC
+       year (-4712 is 53, 88). The BC branch used to add the year byte
+       instead of subtracting it, so -4712 read as -4688 and -101 as -99. */
+    yyyy = ((int)buf[0] - 100) * 100 + ((int)buf[1] - 100);
 
     mm = buf[2];
     dd = buf[3];
@@ -173,12 +170,8 @@ int decode_oracle_timestamp(const unsigned char *buf, int len, char *out, int ou
     if (ts_precision < 0) ts_precision = 6;
     if (ts_precision > 9) ts_precision = 9;
 
-    /* Decode date portion (same as DATE) */
-    if (buf[0] >= 100) {
-        yyyy = ((int)buf[0] - 100) * 100 + ((int)buf[1] - 100);
-    } else {
-        yyyy = -((100 - (int)buf[0]) * 100 + ((int)buf[1] - 100));
-    }
+    /* Decode date portion (same as DATE; excess-100 also for a BC year) */
+    yyyy = ((int)buf[0] - 100) * 100 + ((int)buf[1] - 100);
 
     mm = buf[2];
     dd = buf[3];
