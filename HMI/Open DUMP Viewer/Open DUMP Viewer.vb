@@ -835,7 +835,7 @@ Public Class Open_DUMP_Viewer
                         ElseIf ExportOptions.SqlInferInteger Then
                             ' InferInteger ON: データを読み込んで VB.NET パスで出力
                             Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
                             Dim rows As New List(Of String())
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
@@ -963,7 +963,7 @@ Public Class Open_DUMP_Viewer
                         Else
                             ' Workspace: DLLから再パース
                             Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
                                tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
@@ -1030,7 +1030,7 @@ Public Class Open_DUMP_Viewer
                         Else
                             ' Workspace: DLLから再パース
                             Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
                                tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
@@ -1107,7 +1107,7 @@ Public Class Open_DUMP_Viewer
                         Else
                             ' Workspace: DLLから再パース
                             Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
                                tableData(ctx.Schema).ContainsKey(ctx.TableName) Then
@@ -1182,7 +1182,7 @@ Public Class Open_DUMP_Viewer
                         Else
                             ' Workspace: DLLから再パース
                             Dim tableData = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset)
+                                Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, dataOffsets:=ctx.DataOffsets)
                             If tableData IsNot Nothing AndAlso
                                tableData.ContainsKey(ctx.Schema) AndAlso
                                tableData(ctx.Schema).ContainsKey(ctx.TableName) Then

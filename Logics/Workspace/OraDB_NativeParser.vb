@@ -120,6 +120,21 @@ Public Class Open_NativeParser
     Private Shared Function odv_set_data_offset(session As IntPtr, offset As Long) As Integer
     End Function
 
+    ' 区画表の「表全体」: その表の全エントリの data_offset を渡す (群9)。
+    ' EXPDP は区画をデータ量の順に他の表と混ぜて書くので、1 つの位置からは全区画を読めない
+    <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
+    Private Shared Function odv_set_data_offsets(session As IntPtr, offsets As Long(), count As Integer) As Integer
+    End Function
+
+    ''' <summary>
+    ''' 区画表の「表全体」を開くとき、その表の全エントリの data_offset を DLL に渡す (群9)。
+    ''' Nothing / 空なら何もしない (単一の dataOffset か先頭からの走査)
+    ''' </summary>
+    Private Shared Sub ApplyDataOffsets(session As IntPtr, dataOffsets As Long())
+        If dataOffsets Is Nothing OrElse dataOffsets.Length = 0 Then Return
+        odv_set_data_offsets(session, dataOffsets, dataOffsets.Length)
+    End Sub
+
     ' フィルタ名はUTF-8でDLLに渡す（DLL側でUTF-8→dump charsetに逆変換して比較する）
     ' LPStrだとANSI(=SJIS)に変換されてしまい、DLL側のUTF-8→SJIS変換で文字化けする
     <DllImport(DLL_NAME, CallingConvention:=CallingConvention.StdCall)>
@@ -412,6 +427,11 @@ Public Class Open_NativeParser
         Public Property ParentPartition As String = ""
         ''' <summary>区画表の親行（表全体＝全区画をまとめて開く合成エントリ）か否か (H-14)</summary>
         Public Property IsWholeTable As Boolean = False
+        ''' <summary>
+        ''' 表全体（IsWholeTable）のとき、その表の全エントリ（全区画）の data_offset (群9)。
+        ''' DLL の odv_set_data_offsets に渡し、データの並びで他の表を挟む区画も漏れなく読む
+        ''' </summary>
+        Public Property DataOffsets As Long() = Nothing
 
         ''' <summary>キー文字列 (schema.table)</summary>
         Public ReadOnly Property Key As String
@@ -506,7 +526,8 @@ Public Class Open_NativeParser
                                       Optional filterTable As String = Nothing,
                                       Optional dataOffset As Long = 0,
                                       Optional expectedRowCount As Long = 0,
-                                      Optional filterPartition As String = Nothing) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
+                                      Optional filterPartition As String = Nothing,
+                                      Optional dataOffsets As Long() = Nothing) As Dictionary(Of String, Dictionary(Of String, List(Of String())))
         Dim session As IntPtr = IntPtr.Zero
         Dim ctx As New ParseContext()
         ctx.ProgressAction = progressAction
@@ -556,6 +577,8 @@ Public Class Open_NativeParser
             If dataOffset > 0 Then
                 odv_set_data_offset(session, dataOffset)
             End If
+            ' 区画表の表全体: 全区画の位置 (群9)
+            ApplyDataOffsets(session, dataOffsets)
 
             ' 解析実行
             rc = odv_parse_dump(session)
@@ -659,11 +682,13 @@ Public Class Open_NativeParser
     ''' <param name="outputPath">出力先ファイルパス</param>
     ''' <param name="schema">スキーマ名 (テーブルフィルタ用)</param>
     ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
+    ''' <param name="dataOffsets">区画表の表全体のとき、全エントリの data_offset (群9)</param>
     Public Shared Function ExportCsv(filePath As String, tableName As String, outputPath As String,
                                       Optional schema As String = Nothing,
                                       Optional dataOffset As Long = 0,
                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
-                                      Optional partitionName As String = Nothing) As Integer
+                                      Optional partitionName As String = Nothing,
+                                      Optional dataOffsets As Long() = Nothing) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Dim progCb As ProgressCallback = Nothing
         Dim gcHandle As GCHandle = Nothing
@@ -699,6 +724,8 @@ Public Class Open_NativeParser
             If partitionName IsNot Nothing AndAlso partitionName.Length > 0 Then
                 odv_set_partition_filter(session, partitionName)
             End If
+            ' 区画表の表全体: 全区画の位置 (群9)
+            ApplyDataOffsets(session, dataOffsets)
 
             ' 途中で切れたダンプ: 読めた行までは書き出せているので成功とし、警告を記録する (M-21)
             rc = odv_export_csv(session, tableName, outputPath)
@@ -725,11 +752,13 @@ Public Class Open_NativeParser
     ''' <param name="dbmsType">DBMS種別 (0=Oracle, 4=PostgreSQL, 5=MySQL, 6=SQL Server)</param>
     ''' <param name="schema">スキーマ名 (テーブルフィルタ用)</param>
     ''' <param name="dataOffset">データオフセット (高速シーク用、0=先頭から)</param>
+    ''' <param name="dataOffsets">区画表の表全体のとき、全エントリの data_offset (群9)</param>
     Public Shared Function ExportSql(filePath As String, tableName As String, outputPath As String, dbmsType As Integer,
                                       Optional schema As String = Nothing,
                                       Optional dataOffset As Long = 0,
                                       Optional progressAction As Action(Of Long, String, Integer) = Nothing,
-                                      Optional partitionName As String = Nothing) As Integer
+                                      Optional partitionName As String = Nothing,
+                                      Optional dataOffsets As Long() = Nothing) As Integer
         Dim session As IntPtr = IntPtr.Zero
         Dim progCb As ProgressCallback = Nothing
         Dim gcHandle As GCHandle = Nothing
@@ -765,6 +794,8 @@ Public Class Open_NativeParser
             If partitionName IsNot Nothing AndAlso partitionName.Length > 0 Then
                 odv_set_partition_filter(session, partitionName)
             End If
+            ' 区画表の表全体: 全区画の位置 (群9)
+            ApplyDataOffsets(session, dataOffsets)
 
             ' 途中で切れたダンプ: 読めた行までは書き出せているので成功とし、警告を記録する (M-21)
             rc = odv_export_sql(session, tableName, outputPath, dbmsType)

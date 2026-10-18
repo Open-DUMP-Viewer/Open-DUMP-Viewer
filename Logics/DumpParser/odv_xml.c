@@ -108,7 +108,8 @@ static int xml_unescape(char *s, int len)
       </ROWSET>
  ---------------------------------------------------------------------------*/
 
-int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
+static int parse_xml_core(const char *xml, int xml_len, xml_tag_callback cb,
+                          xml_event_callback ecb, void *ctx)
 {
     int i = 0;
     int depth = 0;
@@ -119,7 +120,7 @@ int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
     int value_len;
     int in_value;
 
-    if (!xml || xml_len <= 0 || !cb) return ODV_ERROR_INVALID_ARG;
+    if (!xml || xml_len <= 0 || (!cb && !ecb)) return ODV_ERROR_INVALID_ARG;
 
     value_buf = (char *)malloc(XML_MAX_VALUE_LEN);
     if (!value_buf) return ODV_ERROR_MALLOC;
@@ -204,7 +205,8 @@ int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
                 value_len = 0;
                 in_value = 1;
                 depth++;
-                cb(tag, "", depth, ctx);
+                if (ecb) ecb(XML_EV_OPEN, tag, "", depth, ctx);
+                else     cb(tag, "", depth, ctx);
 
             } else if (tag_type == 2) {
                 /* Closing tag: deliver the unescaped, untrimmed value, or ""
@@ -217,7 +219,8 @@ int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
                     }
                     if (blank) value_buf[0] = '\0';
                     else xml_unescape(value_buf, value_len);
-                    cb(tag, value_buf, depth, ctx);
+                    if (ecb) ecb(XML_EV_CLOSE, tag, value_buf, depth, ctx);
+                    else     cb(tag, value_buf, depth, ctx);
                 }
                 depth--;
                 if (depth < 0) depth = 0;
@@ -227,7 +230,8 @@ int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
             } else {
                 /* Self-closing */
                 depth++;
-                cb(tag, "", depth, ctx);
+                if (ecb) ecb(XML_EV_EMPTY, tag, "", depth, ctx);
+                else     cb(tag, "", depth, ctx);
                 depth--;
                 if (depth < 0) depth = 0;
             }
@@ -243,4 +247,22 @@ int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
 
     free(value_buf);
     return ODV_OK;
+}
+
+int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx)
+{
+    return parse_xml_core(xml, xml_len, cb, NULL, ctx);
+}
+
+/*---------------------------------------------------------------------------
+    parse_xml_events
+
+    Same parser, but the callback is told what each event is (XML_EV_OPEN /
+    XML_EV_CLOSE / XML_EV_EMPTY for a self-closing tag), so a caller that
+    needs the element nesting (the TABLE_T document of the master table,
+    M-02) does not have to guess it from empty values.
+ ---------------------------------------------------------------------------*/
+int parse_xml_events(const char *xml, int xml_len, xml_event_callback cb, void *ctx)
+{
+    return parse_xml_core(xml, xml_len, NULL, cb, ctx);
 }

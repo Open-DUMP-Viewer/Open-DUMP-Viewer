@@ -225,7 +225,7 @@ Public Class BulkExportLogic
     ''' </summary>
     Private Shared Function LoadTableData(ctx As ExportHelper.TableExportContext) As List(Of String())
         Dim result = Open_NativeParser.ParseDump(ctx.DumpFilePath,
-            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, ctx.RowCount, ctx.Partition)
+            Nothing, ctx.Schema, ctx.TableName, ctx.DataOffset, ctx.RowCount, ctx.Partition, ctx.DataOffsets)
 
         If result IsNot Nothing AndAlso
            result.ContainsKey(ctx.Schema) AndAlso

@@ -228,7 +228,8 @@ Public Class Workspace
             Dim partitionName As String = entry.PartitionName
 
             ' フェーズ2: 選択テーブルのみ非同期解析（UIスレッドをブロックしない）
-            Dim tableData = Await AnalyzeLogic.AnalyzeTableAsync(DumpFilePath, _currentSchema, tableName, dataOffset, expectedRowCount, partitionName)
+            ' 区画表の表全体（親行）は全区画の位置を渡す (群9)
+            Dim tableData = Await AnalyzeLogic.AnalyzeTableAsync(DumpFilePath, _currentSchema, tableName, dataOffset, expectedRowCount, partitionName, entry.DataOffsets)
 
             ' 列名を取得（Phase1のListTablesで取得済みのキャッシュから）
             Dim columnNames As New List(Of String)
@@ -519,6 +520,8 @@ Public Class Workspace
         ctx.DataOffset = entry.DataOffset
         ' 親行（表全体）は PartitionName="" → 全区画。子の区画行はその区画名 → 1 区画だけ (H-14)
         ctx.Partition = entry.PartitionName
+        ' 親行は全区画の位置も渡す (群9)。子の区画行は Nothing
+        ctx.DataOffsets = entry.DataOffsets
 
         If _columnNamesMap.ContainsKey(tableKey) Then ctx.ColumnNames = _columnNamesMap(tableKey)
         If _columnTypesMap.ContainsKey(tableKey) Then ctx.ColumnTypes = _columnTypesMap(tableKey)
@@ -565,6 +568,10 @@ Public Class Workspace
                     Sum(Function(e) e.RowCount)
                 ctx.DataOffset = 0
                 ctx.Partition = ""
+                ' 全区画の位置 (群9): データの並びで他の表を挟む区画も読む
+                ctx.DataOffsets = _tableList(_currentSchema).
+                    Where(Function(e) e.Key = tableKey).
+                    Select(Function(e) e.DataOffset).ToArray()
             Else
                 ctx.RowCount = tableInfo.RowCount
                 ctx.DataOffset = tableInfo.DataOffset
@@ -778,7 +785,8 @@ Public Class Workspace
                         .EntryType = Open_NativeParser.TABLE_TYPE_PARTITION_TABLE,
                         .PartitionName = "",
                         .ParentPartition = "",
-                        .IsWholeTable = True
+                        .IsWholeTable = True,
+                        .DataOffsets = group.Select(Function(e) e.DataOffset).ToArray()
                     }
 
                     Dim parentItem As New ListViewItem(groupName)

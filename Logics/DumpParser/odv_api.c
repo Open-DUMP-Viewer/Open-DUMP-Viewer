@@ -192,6 +192,8 @@ ODV_API int ODV_CALL odv_destroy_session(ODV_SESSION *session)
     session->tl_next = NULL;
     free(session->partition_list);
     session->partition_list = NULL;
+    free(session->seek_list);
+    session->seek_list = NULL;
 
     /* Free LOB buffer if allocated */
     if (session->state.lob_buf) {
@@ -473,6 +475,51 @@ ODV_API int ODV_CALL odv_set_data_offset(ODV_SESSION *s, int64_t offset)
 {
     if (!s) return ODV_ERROR_INVALID_ARG;
     s->seek_offset = offset;
+    return ODV_OK;
+}
+
+static int cmp_i64(const void *a, const void *b)
+{
+    int64_t x = *(const int64_t *)a, y = *(const int64_t *)b;
+    return (x > y) - (x < y);
+}
+
+/*---------------------------------------------------------------------------
+    odv_set_data_offsets
+
+    The whole of a partitioned table: every data_offset of its entries (from
+    the table callbacks / odv_get_table_entry), so that a filtered parse reads
+    each entry where it is instead of the one entry odv_set_data_offset names.
+    EXPDP writes a table's partitions wherever their data fell (ordered by
+    size, other tables in between), so neither one offset nor a scan that stops
+    at the next table finds all of them.  The offsets are kept ascending and
+    distinct (file order: the rows come out as a full parse gives them);
+    0 / negative ones are dropped.  The smallest also becomes the single
+    seek_offset, which is what an EXP dump needs (its partitions follow the
+    one CREATE TABLE they all share).  count <= 0 or NULL clears the list.
+ ---------------------------------------------------------------------------*/
+ODV_API int ODV_CALL odv_set_data_offsets(ODV_SESSION *s, const int64_t *offsets, int count)
+{
+    int i, n = 0;
+    int64_t *v;
+
+    if (!s) return ODV_ERROR_INVALID_ARG;
+    free(s->seek_list);
+    s->seek_list = NULL;
+    s->seek_list_count = 0;
+    if (!offsets || count <= 0) return ODV_OK;
+
+    v = (int64_t *)malloc((size_t)count * sizeof(int64_t));
+    if (!v) return ODV_ERROR_MALLOC;
+    for (i = 0; i < count; i++)
+        if (offsets[i] > 0) v[n++] = offsets[i];
+    if (n == 0) { free(v); return ODV_OK; }
+    qsort(v, (size_t)n, sizeof(int64_t), cmp_i64);
+    for (i = 1, count = 1; i < n; i++)
+        if (v[i] != v[count - 1]) v[count++] = v[i];
+    s->seek_list = v;
+    s->seek_list_count = count;
+    s->seek_offset = v[0];
     return ODV_OK;
 }
 
@@ -824,6 +871,43 @@ static int vf_tail_state(const ODV_VFILE *vf, const ODV_SESSION *s)
     if (s->dump_type == DUMP_EXPDP)
         return expdp_tail_state(sg->path, sg->skip + sg->avail);
     return ODV_TAIL_COMPLETE;
+}
+
+/* Where the master table's definition block is in one expdp file, by the
+   same header / 23ai-trailer fields as expdp_tail_state: the byte offset of
+   the block whose +2 holds its "<?xml" (block number mstart, measured on
+   11.2 / 21c / 23ai), or -1 when the file does not say or that block is not
+   a table definition (a volume without the master). */
+int64_t odv_expdp_master_offset(const char *path)
+{
+    unsigned char h[ODV_DUMP_BLOCK_LEN], t[ODV_DUMP_BLOCK_LEN];
+    FILE *fp;
+    int64_t size, at = -1;
+    uint64_t bs, mstart;
+
+    size = vf_filesize(path);
+    if (size < 2 * ODV_DUMP_BLOCK_LEN) return -1;
+    fp = odv_fopen_path(path, "rb");
+    if (!fp) return -1;
+    if (vf_pread(fp, 0, h, (int)sizeof(h)) == (int)sizeof(h)) {
+        bs = vf_be(h + 0x23, 4);
+        if (bs < 512 || bs > (1u << 20) || (bs & (bs - 1)) != 0)
+            bs = ODV_DUMP_BLOCK_LEN;
+        mstart = vf_be(h + 0x36, 4);
+        if (mstart == 0 && (h[0x32] & 0x40) && size >= (int64_t)(2 * bs) &&
+            vf_pread(fp, size - (int64_t)bs, t, (int)sizeof(t)) == (int)sizeof(t) &&
+            t[0] == h[0] && t[1] == h[1] && memcmp(t + 6, h + 6, 28) == 0 &&
+            (t[0x32] & 0x80))
+            mstart = vf_be(t + 0x36, 4);       /* 23ai: from the trailer */
+        if (mstart > 0 && mstart * bs + 8 <= (uint64_t)size) {
+            unsigned char x[5];
+            if (vf_pread(fp, (int64_t)(mstart * bs) + 2, x, 5) == 5 &&
+                memcmp(x, "<?xml", 5) == 0)
+                at = (int64_t)(mstart * bs);
+        }
+    }
+    fclose(fp);
+    return at;
 }
 
 int odv_expdp_cut_short(ODV_SESSION *s)

@@ -397,6 +397,8 @@ Public Module ExportHelper
         Public Property DataOffset As Long
         ''' <summary>区画名フィルタ。空なら表全体（全区画）。区画を 1 つだけ出す子行用 (H-14)</summary>
         Public Property Partition As String = ""
+        ''' <summary>区画表の表全体のとき、その表の全エントリの data_offset (群9)。Nothing なら DataOffset を使う</summary>
+        Public Property DataOffsets As Long() = Nothing
     End Class
 
     ''' <summary>

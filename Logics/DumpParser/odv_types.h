@@ -116,8 +116,12 @@
 #define COL_BIN_DOUBLE        25
 #define COL_BFILE             30
 #define COL_XMLTYPE           40
+#define COL_JSON              41   /* EXPDP: native JSON (OSON), 21c+ */
+#define COL_VECTOR            42   /* EXPDP: VECTOR, 23ai */
+#define COL_BOOLEAN           43   /* EXPDP: BOOLEAN, 23ai */
 #define COL_ROWID             80
 #define COL_USER_DEFINE       90
+#define COL_VARRAY            91   /* EXPDP: VARRAY (collection image) */
 
 /* EXP export modes */
 #define EXP_MODE_TABLE         0
@@ -495,6 +499,21 @@ typedef struct {
 
     /* 2-byte length buffer (reused for column and LOB lengths) */
     unsigned char len_buf[2];
+
+    /* EXPDP row pieces (M-11 / M-36 / M-42): the COL_* type of each row-data
+     * stream position (parallel to non_lob_map), whether the column being read
+     * continues into the next piece (N flag), the 0-based piece number within
+     * the row, the display index of the LOB-extraction target column, and the
+     * master-table collector (odv_expdp.c; NULL outside the master table). */
+    int     map_type[ODV_MAX_COLUMNS];
+    int     col_open;
+    int     piece_no;
+    int     lob_target_abs;
+    void   *master;
+    /* The unload method of the table being read, from the master table's
+     * TABLE_DATA.UNLOAD_METHOD: 1 = direct path, 2 = external table (its
+     * LONG is UTF-16BE), 0 = not known (odv_expdp.c). */
+    int     expdp_method;
 } ODV_PARSE_STATE;
 
 /* EXP parse state */
@@ -604,6 +623,11 @@ struct _odv_session {
     int             filter_active;   /* 0=no filter, 1=filter active */
     int             pass_flg;        /* 1=skip current table's records */
     int64_t         seek_offset;     /* If >0, seek here after header to skip DDL scan */
+    /* Every data_offset of the filtered table's entries (odv_set_data_offsets):
+       ascending, distinct, > 0; NULL / 0 = not set. A filtered parse reads the
+       entry at each of them in turn (EXPDP: the whole partitioned table). */
+    int64_t        *seek_list;
+    int             seek_list_count;
 
     /* Control */
     int             cancelled;
@@ -744,6 +768,10 @@ FILE   *odv_fopen_path(const char *path, const char *mode);
  * when no table definition is found in it (odv_api.c, M-21). */
 int     odv_expdp_cut_short(ODV_SESSION *s);
 
+/* Byte offset of the master table's definition block in one expdp file, from
+ * its header (23ai: trailer); -1 when the file does not hold it (odv_api.c). */
+int64_t odv_expdp_master_offset(const char *path);
+
 /* odv_number.c */
 int decode_oracle_number(const unsigned char *buf, int len, char *out, int out_size);
 int decode_oracle_rowid(const unsigned char *buf, int len, int is_urowid, char *out, int out_size);
@@ -783,6 +811,11 @@ int odv_utf8_to_ja16(const unsigned char *src, int src_len, int cs,
 /* odv_xml.c */
 typedef void (*xml_tag_callback)(const char *tag, const char *value, int depth, void *ctx);
 int parse_xml_ddl(const char *xml, int xml_len, xml_tag_callback cb, void *ctx);
+#define XML_EV_OPEN   1
+#define XML_EV_CLOSE  2
+#define XML_EV_EMPTY  3   /* self-closing <TAG/> */
+typedef void (*xml_event_callback)(int kind, const char *tag, const char *value, int depth, void *ctx);
+int parse_xml_events(const char *xml, int xml_len, xml_event_callback cb, void *ctx);
 
 /* odv_csv.c */
 int write_csv_file(ODV_SESSION *s, const char *table_name, const char *output_path);

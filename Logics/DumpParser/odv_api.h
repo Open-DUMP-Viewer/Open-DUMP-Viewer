@@ -157,6 +157,16 @@ ODV_API int ODV_CALL odv_set_table_filter(ODV_SESSION *s, const char *schema, co
    Set to 0 to disable (default: scan from beginning). */
 ODV_API int ODV_CALL odv_set_data_offset(ODV_SESSION *s, int64_t offset);
 
+/* Open the whole of a partitioned table: pass the data_offset of every one of
+   its entries (with odv_set_table_filter, and no partition filter). The parse
+   reads the entry at each offset in file order, so all partitions are read
+   however the dump interleaves them with other tables (EXPDP). Replaces the
+   single offset of odv_set_data_offset (the smallest is used for EXP, whose
+   partitions all follow one CREATE TABLE). count = 0 / NULL clears it.
+   Without it, a filtered EXPDP parse of a partitioned table reads to the end
+   of the dump rather than stopping at the next table. */
+ODV_API int ODV_CALL odv_set_data_offsets(ODV_SESSION *s, const int64_t *offsets, int count);
+
 /* Set date format for export output.
    fmt: 0=YYYY/MM/DD HH:MI:SS, 1=YYYYMMDD, 2=YYYYMMDDHHMMSS, 3=Custom
    custom_fmt: format string for fmt=3 (tokens: YYYY,MM,DD,HH24,MI,SS)

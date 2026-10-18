@@ -28,7 +28,7 @@ Public Class CsvExportLogic
         End If
 
         Dim rc = Open_NativeParser.ExportCsv(ctx.DumpFilePath, ctx.TableName, outputPath,
-                                               ctx.Schema, ctx.DataOffset, progressAction, ctx.Partition)
+                                               ctx.Schema, ctx.DataOffset, progressAction, ctx.Partition, ctx.DataOffsets)
         If rc <> Open_NativeParser.ODV_OK Then
             Throw New Exception(Loc.SF("CsvExport_ErrorRc", rc))
         End If
