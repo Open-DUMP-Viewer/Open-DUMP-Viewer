@@ -102,7 +102,6 @@
   <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>Organizar &amp;iconos</value></data>
   <data name="Menu_Help" xml:space="preserve"><value>A&amp;yuda</value></data>
   <data name="Menu_Help_Contents" xml:space="preserve"><value>&amp;Contenido</value></data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>&amp;Informe de errores</value></data>
   <data name="Menu_Help_License" xml:space="preserve"><value>Activación de &amp;licencia</value></data>
   <data name="Menu_Help_About" xml:space="preserve"><value>&amp;Acerca de</value></data>
   <data name="Menu_Help_Language" xml:space="preserve"><value>Idioma</value></data>
@@ -129,7 +128,6 @@
   <data name="Button_Close" xml:space="preserve"><value>Cerrar</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>Cancelar</value></data>
   <data name="Button_OK" xml:space="preserve"><value>OK</value></data>
-  <data name="Button_Submit" xml:space="preserve"><value>Enviar</value></data>
   <data name="Button_Extract" xml:space="preserve"><value>Extraer</value></data>
   <data name="Button_ConnectionTest" xml:space="preserve"><value>Probar conexión</value></data>
   <data name="Button_AddCondition" xml:space="preserve"><value>Agregar condición</value></data>
@@ -291,29 +289,6 @@ Las tablas y filas que se muestran o exportan son solo las contenidas en los arc
   <data name="About_LaunchingInstaller" xml:space="preserve"><value>Iniciando instalador...</value></data>
   <data name="About_DownloadFailed" xml:space="preserve"><value>Error en la descarga: {0}</value></data>
   <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Actualizando Open DUMP Viewer for Oracle database...</value></data>
-  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Informe de errores</value></data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>Asunto:</value></data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>Descripción:</value></data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>Contacto:</value></data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(Opcional) Ingrese su correo electrónico o información de contacto para una respuesta</value></data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── La siguiente información del entorno se enviará automáticamente (sin datos personales) ──</value></data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>App:</value></data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>SO:</value></data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU:</value></data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>Configuración regional:</value></data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>Memoria:</value></data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>Pantalla:</value></data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>Dump:</value></data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>Por favor, ingrese un asunto.</value></data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>Por favor, ingrese una descripción.</value></data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>Informe enviado. Gracias por sus comentarios.</value></data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>Ver Issue #{0}</value></data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>Error en el envío: {0}</value></data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>Error de envío: {0}</value></data>
-  <data name="ErrorReport_Submitting" xml:space="preserve"><value>Enviando...</value></data>
   <data name="TableProp_FormTitle" xml:space="preserve"><value>Propiedades de la tabla - {0}.{1}</value></data>
   <data name="TableProp_SchemaLabel" xml:space="preserve"><value>Esquema:</value></data>
   <data name="TableProp_TableNameLabel" xml:space="preserve"><value>Nombre de tabla:</value></data>
@@ -458,19 +433,6 @@ Por favor, instale el runtime Microsoft Edge WebView2.</value>
   <data name="Parser_SessionCreateFailed" xml:space="preserve"><value>Error al crear la sesión (rc={0})</value></data>
   <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>Error de configuración del archivo Dump: {0}</value></data>
   <data name="Parser_DumpParseError" xml:space="preserve"><value>Error de análisis del Dump: {0}</value></data>
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>Error de recuperación</value></data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>No abierto</value></data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (Comprimido)</value></data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>Desconocido</value></data>
-  <data name="ErrorReport_ServerError" xml:space="preserve"><value>Error del servidor (HTTP {0})</value></data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>Límite de envío excedido. Por favor, inténtelo más tarde.</value></data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>Formato de solicitud no válido.</value></data>
-  <data name="ErrorReport_InternalError" xml:space="preserve"><value>Error interno del servidor. Por favor, inténtelo más tarde.</value></data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>Se produjo un error desconocido (HTTP {0})</value></data>
-  <data name="ErrorReport_Process" xml:space="preserve"><value>Proceso:</value></data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>Adjuntar archivo Dump ({0} MB)</value></data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>Archivo Dump demasiado grande (más de 50 MB)</value></data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>No hay archivo Dump abierto</value></data>
   <data name="ExportOptions_OracleClient" xml:space="preserve"><value>Oracle Client (Opcional)</value></data>
   <data name="ExportOptions_ImpdpPath" xml:space="preserve"><value>Ruta de impdp.exe:</value></data>
   <data name="ExportOptions_ImpdpInfo" xml:space="preserve"><value>Necesario para extraer detalles de columnas de restricciones de volcados EXPDP. Instale Oracle Database Client o Instant Client Tools y especifique la ruta de impdp.exe.</value></data>

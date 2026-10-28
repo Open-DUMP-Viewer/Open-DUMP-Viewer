@@ -104,7 +104,6 @@
   <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>排列图标(&amp;I)</value></data>
   <data name="Menu_Help" xml:space="preserve"><value>帮助(&amp;H)</value></data>
   <data name="Menu_Help_Contents" xml:space="preserve"><value>目录(&amp;C)</value></data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>错误报告(&amp;R)</value></data>
   <data name="Menu_Help_License" xml:space="preserve"><value>许可证激活(&amp;L)</value></data>
   <data name="Menu_Help_About" xml:space="preserve"><value>关于(&amp;A)</value></data>
   <data name="Menu_Help_Language" xml:space="preserve"><value>语言</value></data>
@@ -135,7 +134,6 @@
   <data name="Button_Close" xml:space="preserve"><value>关闭</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>取消</value></data>
   <data name="Button_OK" xml:space="preserve"><value>确定</value></data>
-  <data name="Button_Submit" xml:space="preserve"><value>提交</value></data>
   <data name="Button_Extract" xml:space="preserve"><value>提取</value></data>
   <data name="Button_ConnectionTest" xml:space="preserve"><value>测试连接</value></data>
   <data name="Button_AddCondition" xml:space="preserve"><value>添加条件</value></data>
@@ -312,31 +310,6 @@ https://www.odv.dev/
   <data name="About_DownloadFailed" xml:space="preserve"><value>下载失败: {0}</value></data>
   <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo 正在更新 Open DUMP Viewer for Oracle database...</value></data>
 
-  <!-- ========== Error Report Dialog ========== -->
-  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>错误报告</value></data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>主题:</value></data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>描述:</value></data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>联系方式:</value></data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(可选) 输入您的电子邮件或联系方式以便回复</value></data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── 以下环境信息将自动发送 (不包含个人数据) ──</value></data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>应用:</value></data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>操作系统:</value></data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU:</value></data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>区域设置:</value></data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>内存:</value></data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>屏幕:</value></data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>转储:</value></data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>请输入主题。</value></data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>请输入描述。</value></data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>报告已提交。感谢您的反馈。</value></data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>查看问题 #{0}</value></data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>提交失败: {0}</value></data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>提交错误: {0}</value></data>
-  <data name="ErrorReport_Submitting" xml:space="preserve"><value>正在提交...</value></data>
-
   <!-- ========== Table Properties Dialog ========== -->
   <data name="TableProp_FormTitle" xml:space="preserve"><value>表属性 - {0}.{1}</value></data>
   <data name="TableProp_SchemaLabel" xml:space="preserve"><value>架构:</value></data>
@@ -498,20 +471,6 @@ https://www.odv.dev/
   <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>转储文件设置错误: {0}</value></data>
   <data name="Parser_DumpParseError" xml:space="preserve"><value>转储解析错误: {0}</value></data>
 
-  <!-- ========== Error report logic ========== -->
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>获取失败</value></data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>未打开</value></data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (已压缩)</value></data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>未知</value></data>
-  <data name="ErrorReport_ServerError" xml:space="preserve"><value>服务器错误 (HTTP {0})</value></data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>提交频率超出限制。请稍后重试。</value></data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>请求格式无效。</value></data>
-  <data name="ErrorReport_InternalError" xml:space="preserve"><value>内部服务器错误。请稍后重试。</value></data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>发生未知错误 (HTTP {0})</value></data>
-  <data name="ErrorReport_Process" xml:space="preserve"><value>进程:</value></data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>附加转储文件 ({0} MB)</value></data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>转储文件过大 (超过 50 MB)</value></data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>未打开转储文件</value></data>
   <data name="ExportOptions_OracleClient" xml:space="preserve"><value>Oracle Client（可选）</value></data>
   <data name="ExportOptions_ImpdpPath" xml:space="preserve"><value>impdp.exe 路径：</value></data>
   <data name="ExportOptions_ImpdpInfo" xml:space="preserve"><value>从 EXPDP 转储中提取约束列详细信息时需要。请安装 Oracle Database Client 或 Instant Client Tools，并指定 impdp.exe 的路径。</value></data>

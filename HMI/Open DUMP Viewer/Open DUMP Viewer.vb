@@ -146,7 +146,6 @@ Public Class Open_DUMP_Viewer
         ' ヘルプ
         ヘルプHToolStripMenuItem.Text = Loc.S("Menu_Help")
         MokujiToolStripMenuItem.Text = Loc.S("Menu_Help_Contents")
-        エラー報告RToolStripMenuItem.Text = Loc.S("Menu_Help_ErrorReport")
         ライセンス認証ToolStripMenuItem.Text = Loc.S("Menu_Help_License")
         バージョン情報AToolStripMenuItem.Text = Loc.S("Menu_Help_About")
 
@@ -736,16 +735,6 @@ Public Class Open_DUMP_Viewer
 #Region "メニューイベント: 目次 (ヘルプ)"
     Private Sub MokujiToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles MokujiToolStripMenuItem.Click
         HelpViewerForm.ShowHelp("toc.html")
-    End Sub
-#End Region
-
-#Region "メニューイベント: エラー報告"
-    Private Sub エラー報告RToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles エラー報告RToolStripMenuItem.Click
-        Dim ws = Me.MdiChildren.OfType(Of Workspace)().FirstOrDefault()
-        Dim dumpPath As String = If(ws IsNot Nothing, ws.DumpFilePath, Nothing)
-        Using dlg As New ErrorReportDialog(dumpPath)
-            dlg.ShowDialog(Me)
-        End Using
     End Sub
 #End Region
 
