@@ -104,7 +104,6 @@
   <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>아이콘 정렬(&amp;I)</value></data>
   <data name="Menu_Help" xml:space="preserve"><value>도움말(&amp;H)</value></data>
   <data name="Menu_Help_Contents" xml:space="preserve"><value>목차(&amp;C)</value></data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>오류 보고(&amp;R)</value></data>
   <data name="Menu_Help_License" xml:space="preserve"><value>라이선스 인증(&amp;L)</value></data>
   <data name="Menu_Help_About" xml:space="preserve"><value>정보(&amp;A)</value></data>
   <data name="Menu_Help_Language" xml:space="preserve"><value>언어</value></data>
@@ -135,7 +134,6 @@
   <data name="Button_Close" xml:space="preserve"><value>닫기</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>취소</value></data>
   <data name="Button_OK" xml:space="preserve"><value>확인</value></data>
-  <data name="Button_Submit" xml:space="preserve"><value>제출</value></data>
   <data name="Button_Extract" xml:space="preserve"><value>추출</value></data>
   <data name="Button_ConnectionTest" xml:space="preserve"><value>연결 테스트</value></data>
   <data name="Button_AddCondition" xml:space="preserve"><value>조건 추가</value></data>
@@ -312,31 +310,6 @@ Open_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세�
   <data name="About_DownloadFailed" xml:space="preserve"><value>다운로드 실패: {0}</value></data>
   <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Open DUMP Viewer for Oracle database 업데이트 중...</value></data>
 
-  <!-- ========== 오류 보고 ========== -->
-  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>오류 보고</value></data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>제목:</value></data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>설명:</value></data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>연락처:</value></data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(선택 사항) 답변을 받을 이메일 또는 연락처를 입력하세요</value></data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── 아래 환경 정보는 자동으로 전송됩니다 (개인 정보 미포함) ──</value></data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>앱:</value></data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>OS:</value></data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU:</value></data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>로캘:</value></data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>메모리:</value></data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>화면:</value></data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>덤프:</value></data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>제목을 입력해 주세요.</value></data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>설명을 입력해 주세요.</value></data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>보고서가 제출되었습니다. 소중한 의견에 감사드립니다.</value></data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>이슈 #{0} 보기</value></data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>제출 실패: {0}</value></data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>제출 오류: {0}</value></data>
-  <data name="ErrorReport_Submitting" xml:space="preserve"><value>제출 중...</value></data>
-
   <!-- ========== 테이블 속성 ========== -->
   <data name="TableProp_FormTitle" xml:space="preserve"><value>테이블 속성 - {0}.{1}</value></data>
   <data name="TableProp_SchemaLabel" xml:space="preserve"><value>스키마:</value></data>
@@ -499,20 +472,6 @@ Microsoft Edge WebView2 Runtime을 설치해 주세요.</value></data>
   <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>덤프 파일 설정 오류: {0}</value></data>
   <data name="Parser_DumpParseError" xml:space="preserve"><value>덤프 구문 분석 오류: {0}</value></data>
 
-  <!-- ========== 오류 보고 (추가) ========== -->
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>가져오기 실패</value></data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>열리지 않음</value></data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (압축)</value></data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>알 수 없음</value></data>
-  <data name="ErrorReport_ServerError" xml:space="preserve"><value>서버 오류 (HTTP {0})</value></data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>제출 횟수 제한을 초과했습니다. 잠시 후 다시 시도해 주세요.</value></data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>잘못된 요청 형식입니다.</value></data>
-  <data name="ErrorReport_InternalError" xml:space="preserve"><value>내부 서버 오류입니다. 잠시 후 다시 시도해 주세요.</value></data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>알 수 없는 오류가 발생했습니다 (HTTP {0})</value></data>
-  <data name="ErrorReport_Process" xml:space="preserve"><value>프로세스:</value></data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>덤프 파일 첨부 ({0} MB)</value></data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>덤프 파일이 너무 큽니다 (50 MB 초과)</value></data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>열려 있는 덤프 파일이 없습니다</value></data>
   <data name="ExportOptions_OracleClient" xml:space="preserve"><value>Oracle Client (선택 사항)</value></data>
   <data name="ExportOptions_ImpdpPath" xml:space="preserve"><value>impdp.exe 경로:</value></data>
   <data name="ExportOptions_ImpdpInfo" xml:space="preserve"><value>EXPDP 덤프에서 제약 조건 열 정보를 추출하는 데 필요합니다. Oracle Database Client 또는 Instant Client Tools를 설치하고 impdp.exe 경로를 지정하세요.</value></data>

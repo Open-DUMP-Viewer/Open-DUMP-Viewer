@@ -62,10 +62,6 @@
 		<param name="Local" value="export_csv.html">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
-		<param name="Name" value="エラー報告">
-		<param name="Local" value="about.html">
-		</OBJECT>
-	<LI> <OBJECT type="text/sitemap">
 		<param name="Name" value="オプション">
 		<param name="Local" value="export_options.html">
 		</OBJECT>

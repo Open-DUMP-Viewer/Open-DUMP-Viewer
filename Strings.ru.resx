@@ -104,7 +104,6 @@
   <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>Упорядочить &amp;значки</value></data>
   <data name="Menu_Help" xml:space="preserve"><value>&amp;Справка</value></data>
   <data name="Menu_Help_Contents" xml:space="preserve"><value>&amp;Содержание</value></data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>Отчёт об &amp;ошибке</value></data>
   <data name="Menu_Help_License" xml:space="preserve"><value>Активация &amp;лицензии</value></data>
   <data name="Menu_Help_About" xml:space="preserve"><value>&amp;О программе</value></data>
   <data name="Menu_Help_Language" xml:space="preserve"><value>Язык</value></data>
@@ -135,7 +134,6 @@
   <data name="Button_Close" xml:space="preserve"><value>Закрыть</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>Отмена</value></data>
   <data name="Button_OK" xml:space="preserve"><value>OK</value></data>
-  <data name="Button_Submit" xml:space="preserve"><value>Отправить</value></data>
   <data name="Button_Extract" xml:space="preserve"><value>Извлечь</value></data>
   <data name="Button_ConnectionTest" xml:space="preserve"><value>Проверить подключение</value></data>
   <data name="Button_AddCondition" xml:space="preserve"><value>Добавить условие</value></data>
@@ -312,31 +310,6 @@ https://www.odv.dev/
   <data name="About_DownloadFailed" xml:space="preserve"><value>Ошибка загрузки: {0}</value></data>
   <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Обновление Open DUMP Viewer for Oracle database...</value></data>
 
-  <!-- ========== Error Report Dialog ========== -->
-  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>Отчёт об ошибке</value></data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>Тема:</value></data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>Описание:</value></data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>Контакт:</value></data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(Необязательно) Укажите email или контактные данные для ответа</value></data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── Следующая информация об окружении будет отправлена автоматически (без персональных данных) ──</value></data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>Приложение:</value></data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>ОС:</value></data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>ЦП:</value></data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>Локаль:</value></data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>Память:</value></data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>Экран:</value></data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>Дамп:</value></data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>Введите тему.</value></data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>Введите описание.</value></data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>Отчёт отправлен. Спасибо за обратную связь.</value></data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>Просмотреть Issue #{0}</value></data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>Ошибка отправки: {0}</value></data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>Ошибка отправки: {0}</value></data>
-  <data name="ErrorReport_Submitting" xml:space="preserve"><value>Отправка...</value></data>
-
   <!-- ========== Table Properties Dialog ========== -->
   <data name="TableProp_FormTitle" xml:space="preserve"><value>Свойства таблицы - {0}.{1}</value></data>
   <data name="TableProp_SchemaLabel" xml:space="preserve"><value>Схема:</value></data>
@@ -499,20 +472,6 @@ https://www.odv.dev/
   <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>Ошибка настройки файла дампа: {0}</value></data>
   <data name="Parser_DumpParseError" xml:space="preserve"><value>Ошибка разбора дампа: {0}</value></data>
 
-  <!-- ========== Error report logic ========== -->
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>Ошибка получения</value></data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>Не открыт</value></data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (Сжатый)</value></data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>Неизвестно</value></data>
-  <data name="ErrorReport_ServerError" xml:space="preserve"><value>Ошибка сервера (HTTP {0})</value></data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>Превышен лимит отправки. Попробуйте позже.</value></data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>Неверный формат запроса.</value></data>
-  <data name="ErrorReport_InternalError" xml:space="preserve"><value>Внутренняя ошибка сервера. Попробуйте позже.</value></data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>Произошла неизвестная ошибка (HTTP {0})</value></data>
-  <data name="ErrorReport_Process" xml:space="preserve"><value>Процесс:</value></data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>Прикрепить файл дампа ({0} МБ)</value></data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>Файл дампа слишком большой (более 50 МБ)</value></data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>Файл дампа не открыт</value></data>
   <data name="ExportOptions_OracleClient" xml:space="preserve"><value>Oracle Client (Необязательно)</value></data>
   <data name="ExportOptions_ImpdpPath" xml:space="preserve"><value>Путь к impdp.exe:</value></data>
   <data name="ExportOptions_ImpdpInfo" xml:space="preserve"><value>Требуется для извлечения информации о столбцах ограничений из дампов EXPDP. Установите Oracle Database Client или Instant Client Tools и укажите путь к impdp.exe.</value></data>

@@ -79,8 +79,6 @@ Partial Class Open_DUMP_Viewer
         ヘルプHToolStripMenuItem = New ToolStripMenuItem()
         MokujiToolStripMenuItem = New ToolStripMenuItem()
         ToolStripSeparator9 = New ToolStripSeparator()
-        エラー報告RToolStripMenuItem = New ToolStripMenuItem()
-        ToolStripSeparator10 = New ToolStripSeparator()
         ライセンス認証ToolStripMenuItem = New ToolStripMenuItem()
         バージョン情報AToolStripMenuItem = New ToolStripMenuItem()
         StatusStrip = New StatusStrip()
@@ -444,7 +442,7 @@ Partial Class Open_DUMP_Viewer
         ' 
         ' ヘルプHToolStripMenuItem
         ' 
-        ヘルプHToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {MokujiToolStripMenuItem, ToolStripSeparator9, エラー報告RToolStripMenuItem, ToolStripSeparator10, ライセンス認証ToolStripMenuItem, バージョン情報AToolStripMenuItem})
+        ヘルプHToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {MokujiToolStripMenuItem, ToolStripSeparator9, ライセンス認証ToolStripMenuItem, バージョン情報AToolStripMenuItem})
         ヘルプHToolStripMenuItem.Name = "ヘルプHToolStripMenuItem"
         ヘルプHToolStripMenuItem.Size = New Size(65, 22)
         ヘルプHToolStripMenuItem.Text = "ヘルプ(&H)"
@@ -460,17 +458,6 @@ Partial Class Open_DUMP_Viewer
         ' 
         ToolStripSeparator9.Name = "ToolStripSeparator9"
         ToolStripSeparator9.Size = New Size(155, 6)
-        ' 
-        ' エラー報告RToolStripMenuItem
-        ' 
-        エラー報告RToolStripMenuItem.Name = "エラー報告RToolStripMenuItem"
-        エラー報告RToolStripMenuItem.Size = New Size(158, 22)
-        エラー報告RToolStripMenuItem.Text = "エラー報告(&R)"
-        ' 
-        ' ToolStripSeparator10
-        ' 
-        ToolStripSeparator10.Name = "ToolStripSeparator10"
-        ToolStripSeparator10.Size = New Size(155, 6)
         ' 
         ' ライセンス認証ToolStripMenuItem
         ' 
@@ -676,8 +663,6 @@ Partial Class Open_DUMP_Viewer
     Friend WithEvents ヘルプHToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents MokujiToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripSeparator9 As ToolStripSeparator
-    Friend WithEvents エラー報告RToolStripMenuItem As ToolStripMenuItem
-    Friend WithEvents ToolStripSeparator10 As ToolStripSeparator
     Friend WithEvents バージョン情報AToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents ToolStripMenuItem1 As ToolStripMenuItem
     Friend WithEvents StatusStrip As StatusStrip

@@ -104,7 +104,6 @@
   <data name="Menu_Window_ArrangeIcons" xml:space="preserve"><value>アイコンの整列(&amp;I)</value></data>
   <data name="Menu_Help" xml:space="preserve"><value>ヘルプ(&amp;H)</value></data>
   <data name="Menu_Help_Contents" xml:space="preserve"><value>目次(&amp;I)</value></data>
-  <data name="Menu_Help_ErrorReport" xml:space="preserve"><value>エラー報告(&amp;R)</value></data>
   <data name="Menu_Help_License" xml:space="preserve"><value>ライセンス認証(&amp;L)</value></data>
   <data name="Menu_Help_About" xml:space="preserve"><value>バージョン情報(&amp;A)</value></data>
   <data name="Menu_Help_Language" xml:space="preserve"><value>言語 / Language</value></data>
@@ -135,7 +134,6 @@
   <data name="Button_Close" xml:space="preserve"><value>閉じる</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>キャンセル</value></data>
   <data name="Button_OK" xml:space="preserve"><value>OK</value></data>
-  <data name="Button_Submit" xml:space="preserve"><value>送信</value></data>
   <data name="Button_Extract" xml:space="preserve"><value>抽出</value></data>
   <data name="Button_ConnectionTest" xml:space="preserve"><value>接続テスト</value></data>
   <data name="Button_AddCondition" xml:space="preserve"><value>条件を追加</value></data>
@@ -312,31 +310,6 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="About_DownloadFailed" xml:space="preserve"><value>ダウンロードに失敗しました: {0}</value></data>
   <data name="About_UpdateBatchMessage" xml:space="preserve"><value>echo Open DUMP Viewer for Oracle database を更新しています...</value></data>
 
-  <!-- ========== エラー報告 (ErrorReportDialog) ========== -->
-  <data name="ErrorReport_FormTitle" xml:space="preserve"><value>エラー報告</value></data>
-  <data name="ErrorReport_SubjectLabel" xml:space="preserve"><value>件名:</value></data>
-  <data name="ErrorReport_DescriptionLabel" xml:space="preserve"><value>内容:</value></data>
-  <data name="ErrorReport_ContactLabel" xml:space="preserve"><value>連絡先:</value></data>
-  <data name="ErrorReport_ContactHint" xml:space="preserve"><value>(任意) メールアドレスなど、返信先をご記入ください</value></data>
-  <data name="ErrorReport_SysInfoHeader" xml:space="preserve"><value>── 以下の環境情報が自動的に送信されます (個人情報は含まれません) ──</value></data>
-  <data name="ErrorReport_AppLabel" xml:space="preserve"><value>アプリ:</value></data>
-  <data name="ErrorReport_DllLabel" xml:space="preserve"><value>DLL:</value></data>
-  <data name="ErrorReport_OsLabel" xml:space="preserve"><value>OS:</value></data>
-  <data name="ErrorReport_DotNetLabel" xml:space="preserve"><value>.NET:</value></data>
-  <data name="ErrorReport_CpuLabel" xml:space="preserve"><value>CPU:</value></data>
-  <data name="ErrorReport_LocaleLabel" xml:space="preserve"><value>ロケール:</value></data>
-  <data name="ErrorReport_DpiLabel" xml:space="preserve"><value>DPI:</value></data>
-  <data name="ErrorReport_MemoryLabel" xml:space="preserve"><value>メモリ:</value></data>
-  <data name="ErrorReport_ScreenLabel" xml:space="preserve"><value>画面:</value></data>
-  <data name="ErrorReport_DumpLabel" xml:space="preserve"><value>ダンプ:</value></data>
-  <data name="ErrorReport_SubjectRequired" xml:space="preserve"><value>件名を入力してください。</value></data>
-  <data name="ErrorReport_DescriptionRequired" xml:space="preserve"><value>内容を入力してください。</value></data>
-  <data name="ErrorReport_SubmitSuccess" xml:space="preserve"><value>送信が完了しました。ご報告ありがとうございます。</value></data>
-  <data name="ErrorReport_ViewIssue" xml:space="preserve"><value>Issue #{0} を確認する</value></data>
-  <data name="ErrorReport_SubmitFailed" xml:space="preserve"><value>送信に失敗しました: {0}</value></data>
-  <data name="ErrorReport_SubmitError" xml:space="preserve"><value>送信エラー: {0}</value></data>
-  <data name="ErrorReport_Submitting" xml:space="preserve"><value>送信中...</value></data>
-
   <!-- ========== テーブルプロパティ (TablePropertyDialog) ========== -->
   <data name="TableProp_FormTitle" xml:space="preserve"><value>テーブルプロパティ - {0}.{1}</value></data>
   <data name="TableProp_SchemaLabel" xml:space="preserve"><value>スキーマ:</value></data>
@@ -502,20 +475,6 @@ Microsoft Edge WebView2 ランタイムをインストールしてください�
   <data name="Parser_DumpFileSettingError" xml:space="preserve"><value>ダンプファイル設定エラー: {0}</value></data>
   <data name="Parser_DumpParseError" xml:space="preserve"><value>ダンプ解析エラー: {0}</value></data>
 
-  <!-- ========== エラー報告ロジック ========== -->
-  <data name="ErrorReport_RetrievalFailed" xml:space="preserve"><value>取得失敗</value></data>
-  <data name="ErrorReport_NotOpened" xml:space="preserve"><value>未オープン</value></data>
-  <data name="ErrorReport_DumpType_ExpdpCompress" xml:space="preserve"><value>EXPDP (圧縮)</value></data>
-  <data name="ErrorReport_DumpType_Unknown" xml:space="preserve"><value>不明</value></data>
-  <data name="ErrorReport_ServerError" xml:space="preserve"><value>サーバーエラー (HTTP {0})</value></data>
-  <data name="ErrorReport_RateLimitExceeded" xml:space="preserve"><value>送信回数の制限に達しました。しばらく時間をおいてからお試しください。</value></data>
-  <data name="ErrorReport_InvalidRequest" xml:space="preserve"><value>リクエスト形式が不正です。</value></data>
-  <data name="ErrorReport_InternalError" xml:space="preserve"><value>サーバー内部エラーが発生しました。しばらく時間をおいてからお試しください。</value></data>
-  <data name="ErrorReport_UnknownError" xml:space="preserve"><value>不明なエラーが発生しました (HTTP {0})</value></data>
-  <data name="ErrorReport_Process" xml:space="preserve"><value>プロセス:</value></data>
-  <data name="ErrorReport_AttachDump" xml:space="preserve"><value>ダンプファイルを添付する ({0} MB)</value></data>
-  <data name="ErrorReport_AttachDumpTooLarge" xml:space="preserve"><value>ダンプファイルが大きすぎます (50 MB超)</value></data>
-  <data name="ErrorReport_AttachDumpNoFile" xml:space="preserve"><value>ダンプファイル未オープン</value></data>
   <data name="ExportOptions_OracleClient" xml:space="preserve"><value>Oracle Client (オプション)</value></data>
   <data name="ExportOptions_ImpdpPath" xml:space="preserve"><value>impdp.exe のパス:</value></data>
   <data name="ExportOptions_ImpdpInfo" xml:space="preserve"><value>EXPDP ダンプの制約カラム情報の取得に必要です。Oracle Database Client または Instant Client Tools をインストールし、impdp.exe のパスを指定してください。</value></data>
