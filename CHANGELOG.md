@@ -10,6 +10,11 @@
   - これまでにエラー報告で受け取ったダンプファイルは、2026 年 10 月 28 日に削除しました
   - 不具合のご報告やご質問は、メール (`open_dump_viewer@sent.at`) でお寄せください
 
+### 依存関係
+- Microsoft.Web.WebView2 1.0.4258.31 → 1.0.4314.35
+- System.Data.Odbc / System.Data.OleDb 10.0.12 → 10.0.13
+  - 推移的依存の System.Configuration.ConfigurationManager / System.Diagnostics.EventLog / System.Diagnostics.PerformanceCounter / System.Security.Cryptography.ProtectedData も 10.0.12 → 10.0.13 になります
+
 ### 内部
 - DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.6.2 → 4.7.0 に同期
 
