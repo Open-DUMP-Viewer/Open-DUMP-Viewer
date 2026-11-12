@@ -375,6 +375,8 @@ Archivos extraídos: {0}</value>
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Nombre de usuario:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Contraseña:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Nombre de base de datos:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Confiar en el certificado del servidor</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>Se conecta sin validar el certificado del servidor. La conexión sigue cifrada, pero no se verifica la identidad del servidor. Active esta opción solo con un servidor de confianza, como uno que use un certificado autofirmado.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>DSN del sistema:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Cadena de conexión (entrada directa):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Autenticación de Windows</value></data>

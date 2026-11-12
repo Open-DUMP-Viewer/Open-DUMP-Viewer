@@ -63,6 +63,14 @@
     <li>Se crea una tabla en la base de datos de destino y se insertan los datos.</li>
 </ol>
 <p>Si ya existe una tabla con el mismo nombre, se elimina y se recrea automáticamente.</p>
+<p>Si la conexión falla porque el certificado del servidor no es de confianza, por ejemplo, cuando el servidor usa un certificado autofirmado
+(ejemplo de mensaje de error: <code>The certificate chain was issued by an authority that is not trusted.</code>),
+active la opción <strong>Confiar en el certificado del servidor</strong> en el cuadro de diálogo de conexión.</p>
+<div class="caution">
+<strong>Precaución:</strong> Con esta opción activada, la conexión sigue cifrada, pero el certificado del servidor no se valida, por lo que no se verifica la identidad del servidor.
+Úsela solo con un servidor de confianza. Si agrega el certificado del servidor (o el de su emisor) al almacén "Entidades de certificación raíz de confianza" de este equipo, podrá conectarse sin activar esta opción.
+Esta opción se desactiva cada vez que se abre el cuadro de diálogo de conexión.
+</div>
 
 <h2>Exportación ODBC</h2>
 <p>Exporta datos de tablas a cualquier base de datos compatible con ODBC.</p>

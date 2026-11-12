@@ -63,6 +63,14 @@
     <li>Viene creata una tabella nel database di destinazione e i dati vengono inseriti.</li>
 </ol>
 <p>Se esiste già una tabella con lo stesso nome, viene automaticamente eliminata e ricreata.</p>
+<p>Se la connessione non riesce perché il certificato del server non è considerato attendibile, ad esempio quando il server usa un certificato autofirmato
+(esempio di messaggio di errore: <code>The certificate chain was issued by an authority that is not trusted.</code>),
+selezionare <strong>Considera attendibile il certificato del server</strong> nella finestra di dialogo di connessione.</p>
+<div class="caution">
+<strong>Attenzione:</strong> Quando questa opzione è attivata, la connessione resta crittografata, ma il certificato del server non viene convalidato e quindi l'identità del server non viene verificata.
+Utilizzarla solo per un server attendibile. Se si aggiunge il certificato del server (o quello della relativa autorità emittente) all'archivio "Autorità di certificazione radice attendibili" di questo PC, è possibile connettersi senza attivare questa opzione.
+Questa opzione viene disattivata a ogni apertura della finestra di dialogo di connessione.
+</div>
 
 <h2>Esportazione ODBC</h2>
 <p>Esporta i dati della tabella in qualsiasi database compatibile ODBC.</p>

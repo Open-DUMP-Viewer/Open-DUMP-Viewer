@@ -63,6 +63,14 @@
     <li>Une table est cr&eacute;&eacute;e dans la base de donn&eacute;es cible et les donn&eacute;es sont ins&eacute;r&eacute;es.</li>
 </ol>
 <p>Si une table du m&ecirc;me nom existe d&eacute;j&agrave;, elle est automatiquement supprim&eacute;e et recr&eacute;&eacute;e.</p>
+<p>Si la connexion &eacute;choue parce que le certificat du serveur n'est pas approuv&eacute;, par exemple lorsque le serveur utilise un certificat auto-sign&eacute;
+(exemple de message d'erreur : <code>The certificate chain was issued by an authority that is not trusted.</code>),
+cochez <strong>Approuver le certificat de serveur</strong> dans la bo&icirc;te de dialogue de connexion.</p>
+<div class="caution">
+<strong>Attention :</strong> Lorsque cette option est activ&eacute;e, la connexion reste chiffr&eacute;e, mais le certificat du serveur n'est pas valid&eacute;, de sorte que l'identit&eacute; du serveur n'est pas v&eacute;rifi&eacute;e.
+Ne l'utilisez que pour un serveur de confiance. Si vous ajoutez le certificat du serveur (ou celui de son &eacute;metteur) au magasin &laquo; Autorit&eacute;s de certification racines de confiance &raquo; de ce PC, vous pouvez vous connecter sans activer cette option.
+Cette option est d&eacute;sactiv&eacute;e &agrave; chaque ouverture de la bo&icirc;te de dialogue de connexion.
+</div>
 
 <h2>Export ODBC</h2>
 <p>Exporte les donn&eacute;es de table vers toute base de donn&eacute;es compatible ODBC.</p>

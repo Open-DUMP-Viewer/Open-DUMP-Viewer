@@ -419,6 +419,8 @@ Fichiers extraits : {0}</value>
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Nom d'utilisateur :</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Mot de passe :</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Nom de la base de données :</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Approuver le certificat de serveur</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>La connexion est établie sans valider le certificat. Elle reste chiffrée, mais l'identité du serveur n'est pas vérifiée. N'activez cette option que pour un serveur de confiance, comme un serveur utilisant un certificat auto-signé.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>DSN système :</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Chaîne de connexion (saisie directe) :</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Authentification Windows</value></data>

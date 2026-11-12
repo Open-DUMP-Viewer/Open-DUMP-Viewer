@@ -375,6 +375,8 @@ Extrahierte Dateien: {0}</value>
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Benutzername:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Passwort:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Datenbankname:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Serverzertifikat vertrauen</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>Verbindet ohne Validierung des Serverzertifikats. Die Verbindung bleibt verschlüsselt, die Serveridentität wird aber nicht überprüft. Aktivieren Sie dies nur für vertrauenswürdige Server, z. B. mit selbstsigniertem Zertifikat.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>System-DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Verbindungszeichenfolge (Direkteingabe):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows-Authentifizierung</value></data>

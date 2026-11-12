@@ -63,6 +63,14 @@
     <li>Eine Tabelle wird in der Zieldatenbank erstellt und die Daten werden eingef&uuml;gt.</li>
 </ol>
 <p>Wenn bereits eine Tabelle mit demselben Namen existiert, wird sie automatisch gel&ouml;scht und neu erstellt.</p>
+<p>Wenn keine Verbindung hergestellt werden kann, weil das Serverzertifikat nicht vertrauensw&uuml;rdig ist, z.&nbsp;B. weil der Server ein selbstsigniertes Zertifikat verwendet
+(Beispiel f&uuml;r eine Fehlermeldung: <code>The certificate chain was issued by an authority that is not trusted.</code>),
+aktivieren Sie im Verbindungsdialog die Option <strong>Serverzertifikat vertrauen</strong>.</p>
+<div class="caution">
+<strong>Achtung:</strong> Wenn diese Option aktiviert ist, bleibt die Verbindung verschl&uuml;sselt, das Serverzertifikat wird jedoch nicht validiert, sodass die Identit&auml;t des Servers nicht &uuml;berpr&uuml;ft wird.
+Verwenden Sie die Option nur f&uuml;r Server, denen Sie vertrauen. Wenn Sie das Serverzertifikat (oder das Zertifikat seines Ausstellers) auf diesem PC dem Zertifikatspeicher &bdquo;Vertrauensw&uuml;rdige Stammzertifizierungsstellen&ldquo; hinzuf&uuml;gen, k&ouml;nnen Sie auch ohne diese Option eine Verbindung herstellen.
+Diese Option wird bei jedem &Ouml;ffnen des Verbindungsdialogs wieder deaktiviert.
+</div>
 
 <h2>ODBC-Export</h2>
 <p>Exportiert Tabellendaten in eine beliebige ODBC-kompatible Datenbank.</p>

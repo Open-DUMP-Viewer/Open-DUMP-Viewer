@@ -403,6 +403,8 @@ File estratti: {0}</value>
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Nome utente:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Password:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Nome database:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Considera attendibile il certificato del server</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>La connessione viene stabilita senza convalidare il certificato del server. Resta crittografata, ma l'identità del server non viene verificata. Attivare solo per un server attendibile, ad esempio uno con certificato autofirmato.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>DSN di sistema:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Stringa di connessione (input diretto):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Autenticazione Windows</value></data>
