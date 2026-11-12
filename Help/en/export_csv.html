@@ -63,6 +63,14 @@
     <li>A table is created in the target database and data is inserted.</li>
 </ol>
 <p>If a table with the same name already exists, it is automatically dropped and recreated.</p>
+<p>If the connection fails because the server certificate is not trusted, for example when the server uses a self-signed certificate
+(example error message: <code>The certificate chain was issued by an authority that is not trusted.</code>),
+select <strong>Trust server certificate</strong> in the connection dialog.</p>
+<div class="caution">
+<strong>Caution:</strong> When this option is on, the connection is still encrypted, but the server certificate is not validated, so the server's identity is not verified.
+Use it only for a server you trust. If you add the server certificate (or the certificate of its issuer) to the Trusted Root Certification Authorities store on this PC, you can connect without turning this option on.
+This option is turned off each time the connection dialog opens.
+</div>
 
 <h2>ODBC Export</h2>
 <p>Exports table data to any ODBC-compatible database.</p>

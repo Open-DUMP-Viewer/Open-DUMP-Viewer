@@ -412,6 +412,8 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>ユーザー名:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>パスワード:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>データベース名:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>サーバー証明書を信頼する</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>証明書を検証せずに接続します。通信は暗号化されますが、接続先が本物のサーバーかは確かめません。自己署名証明書を使うサーバーなど、接続先を信頼できる場合にだけオンにしてください。</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>システム DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>接続文字列 (直接入力):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows 認証</value></data>

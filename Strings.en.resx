@@ -412,6 +412,8 @@ Rows that could not be written: {1} (unsafe file name or write failure)</value><
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>User name:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Password:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Database name:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Trust server certificate</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>Connects without validating the server certificate. The connection is still encrypted, but the server's identity is not verified. Turn this on only for a server you trust, such as one that uses a self-signed certificate.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>System DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Connection string (Direct input):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows Authentication</value></data>

@@ -73,7 +73,9 @@ Public Class DatabaseConnectionDialog
         Dim builder As New SqlConnectionStringBuilder()
         builder.DataSource = txtServer.Text.Trim()
         builder.InitialCatalog = txtDatabase.Text.Trim()
-        builder.TrustServerCertificate = False
+        ' 暗号化は常に必須 (Mandatory)。「サーバー証明書を信頼する」をオンにしたときだけ
+        ' 証明書の検証を省く (自己署名証明書のサーバー向け。暗号化はされるが接続先の確認はしない)
+        builder.TrustServerCertificate = chkTrustServerCert.Checked
         builder.Encrypt = True
 
         If cboAuth.SelectedIndex = 0 Then
@@ -167,6 +169,8 @@ Public Class DatabaseConnectionDialog
         lblUser.Text = Loc.S("DbConn_UserNameLabel")
         lblPassword.Text = Loc.S("DbConn_PasswordLabel")
         lblDatabase.Text = Loc.S("DbConn_DatabaseNameLabel")
+        chkTrustServerCert.Text = Loc.S("DbConn_TrustServerCertificate")
+        lblTrustServerCertNote.Text = Loc.S("DbConn_TrustServerCertificateNote")
         btnTest.Text = Loc.S("Button_ConnectionTest")
         btnTestOdbc.Text = Loc.S("Button_ConnectionTest")
         lblDsn.Text = Loc.S("DbConn_SystemDsnLabel")

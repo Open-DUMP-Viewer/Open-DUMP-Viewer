@@ -29,6 +29,8 @@ Partial Class DatabaseConnectionDialog
         txtPassword = New TextBox()
         lblDatabase = New Label()
         txtDatabase = New TextBox()
+        chkTrustServerCert = New CheckBox()
+        lblTrustServerCertNote = New Label()
         btnTest = New Button()
         lblTestResult = New Label()
         tabOdbc = New TabPage()
@@ -52,7 +54,7 @@ Partial Class DatabaseConnectionDialog
         tabControl.Location = New Point(12, 12)
         tabControl.Name = "tabControl"
         tabControl.SelectedIndex = 0
-        tabControl.Size = New Size(460, 290)
+        tabControl.Size = New Size(460, 360)
         tabControl.TabIndex = 0
         '
         ' tabSqlServer
@@ -67,12 +69,14 @@ Partial Class DatabaseConnectionDialog
         tabSqlServer.Controls.Add(txtPassword)
         tabSqlServer.Controls.Add(lblDatabase)
         tabSqlServer.Controls.Add(txtDatabase)
+        tabSqlServer.Controls.Add(chkTrustServerCert)
+        tabSqlServer.Controls.Add(lblTrustServerCertNote)
         tabSqlServer.Controls.Add(btnTest)
         tabSqlServer.Controls.Add(lblTestResult)
         tabSqlServer.Location = New Point(4, 24)
         tabSqlServer.Name = "tabSqlServer"
         tabSqlServer.Padding = New Padding(10)
-        tabSqlServer.Size = New Size(452, 262)
+        tabSqlServer.Size = New Size(452, 332)
         tabSqlServer.TabIndex = 0
         tabSqlServer.Text = "SQL Server"
         '
@@ -150,9 +154,24 @@ Partial Class DatabaseConnectionDialog
         txtDatabase.Name = "txtDatabase"
         txtDatabase.Size = New Size(200, 23)
         '
+        ' chkTrustServerCert
+        '
+        chkTrustServerCert.AutoSize = True
+        chkTrustServerCert.Location = New Point(15, 182)
+        chkTrustServerCert.Name = "chkTrustServerCert"
+        chkTrustServerCert.Size = New Size(163, 19)
+        chkTrustServerCert.Text = "サーバー証明書を信頼する"
+        chkTrustServerCert.UseVisualStyleBackColor = True
+        '
+        ' lblTrustServerCertNote
+        '
+        lblTrustServerCertNote.Location = New Point(33, 204)
+        lblTrustServerCertNote.Name = "lblTrustServerCertNote"
+        lblTrustServerCertNote.Size = New Size(397, 75)
+        '
         ' btnTest
         '
-        btnTest.Location = New Point(15, 185)
+        btnTest.Location = New Point(15, 290)
         btnTest.Name = "btnTest"
         btnTest.Size = New Size(100, 30)
         btnTest.Text = "接続テスト"
@@ -160,7 +179,7 @@ Partial Class DatabaseConnectionDialog
         ' lblTestResult
         '
         lblTestResult.AutoSize = True
-        lblTestResult.Location = New Point(130, 192)
+        lblTestResult.Location = New Point(130, 297)
         lblTestResult.Name = "lblTestResult"
         lblTestResult.Size = New Size(0, 15)
         '
@@ -175,7 +194,7 @@ Partial Class DatabaseConnectionDialog
         tabOdbc.Location = New Point(4, 24)
         tabOdbc.Name = "tabOdbc"
         tabOdbc.Padding = New Padding(10)
-        tabOdbc.Size = New Size(452, 262)
+        tabOdbc.Size = New Size(452, 332)
         tabOdbc.TabIndex = 1
         tabOdbc.Text = "ODBC"
         '
@@ -226,7 +245,7 @@ Partial Class DatabaseConnectionDialog
         '
         ' btnOK
         '
-        btnOK.Location = New Point(280, 315)
+        btnOK.Location = New Point(280, 385)
         btnOK.Name = "btnOK"
         btnOK.Size = New Size(90, 30)
         btnOK.Text = "OK"
@@ -234,7 +253,7 @@ Partial Class DatabaseConnectionDialog
         '
         ' btnCancel
         '
-        btnCancel.Location = New Point(382, 315)
+        btnCancel.Location = New Point(382, 385)
         btnCancel.Name = "btnCancel"
         btnCancel.Size = New Size(90, 30)
         btnCancel.Text = "キャンセル"
@@ -246,7 +265,7 @@ Partial Class DatabaseConnectionDialog
         CancelButton = btnCancel
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
-        ClientSize = New Size(484, 360)
+        ClientSize = New Size(484, 430)
         Controls.Add(tabControl)
         Controls.Add(btnOK)
         Controls.Add(btnCancel)
@@ -276,6 +295,8 @@ Partial Class DatabaseConnectionDialog
     Friend WithEvents txtPassword As TextBox
     Friend WithEvents lblDatabase As Label
     Friend WithEvents txtDatabase As TextBox
+    Friend WithEvents chkTrustServerCert As CheckBox
+    Friend WithEvents lblTrustServerCertNote As Label
     Friend WithEvents btnTest As Button
     Friend WithEvents lblTestResult As Label
     Friend WithEvents tabOdbc As TabPage
