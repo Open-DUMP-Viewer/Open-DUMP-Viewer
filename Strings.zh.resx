@@ -408,6 +408,8 @@ https://www.odv.dev/
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>用户名:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>密码:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>数据库名称:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>信任服务器证书</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>不验证服务器证书即进行连接。通信仍会加密，但不会确认连接目标是否为真正的服务器。请仅对可信的服务器（如使用自签名证书的服务器）勾选此项。</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>系统 DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>连接字符串 (直接输入):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows 身份验证</value></data>

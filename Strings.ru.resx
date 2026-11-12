@@ -409,6 +409,8 @@ https://www.odv.dev/
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>Имя пользователя:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>Пароль:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>Имя базы данных:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>Доверять сертификату сервера</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>Подключение выполняется без проверки сертификата сервера. Соединение остаётся зашифрованным, но подлинность сервера не подтверждается. Включайте только для доверенного сервера, например с самозаверяющим сертификатом.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>Системный DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>Строка подключения (прямой ввод):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Аутентификация Windows</value></data>

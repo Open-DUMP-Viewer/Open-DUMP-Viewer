@@ -409,6 +409,8 @@ Open_DumpParser.dll이 실행 파일과 같은 폴더에 있는지 확인하세�
   <data name="DbConn_UserNameLabel" xml:space="preserve"><value>사용자 이름:</value></data>
   <data name="DbConn_PasswordLabel" xml:space="preserve"><value>비밀번호:</value></data>
   <data name="DbConn_DatabaseNameLabel" xml:space="preserve"><value>데이터베이스 이름:</value></data>
+  <data name="DbConn_TrustServerCertificate" xml:space="preserve"><value>서버 인증서 신뢰</value></data>
+  <data name="DbConn_TrustServerCertificateNote" xml:space="preserve"><value>인증서를 검증하지 않고 연결합니다. 통신은 암호화되지만 서버의 신원은 확인하지 않습니다. 자체 서명 인증서를 사용하는 서버 등 신뢰할 수 있는 서버에만 사용해 주세요.</value></data>
   <data name="DbConn_SystemDsnLabel" xml:space="preserve"><value>시스템 DSN:</value></data>
   <data name="DbConn_ConnectionStringLabel" xml:space="preserve"><value>연결 문자열 (직접 입력):</value></data>
   <data name="DbConn_AuthWindows" xml:space="preserve"><value>Windows 인증</value></data>

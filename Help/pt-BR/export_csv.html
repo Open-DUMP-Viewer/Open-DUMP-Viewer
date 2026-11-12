@@ -63,6 +63,14 @@
     <li>Uma tabela é criada no banco de dados de destino e os dados são inseridos.</li>
 </ol>
 <p>Se uma tabela com o mesmo nome já existir, ela será automaticamente excluída e recriada.</p>
+<p>Se não for possível conectar porque o certificado do servidor não é confiável, por exemplo, quando o servidor usa um certificado autoassinado
+(exemplo de mensagem de erro: <code>The certificate chain was issued by an authority that is not trusted.</code>),
+marque <strong>Confiar no certificado do servidor</strong> na caixa de diálogo de conexão.</p>
+<div class="caution">
+<strong>Atenção:</strong> Com esta opção ativada, a conexão continua criptografada, mas o certificado do servidor não é validado; portanto, a identidade do servidor não é verificada.
+Use-a somente com servidores confiáveis. Se você adicionar o certificado do servidor (ou o certificado da autoridade que o emitiu) ao repositório Autoridades de Certificação Raiz Confiáveis deste PC, poderá se conectar sem ativar esta opção.
+Esta opção é desativada sempre que a caixa de diálogo de conexão é aberta.
+</div>
 
 <h2>Exportação ODBC</h2>
 <p>Exporta dados da tabela para qualquer banco de dados compatível com ODBC.</p>
