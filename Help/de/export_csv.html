@@ -68,7 +68,8 @@
 aktivieren Sie im Verbindungsdialog die Option <strong>Serverzertifikat vertrauen</strong>.</p>
 <div class="caution">
 <strong>Achtung:</strong> Wenn diese Option aktiviert ist, bleibt die Verbindung verschl&uuml;sselt, das Serverzertifikat wird jedoch nicht validiert, sodass die Identit&auml;t des Servers nicht &uuml;berpr&uuml;ft wird.
-Verwenden Sie die Option nur f&uuml;r Server, denen Sie vertrauen. Wenn Sie das Serverzertifikat (oder das Zertifikat seines Ausstellers) auf diesem PC dem Zertifikatspeicher &bdquo;Vertrauensw&uuml;rdige Stammzertifizierungsstellen&ldquo; hinzuf&uuml;gen, k&ouml;nnen Sie auch ohne diese Option eine Verbindung herstellen.
+Verwenden Sie die Option nur f&uuml;r Server, denen Sie vertrauen.
+Um ohne diese Option eine Verbindung herzustellen, richten Sie auf dem Server ein Zertifikat ein, f&uuml;gen Sie dieses Zertifikat (oder das Zertifikat seines Ausstellers) auf diesem PC dem Zertifikatspeicher &bdquo;Vertrauensw&uuml;rdige Stammzertifizierungsstellen&ldquo; hinzu und geben Sie als <strong>Servername</strong> den Namen ein, der im Zertifikat angegeben ist. Mit einem anderen Namen, etwa localhost oder einer IP-Adresse, schl&auml;gt die Verbindung fehl, auch wenn das Zertifikat hinzugef&uuml;gt wurde. Mit dem Zertifikat, das SQL Server automatisch erstellt, wenn kein Zertifikat eingerichtet ist, funktioniert dieses Verfahren nicht.
 Diese Option wird bei jedem &Ouml;ffnen des Verbindungsdialogs wieder deaktiviert.
 </div>
 

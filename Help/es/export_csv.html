@@ -68,7 +68,8 @@
 active la opción <strong>Confiar en el certificado del servidor</strong> en el cuadro de diálogo de conexión.</p>
 <div class="caution">
 <strong>Precaución:</strong> Con esta opción activada, la conexión sigue cifrada, pero el certificado del servidor no se valida, por lo que no se verifica la identidad del servidor.
-Úsela solo con un servidor de confianza. Si agrega el certificado del servidor (o el de su emisor) al almacén "Entidades de certificación raíz de confianza" de este equipo, podrá conectarse sin activar esta opción.
+Úsela solo con un servidor de confianza.
+Para conectarse sin activar esta opción, configure un certificado en el servidor, agregue ese certificado (o el de su emisor) al almacén "Entidades de certificación raíz de confianza" de este equipo e introduzca en <strong>Nombre del servidor</strong> el nombre que figura en el certificado. Si usa un nombre distinto, como localhost o una dirección IP, la conexión falla aunque el certificado esté registrado. Este método no funciona con el certificado que SQL Server crea automáticamente cuando no hay ningún certificado configurado.
 Esta opción se desactiva cada vez que se abre el cuadro de diálogo de conexión.
 </div>
 

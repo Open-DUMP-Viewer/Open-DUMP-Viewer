@@ -68,7 +68,8 @@
 cochez <strong>Approuver le certificat de serveur</strong> dans la bo&icirc;te de dialogue de connexion.</p>
 <div class="caution">
 <strong>Attention :</strong> Lorsque cette option est activ&eacute;e, la connexion reste chiffr&eacute;e, mais le certificat du serveur n'est pas valid&eacute;, de sorte que l'identit&eacute; du serveur n'est pas v&eacute;rifi&eacute;e.
-Ne l'utilisez que pour un serveur de confiance. Si vous ajoutez le certificat du serveur (ou celui de son &eacute;metteur) au magasin &laquo; Autorit&eacute;s de certification racines de confiance &raquo; de ce PC, vous pouvez vous connecter sans activer cette option.
+Ne l'utilisez que pour un serveur de confiance.
+Pour vous connecter sans activer cette option, configurez un certificat sur le serveur, ajoutez ce certificat (ou celui de son &eacute;metteur) au magasin &laquo; Autorit&eacute;s de certification racines de confiance &raquo; de ce PC, puis saisissez comme <strong>Nom du serveur</strong> le nom inscrit dans le certificat. Si vous saisissez un autre nom, tel que localhost ou une adresse IP, la connexion &eacute;choue m&ecirc;me si le certificat est enregistr&eacute;. Cette m&eacute;thode ne fonctionne pas avec le certificat que SQL Server cr&eacute;e automatiquement lorsqu'aucun certificat n'est configur&eacute;.
 Cette option est d&eacute;sactiv&eacute;e &agrave; chaque ouverture de la bo&icirc;te de dialogue de connexion.
 </div>
 

@@ -68,7 +68,8 @@
 selezionare <strong>Considera attendibile il certificato del server</strong> nella finestra di dialogo di connessione.</p>
 <div class="caution">
 <strong>Attenzione:</strong> Quando questa opzione è attivata, la connessione resta crittografata, ma il certificato del server non viene convalidato e quindi l'identità del server non viene verificata.
-Utilizzarla solo per un server attendibile. Se si aggiunge il certificato del server (o quello della relativa autorità emittente) all'archivio "Autorità di certificazione radice attendibili" di questo PC, è possibile connettersi senza attivare questa opzione.
+Utilizzarla solo per un server attendibile.
+Per connettersi senza attivare questa opzione, configurare un certificato sul server, aggiungere tale certificato (o quello della relativa autorità emittente) all'archivio "Autorità di certificazione radice attendibili" di questo PC e inserire come <strong>Nome server</strong> il nome riportato nel certificato. La connessione con un nome diverso, ad esempio localhost o un indirizzo IP, non riesce anche se il certificato è registrato. Questo metodo non funziona con il certificato che SQL Server crea automaticamente quando non è configurato alcun certificato.
 Questa opzione viene disattivata a ogni apertura della finestra di dialogo di connessione.
 </div>
 
