@@ -141,9 +141,11 @@ Public Class BulkExportLogic
     ''' <summary>
     ''' SQL Server 一括エクスポート: 接続先 DB に複数テーブルを作成
     ''' </summary>
+    ''' <param name="notes">元の値のとおりには書けなかった列の説明を足す先 (SqlServerExportLogic.Export の notes)</param>
     Public Shared Function ExportSqlServer(contexts As List(Of ExportHelper.TableExportContext),
                                             connectionString As String,
-                                            worker As BackgroundWorker) As Boolean
+                                            worker As BackgroundWorker,
+                                            Optional notes As List(Of String) = Nothing) As Boolean
         For i As Integer = 0 To contexts.Count - 1
             If worker IsNot Nothing AndAlso worker.CancellationPending Then Return False
 
@@ -156,7 +158,7 @@ Public Class BulkExportLogic
             Dim columnList = New List(Of String)(colNames)
 
             Dim ok = SqlServerExportLogic.Export(tableData, columnList, ctx.ColumnTypes,
-                                                 ctx.Schema, ctx.TableName, connectionString, worker, marks)
+                                                 ctx.Schema, ctx.TableName, connectionString, worker, marks, notes)
             If Not ok Then Return False
 
             tableData = Nothing

@@ -1070,6 +1070,7 @@ Public Class Open_DUMP_Viewer
             Dim exportedRows As Long = 0
             Dim preview = GetActiveTablePreview()
 
+            Dim notes As New List(Of String)
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connectionString
                 Dim success = dlg.RunExport(
@@ -1087,12 +1088,11 @@ Public Class Open_DUMP_Viewer
                         exportedRows = rows.Count
 
                         Dim ok = SqlServerExportLogic.Export(rows, columnList, ctx.ColumnTypes,
-                                                             ctx.Schema, ctx.TableName, connStr, worker, marks)
+                                                             ctx.Schema, ctx.TableName, connStr, worker, marks, notes)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
-                    MessageBox.Show(Loc.SF("Msg_SqlServerExportComplete", exportedRows),
-                                   Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    ShowSqlServerExportComplete(Loc.SF("Msg_SqlServerExportComplete", exportedRows), notes)
                 End If
             End Using
         Else
@@ -1100,19 +1100,38 @@ Public Class Open_DUMP_Viewer
             Dim contexts = GetBulkExportContexts()
             If contexts Is Nothing Then Return
 
+            Dim notes As New List(Of String)
             Using dlg As New ExportProgressDialog()
                 Dim connStr = connectionString
                 Dim success = dlg.RunExport(
                     Sub(worker, args)
-                        Dim ok = BulkExportLogic.ExportSqlServer(contexts, connStr, worker)
+                        Dim ok = BulkExportLogic.ExportSqlServer(contexts, connStr, worker, notes)
                         If Not ok Then args.Cancel = True
                     End Sub)
                 If success Then
-                    MessageBox.Show(Loc.SF("Msg_BulkSqlServerExportComplete", contexts.Count),
-                                   Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+                    ShowSqlServerExportComplete(Loc.SF("Msg_BulkSqlServerExportComplete", contexts.Count), notes)
                 End If
             End Using
         End If
+    End Sub
+
+    ''' <summary>
+    ''' SQL Server 出力の完了の表示。元の値のとおりには書けなかった列 (丸め・FLOAT(53)・NULL) があれば、
+    ''' 警告のアイコンで列ごとに挙げる (多いときは先頭の 15 件と残りの件数)
+    ''' </summary>
+    Private Sub ShowSqlServerExportComplete(doneMessage As String, notes As List(Of String))
+        If notes Is Nothing OrElse notes.Count = 0 Then
+            MessageBox.Show(doneMessage, Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+        Const MAX_SHOWN As Integer = 15
+        Dim sb As New System.Text.StringBuilder()
+        sb.Append(doneMessage).Append(vbCrLf).Append(vbCrLf).Append(Loc.S("Msg_SqlServerExportChangedValues")).Append(vbCrLf)
+        For i = 0 To Math.Min(notes.Count, MAX_SHOWN) - 1
+            sb.Append("- ").Append(notes(i)).Append(vbCrLf)
+        Next
+        If notes.Count > MAX_SHOWN Then sb.Append(Loc.SF("Msg_SqlServerExportChangedMore", notes.Count - MAX_SHOWN)).Append(vbCrLf)
+        MessageBox.Show(sb.ToString(), Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
     End Sub
 
     Private Sub btnExportOdbc_Click(sender As Object, e As EventArgs) Handles btnExportOdbc.Click

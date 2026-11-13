@@ -435,6 +435,11 @@ Open_DumpParser.dll が実行ファイルと同じフォルダにあることを
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine がインストールされていません。</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog が利用できません。Microsoft Access Database Engine をインストールしてください。</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server エクスポートエラー: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>次の列には SQL Server の型に収まらない値があったため、値を変えて書き込みました。元の値が必要な場合は、出力した表のこれらの列を確認してください。</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>ほか {0} 件</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): {2} 件の値を小数第 {3} 位に丸めました (例: {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): 有効数字が 15 桁を超える {3} 件の値は近似値になりました (例: {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: SQL Server に書けない値 (NaN・無限大) {1} 件を NULL にしました (例: {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC エクスポートエラー: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel 一括エクスポートエラー: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>列情報がありません。</value></data>

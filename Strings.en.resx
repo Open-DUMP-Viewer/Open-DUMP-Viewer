@@ -435,6 +435,11 @@ Rows that could not be written: {1} (unsafe file name or write failure)</value><
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine is not installed.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog is not available. Please install Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server export error: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>The following columns had values that do not fit the SQL Server column types, so those values were written with changes. If you need the original values, check these columns in the exported table.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>and {0} more</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): rounded {2} value(s) to {3} decimal places (e.g. {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): {3} value(s) with more than 15 significant digits were stored as approximate values (e.g. {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: {1} value(s) that SQL Server cannot store (NaN or infinity) were written as NULL (e.g. {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC export error: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel bulk export error: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>No column information available.</value></data>
