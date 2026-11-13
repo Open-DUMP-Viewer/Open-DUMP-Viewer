@@ -57,7 +57,7 @@
   「Open DUMP Viewer for Oracle database」を選択し、アンインストールしてください。
   ライセンス情報 (%APPDATA%\OpenDUMPViewer) は、安定版・ベータ版・ポータブル版で
   共有しているため、アンインストールでは削除しません。不要な場合は手動で削除してください。
-  自動セットアップした Oracle Instant Client (%LOCALAPPDATA%\Open_DUMP_Viewer) は、
+  自動セットアップした Oracle Instant Client (%LOCALAPPDATA%\Open_DUMP_Viewer\oracle_client) は、
   安定版とベータ版のもう一方がインストールされていない場合だけ削除します。
 
   【ポータブル版】

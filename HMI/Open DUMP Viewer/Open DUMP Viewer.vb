@@ -1093,6 +1093,8 @@ Public Class Open_DUMP_Viewer
                     End Sub)
                 If success Then
                     ShowSqlServerExportComplete(Loc.SF("Msg_SqlServerExportComplete", exportedRows), notes)
+                ElseIf notes.Count > 0 Then
+                    ShowSqlServerExportComplete(Nothing, notes)
                 End If
             End Using
         Else
@@ -1110,6 +1112,9 @@ Public Class Open_DUMP_Viewer
                     End Sub)
                 If success Then
                     ShowSqlServerExportComplete(Loc.SF("Msg_BulkSqlServerExportComplete", contexts.Count), notes)
+                ElseIf notes.Count > 0 Then
+                    ' 途中で失敗・取り消した一括エクスポート: 書き終えた表のうち値を変えた列を知らせる
+                    ShowSqlServerExportComplete(Nothing, notes)
                 End If
             End Using
         End If
@@ -1117,7 +1122,8 @@ Public Class Open_DUMP_Viewer
 
     ''' <summary>
     ''' SQL Server 出力の完了の表示。元の値のとおりには書けなかった列 (丸め・FLOAT(53)・NULL) があれば、
-    ''' 警告のアイコンで列ごとに挙げる (多いときは先頭の 15 件と残りの件数)
+    ''' 警告のアイコンで列ごとに挙げる (多いときは先頭の 15 件と残りの件数)。
+    ''' doneMessage が Nothing のときは、失敗・取り消しの後に、書き終えた表の列だけを警告として挙げる
     ''' </summary>
     Private Sub ShowSqlServerExportComplete(doneMessage As String, notes As List(Of String))
         If notes Is Nothing OrElse notes.Count = 0 Then
@@ -1126,12 +1132,13 @@ Public Class Open_DUMP_Viewer
         End If
         Const MAX_SHOWN As Integer = 15
         Dim sb As New System.Text.StringBuilder()
-        sb.Append(doneMessage).Append(vbCrLf).Append(vbCrLf).Append(Loc.S("Msg_SqlServerExportChangedValues")).Append(vbCrLf)
+        If doneMessage IsNot Nothing Then sb.Append(doneMessage).Append(vbCrLf).Append(vbCrLf)
+        sb.Append(Loc.S("Msg_SqlServerExportChangedValues")).Append(vbCrLf)
         For i = 0 To Math.Min(notes.Count, MAX_SHOWN) - 1
             sb.Append("- ").Append(notes(i)).Append(vbCrLf)
         Next
         If notes.Count > MAX_SHOWN Then sb.Append(Loc.SF("Msg_SqlServerExportChangedMore", notes.Count - MAX_SHOWN)).Append(vbCrLf)
-        MessageBox.Show(sb.ToString(), Loc.S("Title_Complete"), MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        MessageBox.Show(sb.ToString(), Loc.S(If(doneMessage Is Nothing, "Title_Warning", "Title_Complete")), MessageBoxButtons.OK, MessageBoxIcon.Warning)
     End Sub
 
     Private Sub btnExportOdbc_Click(sender As Object, e As EventArgs) Handles btnExportOdbc.Click

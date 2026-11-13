@@ -186,7 +186,7 @@ Public Class SqlServerExportLogic
     ''' 精度なしの NUMBER: 全行の値の整数部の桁 I・小数部の桁 F の最大から型を選ぶ。
     '''   I + F &lt;= 38 → DECIMAL(38,F)。丸めない (整数部は 38-F 桁まで入る)
     '''   I &lt;= 38 &lt; I + F → DECIMAL(38,38-I)。小数部の多い値を丸めて数える (繰り上がりで整数部が増える値があれば 1 桁詰める)
-    '''   I &gt; 38 → FLOAT(53)。DECIMAL に入らない。有効数字 15 桁を超える値を数える
+    '''   I &gt; 38 (または丸めの繰り上がりで 39 桁になる) → FLOAT(53)。DECIMAL に入らない。倍精度で元の値に戻らない値を数える
     ''' 値が 1 つも無い列は従来どおり DECIMAL(38,10)
     ''' </summary>
     Private Shared Sub PlanBareNumber(p As ColumnPlan, data As List(Of String()), col As Integer, marks As Open_NativeParser.ValueMarks)
@@ -203,9 +203,7 @@ Public Class SqlServerExportLogic
         If Not any Then
             SetDecimal(p, 10)
         ElseIf maxInt > MAX_DEC Then
-            p.Kind = ValueKind.Dbl
-            p.SqlType = "FLOAT(53)"
-            p.CountApprox = True
+            SetFloat(p)
         ElseIf maxInt + maxFrac <= MAX_DEC Then
             SetDecimal(p, maxFrac)
         Else
@@ -221,8 +219,19 @@ Public Class SqlServerExportLogic
                     Exit For
                 End If
             Next
-            SetDecimal(p, Math.Max(scale, 0))
+            If scale < 0 Then
+                ' 整数部 38 桁の値が丸めの繰り上がりで 39 桁になる: DECIMAL に入らない
+                SetFloat(p)
+            Else
+                SetDecimal(p, scale)
+            End If
         End If
+    End Sub
+
+    Private Shared Sub SetFloat(p As ColumnPlan)
+        p.Kind = ValueKind.Dbl
+        p.SqlType = "FLOAT(53)"
+        p.CountApprox = True
     End Sub
 
     Private Shared Sub SetDecimal(p As ColumnPlan, scale As Integer)
@@ -387,9 +396,11 @@ Public Class SqlServerExportLogic
                 If p.CountApprox Then
                     Dim intd, fracd, sig As Integer
                     SqlDialect.NumberDigits(v, intd, fracd, sig)
-                    If sig > 15 Then
+                    ' 有効数字 15 桁までは倍精度で必ず元の値に戻る。それを超える値は、倍精度の最短の表記が元の値と違うときだけ数える
+                    Dim back = d.ToString("R", CultureInfo.InvariantCulture)
+                    If sig > 15 AndAlso Not SameDecimalValue(v, back) Then
                         p.Approx += 1
-                        If p.ApproxExample Is Nothing Then p.ApproxExample = $"{v} -> {d.ToString("R", CultureInfo.InvariantCulture)}"
+                        If p.ApproxExample Is Nothing Then p.ApproxExample = $"{v} -> {back}"
                     End If
                 End If
                 Return d
@@ -397,6 +408,50 @@ Public Class SqlServerExportLogic
             Case Else
                 Return v
         End Select
+    End Function
+
+    ''' <summary>
+    ''' 2 つの 10 進の表記 (符号・数字・小数点。指数 E±n も可) が同じ値か。有効数字の並びと桁の位置で比べる
+    ''' </summary>
+    Friend Shared Function SameDecimalValue(a As String, b As String) As Boolean
+        Dim sa As String = "", sb As String = ""
+        Dim ea, eb As Integer, na, nb As Boolean
+        If Not CanonicalDecimal(a, na, sa, ea) OrElse Not CanonicalDecimal(b, nb, sb, eb) Then Return False
+        If sa.Length = 0 AndAlso sb.Length = 0 Then Return True      ' どちらも 0 (符号は問わない)
+        Return na = nb AndAlso sa = sb AndAlso ea = eb
+    End Function
+
+    ''' <summary>
+    ''' 10 進の表記を、符号・有効数字の並び (先頭と末尾の 0 を除く。0 なら空)・先頭の有効数字の桁位置 (10 の何乗の位か) にする
+    ''' </summary>
+    Private Shared Function CanonicalDecimal(s As String, ByRef neg As Boolean, ByRef sig As String, ByRef exp10 As Integer) As Boolean
+        neg = False : sig = "" : exp10 = 0
+        If String.IsNullOrEmpty(s) Then Return False
+        Dim pos = 0
+        If s(0) = "-"c OrElse s(0) = "+"c Then
+            neg = (s(0) = "-"c)
+            pos = 1
+        End If
+        Dim ePos = s.IndexOfAny({"E"c, "e"c}, pos)
+        Dim mant = If(ePos < 0, s.Substring(pos), s.Substring(pos, ePos - pos))
+        Dim e As Integer = 0
+        If ePos >= 0 AndAlso Not Integer.TryParse(s.Substring(ePos + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, e) Then Return False
+        Dim dot = mant.IndexOf("."c)
+        Dim ip = If(dot < 0, mant, mant.Substring(0, dot))
+        Dim fp = If(dot < 0, "", mant.Substring(dot + 1))
+        If ip.Length + fp.Length = 0 Then Return False
+        For Each c In ip & fp
+            If Not SqlDialect.IsAsciiDigit(c) Then Return False
+        Next
+        Dim digits = ip & fp
+        Dim lead = 0
+        While lead < digits.Length AndAlso digits(lead) = "0"c
+            lead += 1
+        End While
+        If lead = digits.Length Then Return True                    ' 0
+        sig = digits.Substring(lead).TrimEnd("0"c)
+        exp10 = ip.Length - 1 - lead + e
+        Return True
     End Function
 
     ''' <summary>元の値のとおりには書けなかった列を、利用者に見せる文にして notes に足す</summary>
