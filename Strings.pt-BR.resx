@@ -432,6 +432,11 @@ Arquivos extraídos: {0}</value></data>
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>O Microsoft Access Database Engine não está instalado.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog não está disponível. Por favor, instale o Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Erro de exportação SQL Server: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>As colunas a seguir continham valores que não cabem nos tipos de coluna do SQL Server; por isso, esses valores foram alterados ao serem gravados. Se precisar dos valores originais, verifique essas colunas na tabela exportada.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>e mais {0}</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): {2} valor(es) arredondado(s) para {3} casas decimais (ex.: {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): {3} valor(es) com mais de 15 dígitos significativos foram armazenados como valores aproximados (ex.: {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: {1} valor(es) que o SQL Server não consegue armazenar (NaN ou infinito) foram gravados como NULL (ex.: {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Erro de exportação ODBC: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Erro de exportação Excel em massa: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>Nenhuma informação de coluna disponível.</value></data>

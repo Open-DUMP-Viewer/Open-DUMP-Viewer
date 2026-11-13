@@ -432,6 +432,11 @@ https://www.odv.dev/
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine не установлен.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog недоступен. Установите Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Ошибка экспорта SQL Server: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>В следующих столбцах были значения, которые не помещаются в типы столбцов SQL Server, поэтому эти значения записаны в изменённом виде. Если вам нужны исходные значения, проверьте эти столбцы в экспортированной таблице.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>и ещё {0}</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): значения округлены до {3}-го знака после запятой (количество: {2}; например, {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): значения, содержащие более 15 значащих цифр, сохранены как приближённые (количество: {3}; например, {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: значения, которые SQL Server не может сохранить (NaN или бесконечность), записаны как NULL (количество: {1}; например, {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Ошибка экспорта ODBC: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Ошибка массового экспорта Excel: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>Информация о столбцах недоступна.</value></data>

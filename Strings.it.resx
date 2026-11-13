@@ -425,6 +425,11 @@ File estratti: {0}</value>
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine non è installato.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog non è disponibile. Installare Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Errore esportazione SQL Server: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>Le seguenti colonne contenevano valori che non rientrano nei tipi di colonna di SQL Server, pertanto tali valori sono stati modificati durante la scrittura. Se sono necessari i valori originali, controllare queste colonne nella tabella esportata.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>e altre {0}</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): {2} valore/i arrotondato/i a {3} cifre decimali (ad es. {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): {3} valore/i con più di 15 cifre significative memorizzato/i in forma approssimata (ad es. {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: {1} valore/i che SQL Server non può memorizzare (NaN o infinito) scritto/i come NULL (ad es. {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Errore esportazione ODBC: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Errore esportazione Excel massiva: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>Nessuna informazione sulle colonne disponibile.</value></data>

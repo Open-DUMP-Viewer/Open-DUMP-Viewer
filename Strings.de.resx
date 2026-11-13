@@ -396,6 +396,11 @@ Extrahierte Dateien: {0}</value>
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine ist nicht installiert.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog ist nicht verfügbar. Bitte installieren Sie Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server-Exportfehler: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>Die folgenden Spalten enthielten Werte, die nicht in die SQL Server-Spaltentypen passen. Diese Werte wurden daher beim Schreiben geändert. Wenn Sie die ursprünglichen Werte benötigen, prüfen Sie diese Spalten in der exportierten Tabelle.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>und {0} weitere</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): {2} Wert(e) auf {3} Dezimalstellen gerundet (z. B. {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): {3} Wert(e) mit mehr als 15 signifikanten Stellen als Näherungswerte gespeichert (z. B. {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: {1} Wert(e), die SQL Server nicht speichern kann (NaN oder Unendlich), als NULL geschrieben (z. B. {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC-Exportfehler: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel-Massenexportfehler: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>Keine Spalteninformationen verfügbar.</value></data>

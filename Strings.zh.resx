@@ -431,6 +431,11 @@ https://www.odv.dev/
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>未安装 Microsoft Access Database Engine。</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog 不可用。请安装 Microsoft Access Database Engine。</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>SQL Server 导出错误: {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>以下各列中包含 SQL Server 列类型无法按原样容纳的值，因此这些值在写入时已被更改。如需原始值，请检查已导出表中的这些列。</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>另有 {0} 项</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}): 已将 {2} 个值舍入到小数点后 {3} 位 (例如: {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}): 有效数字超过 15 位的 {3} 个值已存储为近似值 (例如: {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0}: SQL Server 无法存储的 {1} 个值 (NaN 或无穷大) 已设为 NULL (例如: {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>ODBC 导出错误: {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Excel 批量导出错误: {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>没有可用的列信息。</value></data>

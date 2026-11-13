@@ -442,6 +442,11 @@ Fichiers extraits : {0}</value>
   <data name="AccessExport_AceNotInstalled" xml:space="preserve"><value>Microsoft Access Database Engine n'est pas installé.</value></data>
   <data name="AccessExport_AdoxUnavailable" xml:space="preserve"><value>ADOX.Catalog n'est pas disponible. Veuillez installer Microsoft Access Database Engine.</value></data>
   <data name="SqlServerExport_Error" xml:space="preserve"><value>Erreur d'export SQL Server : {0}</value></data>
+  <data name="Msg_SqlServerExportChangedValues" xml:space="preserve"><value>Les colonnes suivantes comportaient des valeurs que les types de colonnes SQL Server ne peuvent pas stocker telles quelles. Ces valeurs ont donc été modifiées lors de l'écriture. Si vous avez besoin des valeurs d'origine, vérifiez ces colonnes dans la table exportée.</value></data>
+  <data name="Msg_SqlServerExportChangedMore" xml:space="preserve"><value>et {0} autre(s)</value></data>
+  <data name="SqlServerExport_NoteRounded" xml:space="preserve"><value>{0} ({1}) : {2} valeur(s) arrondie(s) à {3} décimale(s) (p. ex. {4})</value></data>
+  <data name="SqlServerExport_NoteApprox" xml:space="preserve"><value>{0} ({1} → {2}) : {3} valeur(s) de plus de 15 chiffres significatifs stockée(s) sous forme de valeur approchée (p. ex. {4})</value></data>
+  <data name="SqlServerExport_NoteNulled" xml:space="preserve"><value>{0} : {1} valeur(s) que SQL Server ne peut pas stocker (NaN ou infini) remplacée(s) par NULL (p. ex. {2})</value></data>
   <data name="OdbcExport_Error" xml:space="preserve"><value>Erreur d'export ODBC : {0}</value></data>
   <data name="BulkExcelExport_Error" xml:space="preserve"><value>Erreur d'export Excel en masse : {0}</value></data>
   <data name="TablePreview_NoColumns" xml:space="preserve"><value>Aucune information de colonne disponible.</value></data>
