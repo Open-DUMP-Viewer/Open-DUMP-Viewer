@@ -18,11 +18,15 @@
   #define MyAppId        "{{2e7f53d3-f0d6-4000-8d40-253b4ae66c63}"
   #define MyAppDirName   "Open DUMP Viewer Beta"
   #define MyOldAppId     "{a6f03b60-f9ab-4182-a1fc-aa9801428121}_is1"
+  ; もう一方の版 (安定版) の Uninstall キー名。共有フォルダーを消してよいかの判定に使う
+  #define MyOtherAppUninstKey "{25f04e6a-ad47-47aa-9a66-74f64c772bac}_is1"
 #else
   #define MyAppName      "Open DUMP Viewer for Oracle database"
   #define MyAppId        "{{25f04e6a-ad47-47aa-9a66-74f64c772bac}"
   #define MyAppDirName   "Open DUMP Viewer"
   #define MyOldAppId     "{cd3b541d-5df6-4737-9bcc-16a4329a8a54}_is1"
+  ; もう一方の版 (ベータ版) の Uninstall キー名
+  #define MyOtherAppUninstKey "{2e7f53d3-f0d6-4000-8d40-253b4ae66c63}_is1"
 #endif
 
 ; ============================================================
@@ -92,43 +96,33 @@ Name: "chinesesimplified";    MessagesFile: "ChineseSimplified.isl";            
 [CustomMessages]
 ; --- 日本語 ---
 japanese.LaunchAfterInstall=インストール後に {#MyAppName} を起動する
-japanese.DeleteSettings=ユーザー設定を削除しますか？（ライセンス情報等）
 japanese.VisitReleasePage=フィードバックを送信する（ブラウザが開きます）
 ; --- English ---
 english.LaunchAfterInstall=Launch {#MyAppName} after installation
-english.DeleteSettings=Do you want to delete user settings? (license info, etc.)
 english.VisitReleasePage=Send feedback (opens browser)
 ; --- Deutsch ---
 german.LaunchAfterInstall={#MyAppName} nach der Installation starten
-german.DeleteSettings=Möchten Sie die Benutzereinstellungen löschen? (Lizenzinformationen usw.)
 german.VisitReleasePage=Feedback senden (öffnet Browser)
 ; --- Español ---
 spanish.LaunchAfterInstall=Iniciar {#MyAppName} después de la instalación
-spanish.DeleteSettings=¿Desea eliminar la configuración del usuario? (información de licencia, etc.)
 spanish.VisitReleasePage=Enviar comentarios (abre el navegador)
 ; --- Français ---
 french.LaunchAfterInstall=Lancer {#MyAppName} après l'installation
-french.DeleteSettings=Voulez-vous supprimer les paramètres utilisateur ? (informations de licence, etc.)
 french.VisitReleasePage=Envoyer des commentaires (ouvre le navigateur)
 ; --- Italiano ---
 italian.LaunchAfterInstall=Avvia {#MyAppName} dopo l'installazione
-italian.DeleteSettings=Eliminare le impostazioni utente? (informazioni sulla licenza, ecc.)
 italian.VisitReleasePage=Invia feedback (apre il browser)
 ; --- 한국어 ---
 korean.LaunchAfterInstall=설치 후 {#MyAppName} 실행
-korean.DeleteSettings=사용자 설정을 삭제하시겠습니까? (라이선스 정보 등)
 korean.VisitReleasePage=피드백 보내기 (브라우저가 열립니다)
 ; --- Português (BR) ---
 brazilianportuguese.LaunchAfterInstall=Iniciar {#MyAppName} após a instalação
-brazilianportuguese.DeleteSettings=Deseja excluir as configurações do usuário? (informações de licença, etc.)
 brazilianportuguese.VisitReleasePage=Enviar feedback (abre o navegador)
 ; --- Русский ---
 russian.LaunchAfterInstall=Запустить {#MyAppName} после установки
-russian.DeleteSettings=Удалить пользовательские настройки? (информация о лицензии и т.д.)
 russian.VisitReleasePage=Отправить отзыв (откроется браузер)
 ; --- 中文 (简体) ---
 chinesesimplified.LaunchAfterInstall=安装后启动 {#MyAppName}
-chinesesimplified.DeleteSettings=是否删除用户设置？（许可证信息等）
 chinesesimplified.VisitReleasePage=发送反馈（将打开浏览器）
 
 ; ============================================================
@@ -200,27 +194,52 @@ begin
 end;
 
 /// <summary>
-/// アンインストール時: ユーザー設定の削除を確認
-/// %APPDATA%\OpenDUMPViewer を削除するか尋ねる
+/// もう一方の版 (安定版から見たベータ版、ベータ版から見た安定版) がこの PC に残っているか。
+/// 両版とポータブル版は %APPDATA%\OpenDUMPViewer と %LOCALAPPDATA%\Open_DUMP_Viewer を
+/// 共有しているため、残る版があるときは共有フォルダーを消さない。
+/// 両版とも PrivilegesRequired=admin かつ 64 ビットモードなので Uninstall キーは HKLM の
+/// 64 ビットビューにあり、64 ビットモードの Reg* は既定でそこを見る。HKCU も見るのは、
+/// 将来ユーザー単位のインストールを許したときに備えるため。キーがあっても
+/// アンインストーラー本体が無ければ (フォルダーを手で消した等) 残っていないとみなす。
+/// ポータブル版はレジストリに何も残さないため、ここでは検出できない。
+/// </summary>
+function OtherEditionInstalled(): Boolean;
+var
+  Key: String;
+  UninstallExe: String;
+begin
+  Result := False;
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{#MyOtherAppUninstKey}';
+  if RegQueryStringValue(HKLM, Key, 'UninstallString', UninstallExe) then
+    Result := FileExists(RemoveQuotes(UninstallExe));
+  if (not Result) and RegQueryStringValue(HKCU, Key, 'UninstallString', UninstallExe) then
+    Result := FileExists(RemoveQuotes(UninstallExe));
+end;
+
+/// <summary>
+/// アンインストール時: 自動セットアップした Oracle Instant Client を片付ける。
+/// もう一方の版が残っているときは消さない (その版の impdp が使えなくなるため)。
+/// %APPDATA%\OpenDUMPViewer (license.status / license.check / heartbeat.last) は消さない。
+/// ライセンスは安定版・ベータ版・ポータブル版で共有しており、ポータブル版の有無は
+/// 検出できない。ローカルのファイルを消してもサーバー側の割り当ては解放されない。
 /// </summary>
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  SettingsDir: String;
+  ClientDir: String;
 begin
-  if CurUninstallStep = usPostUninstall then
-  begin
-    { Oracle Client キャッシュを無条件削除 }
-    DelTree(ExpandConstant('{localappdata}\Open_DUMP_Viewer\oracle_client'), True, True, True);
+  if CurUninstallStep <> usPostUninstall then
+    Exit;
 
-    SettingsDir := ExpandConstant('{userappdata}\OpenDUMPViewer');
-    if DirExists(SettingsDir) then
-    begin
-      if MsgBox(CustomMessage('DeleteSettings'), mbConfirmation, MB_YESNO) = IDYES then
-      begin
-        DelTree(SettingsDir, True, True, True);
-      end;
-    end;
+  ClientDir := ExpandConstant('{localappdata}\Open_DUMP_Viewer\oracle_client');
+  if OtherEditionInstalled() then
+  begin
+    Log('Keeping ' + ClientDir + ': {#MyOtherAppUninstKey} is still installed');
+    Exit;
   end;
+
+  DelTree(ClientDir, True, True, True);
+  { 親フォルダーは空のときだけ消える }
+  RemoveDir(ExpandConstant('{localappdata}\Open_DUMP_Viewer'));
 end;
 
 /// <summary>
