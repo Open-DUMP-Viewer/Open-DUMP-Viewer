@@ -26,6 +26,7 @@
 #include "odv_types.h"
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 /*---------------------------------------------------------------------------
     decode_oracle_date
@@ -274,9 +275,9 @@ int decode_binary_float(const unsigned char *buf, char *out, int out_size)
     if (fval != fval) {
         /* NaN: use uppercase representation */
         odv_strcpy(out, "NaN", out_size - 1);
-    } else if (fval > 3.402823e+38f) {
+    } else if (fval > FLT_MAX) {
         odv_strcpy(out, "Inf", out_size - 1);
-    } else if (fval < -3.402823e+38f) {
+    } else if (fval < -FLT_MAX) {
         odv_strcpy(out, "-Inf", out_size - 1);
     } else {
         snprintf(out, out_size, "%.10g", (double)fval);
