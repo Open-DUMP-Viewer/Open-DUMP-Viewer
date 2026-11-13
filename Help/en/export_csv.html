@@ -68,7 +68,8 @@
 select <strong>Trust server certificate</strong> in the connection dialog.</p>
 <div class="caution">
 <strong>Caution:</strong> When this option is on, the connection is still encrypted, but the server certificate is not validated, so the server's identity is not verified.
-Use it only for a server you trust. If you add the server certificate (or the certificate of its issuer) to the Trusted Root Certification Authorities store on this PC, you can connect without turning this option on.
+Use it only for a server you trust.
+To connect without this option, configure a certificate on the server, add that certificate (or the certificate of its issuer) to the Trusted Root Certification Authorities store on this PC, and enter the name written in the certificate as the <strong>Server name</strong>. Connecting by a different name, such as localhost or an IP address, fails even if the certificate is registered. This method does not work with the certificate that SQL Server creates automatically when no certificate is configured.
 This option is turned off each time the connection dialog opens.
 </div>
 
