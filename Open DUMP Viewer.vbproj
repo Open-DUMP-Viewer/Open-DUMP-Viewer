@@ -136,7 +136,7 @@
     <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.15" />
+    <PackageReference Include="System.Data.Odbc" Version="11.0.0" />
     <PackageReference Include="System.Data.OleDb" Version="10.0.15" />
   </ItemGroup>
 
