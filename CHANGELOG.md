@@ -1,6 +1,6 @@
 # Changelog
 
-## [4.8.1] - 2026-11-13
+## [4.8.1] - 2026-11-16
 
 4.8.0 はベータ版 (v4.8.0-beta) としてのみ公開しました。正式版としては 4.7.0 の次のバージョンで、4.8.0 の新機能を含みます。
 
@@ -31,8 +31,11 @@
   - この修正は、4.8.1 以降に更新してからアンインストールしたときに働きます
 
 ### 依存関係
-- System.Data.Odbc / System.Data.OleDb 10.0.13 → 10.0.15
-  - 推移的依存の System.Configuration.ConfigurationManager / System.Diagnostics.EventLog / System.Diagnostics.PerformanceCounter / System.Security.Cryptography.ProtectedData も 10.0.13 → 10.0.15 になります
+- System.Data.Odbc / System.Data.OleDb 10.0.13 → 11.0.0
+  - 推移的依存の System.Configuration.ConfigurationManager / System.Diagnostics.EventLog / System.Diagnostics.PerformanceCounter / System.Security.Cryptography.ProtectedData も 11.0.0 になります。これらは従来 .NET 10 の Windows デスクトップ ランタイムに含まれる版を同梱していましたが、以後はパッケージの版 (11.0.0) を同梱します (アプリの動作環境は引き続き .NET 10 です)
+- Microsoft.Data.SqlClient 7.1.1 → 7.1.2
+  - 推移的依存の Microsoft.Data.SqlClient.Extensions.Abstractions / Microsoft.Data.SqlClient.Internal.Logging も 7.1.2、Microsoft.Data.SqlClient.SNI.runtime は 7.1.0 → 7.1.2、Microsoft.Bcl.Cryptography / Microsoft.Extensions.Caching.Abstractions / Microsoft.Extensions.Caching.Memory / Microsoft.Extensions.Options / Microsoft.Extensions.Primitives / System.Threading.RateLimiting は 9.0.18 → 9.0.21 になります
+  - 接続時のサーバー応答の検証が強化されました (不正な PRELOGIN 応答などを破損として拒否し、その接続をプールに戻しません)。「サーバー証明書を信頼する」の動作は変わりません
 
 ### 内部
 - DLL バージョン文字列 (`ODV_VERSION_STRING`) を 4.8.0 → 4.8.1 に同期
