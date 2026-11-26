@@ -40,7 +40,7 @@ als eine Datei pro Datensatz.</p>
 <h2>Dateibenennungsmethoden</h2>
 <table>
 <tr><th>Methode</th><th>Beispiel</th><th>Beschreibung</th></tr>
-<tr><td>Fortlaufend</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>6-stellige fortlaufende Nummern ab 1</td></tr>
+<tr><td>Fortlaufend</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>Nummern ab 1. F&uuml;r eine Zeile, deren LOB NULL oder leer ist, wird keine Datei erstellt und keine Nummer vergeben</td></tr>
 <tr><td>Spaltenwert</td><td><code>dateiname_spalte_wert.jpg</code></td><td>Verwendet den Wert einer angegebenen Spalte als Dateinamen</td></tr>
 </table>
 
@@ -67,7 +67,7 @@ Sie k&ouml;nnen den Vorgang &uuml;ber den Fortschrittsdialog abbrechen.
 
 <div class="note">
 <strong>Hinweis:</strong> In der Tabellenvorschau wird von LOB-Daten nur der Anfang angezeigt
-(bei einem mit exp erstellten Dump die Platzhalter <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+(bei einem mit exp erstellten Dump <code>%CLOB%</code> f&uuml;r CLOB und <code>%NCLOB%</code> f&uuml;r NCLOB).
 Verwenden Sie diese LOB-Dateiextraktionsfunktion, um die vollst&auml;ndigen Daten abzurufen.
 </div>
 

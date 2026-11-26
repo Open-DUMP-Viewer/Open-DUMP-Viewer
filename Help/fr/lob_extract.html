@@ -40,7 +40,7 @@ en un fichier par enregistrement.</p>
 <h2>M&eacute;thodes de nommage des fichiers</h2>
 <table>
 <tr><th>M&eacute;thode</th><th>Exemple</th><th>Description</th></tr>
-<tr><td>S&eacute;quentiel</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>Num&eacute;ros s&eacute;quentiels &agrave; 6 chiffres &agrave; partir de 1</td></tr>
+<tr><td>S&eacute;quentiel</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>Num&eacute;ros &agrave; partir de 1. Une ligne dont le LOB est NULL ou vide ne produit pas de fichier et ne prend pas de num&eacute;ro</td></tr>
 <tr><td>Valeur de colonne</td><td><code>valeur_col_nom.jpg</code></td><td>Utilise la valeur d'une colonne sp&eacute;cifi&eacute;e comme nom de fichier</td></tr>
 </table>
 
@@ -67,7 +67,7 @@ Vous pouvez annuler via la bo&icirc;te de dialogue de progression.
 
 <div class="note">
 <strong>Remarque :</strong> Dans l'aper&ccedil;u de table, seul le d&eacute;but des donn&eacute;es LOB est affich&eacute;
-(un dump cr&eacute;&eacute; avec exp affiche les espaces r&eacute;serv&eacute;s <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+(un dump cr&eacute;&eacute; avec exp affiche <code>%CLOB%</code> pour CLOB et <code>%NCLOB%</code> pour NCLOB).
 Utilisez cette fonctionnalit&eacute; d'extraction de fichiers LOB pour r&eacute;cup&eacute;rer les donn&eacute;es compl&egrave;tes.
 </div>
 

@@ -40,7 +40,7 @@ como un archivo por registro.</p>
 <h2>Métodos de nomenclatura de archivos</h2>
 <table>
 <tr><th>Método</th><th>Ejemplo</th><th>Descripción</th></tr>
-<tr><td>Secuencial</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>Números secuenciales de 6 dígitos a partir de 1</td></tr>
+<tr><td>Secuencial</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>Números a partir de 1. Una fila cuyo LOB es NULL o está vacío no genera archivo ni consume número</td></tr>
 <tr><td>Valor de columna</td><td><code>valor_col_nombre.jpg</code></td><td>Usa el valor de una columna especificada como nombre de archivo</td></tr>
 </table>
 
@@ -67,7 +67,7 @@ Puede cancelar mediante el cuadro de diálogo de progreso.
 
 <div class="note">
 <strong>Nota:</strong> En la vista previa de la tabla, solo se muestra la primera parte de los datos LOB
-(en un volcado creado con exp, los marcadores <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+(en un volcado creado con exp, <code>%CLOB%</code> para CLOB y <code>%NCLOB%</code> para NCLOB).
 Use esta función de extracción de archivos LOB para obtener los datos completos.
 </div>
 

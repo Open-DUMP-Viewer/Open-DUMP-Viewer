@@ -40,7 +40,7 @@
 <h2>ファイル名方式</h2>
 <table>
 <tr><th>方式</th><th>例</th><th>説明</th></tr>
-<tr><td>連番</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>1 から始まる6桁連番</td></tr>
+<tr><td>連番</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>1 から始まる番号。LOB が NULL または空の行はファイルを作らず、番号も進みません</td></tr>
 <tr><td>カラム値</td><td><code>filename_col_value.jpg</code></td><td>指定カラムの値をファイル名に使用</td></tr>
 </table>
 
@@ -67,7 +67,7 @@
 
 <div class="note">
 <strong>注意:</strong> テーブルプレビューでは、LOB データは先頭の一部だけが表示されます
-(exp で作ったダンプでは <code>%BLOB%</code>、<code>%CLOB%</code>、<code>%NCLOB%</code> と表示されます)。
+(exp で作ったダンプでは、CLOB は <code>%CLOB%</code>、NCLOB は <code>%NCLOB%</code> と表示されます)。
 データ全体を取得するにはこの LOB ファイル抽出機能を使用してください。
 </div>
 

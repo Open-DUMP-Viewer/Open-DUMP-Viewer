@@ -40,7 +40,7 @@ come un file per ogni record.</p>
 <h2>Metodi di denominazione dei file</h2>
 <table>
 <tr><th>Metodo</th><th>Esempio</th><th>Descrizione</th></tr>
-<tr><td>Sequenziale</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>Numeri sequenziali a 6 cifre a partire da 1</td></tr>
+<tr><td>Sequenziale</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>Numeri a partire da 1. Una riga il cui LOB è NULL o vuoto non produce alcun file né numero</td></tr>
 <tr><td>Valore colonna</td><td><code>valore_colonna_nome.jpg</code></td><td>Utilizza il valore di una colonna specificata come nome del file</td></tr>
 </table>
 
@@ -67,7 +67,7 @@ come un file per ogni record.</p>
 
 <div class="note">
 <strong>Nota:</strong> Nell'anteprima della tabella viene visualizzata solo la parte iniziale dei dati LOB
-(in un dump creato con exp, i segnaposto <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+(in un dump creato con exp, <code>%CLOB%</code> per CLOB e <code>%NCLOB%</code> per NCLOB).
 Utilizzare questa funzionalità di estrazione file LOB per recuperare i dati completi.
 </div>
 

@@ -40,7 +40,7 @@ as one file per record.</p>
 <h2>File Naming Methods</h2>
 <table>
 <tr><th>Method</th><th>Example</th><th>Description</th></tr>
-<tr><td>Sequential</td><td><code>000001.jpg</code>, <code>000002.jpg</code></td><td>6-digit sequential numbers starting from 1</td></tr>
+<tr><td>Sequential</td><td><code>1.jpg</code>, <code>2.jpg</code></td><td>Numbers starting from 1. A row whose LOB is NULL or empty gets no file and no number</td></tr>
 <tr><td>Column Value</td><td><code>filename_col_value.jpg</code></td><td>Uses the value of a specified column as the file name</td></tr>
 </table>
 
@@ -67,7 +67,7 @@ You can cancel via the progress dialog.
 
 <div class="note">
 <strong>Note:</strong> In the table preview, only the first part of LOB data is shown
-(a dump made with exp shows the placeholders <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+(a dump made with exp shows <code>%CLOB%</code> for CLOB and <code>%NCLOB%</code> for NCLOB).
 Use this LOB File Extraction feature to retrieve the whole data.
 </div>
 

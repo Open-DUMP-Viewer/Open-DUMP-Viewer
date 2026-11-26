@@ -39,7 +39,7 @@
 <h2>文件命名方式</h2>
 <table>
 <tr><th>方式</th><th>示例</th><th>说明</th></tr>
-<tr><td>顺序编号</td><td><code>000001.jpg</code>、<code>000002.jpg</code></td><td>从 1 开始的 6 位顺序编号</td></tr>
+<tr><td>顺序编号</td><td><code>1.jpg</code>、<code>2.jpg</code></td><td>从 1 开始的编号。LOB 为 NULL 或空的行不生成文件，也不占用编号</td></tr>
 <tr><td>列值</td><td><code>filename_col_value.jpg</code></td><td>使用指定列的值作为文件名</td></tr>
 </table>
 
@@ -66,7 +66,7 @@
 
 <div class="note">
 <strong>说明：</strong> 在表预览中，只显示 LOB 数据的开头部分
-（用 exp 创建的转储显示为占位符 <code>%BLOB%</code>、<code>%CLOB%</code>、<code>%NCLOB%</code>）。
+（用 exp 创建的转储中，CLOB 显示为 <code>%CLOB%</code>，NCLOB 显示为 <code>%NCLOB%</code>）。
 请使用此 LOB 文件提取功能获取完整数据。
 </div>
 
