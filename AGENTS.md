@@ -101,11 +101,14 @@ Open DUMP Viewer for Oracle database/
 │     ├─ odv_charset.c                     # 文字セット変換
 │     ├─ odv_ja16.c                        # JA16SJIS/JA16EUC(+TILDE/YEN) の変換（Oracle の対応表）
 │     ├─ odv_ja16map.c / odv_ja16map.h     # JA16 系の対応表（生成物。tools/ja16map）
+│     ├─ odv_sb.c                          # 1 バイト系の文字セットの変換（Oracle の対応表）
+│     ├─ odv_sbmap.c / odv_sbmap.h         # 1 バイト系の対応表（生成物。tools/sbmap）
 │     ├─ odv_xml.c                         # XMLパーサ（EXPDP用）
 │     ├─ odv_csv.c                         # CSV出力
 │     ├─ odv_sql.c                         # SQL INSERT文生成
 │     ├─ tools/tzdata/                     # tzdata から odv_tzdata.c を作る生成スクリプト
 │     ├─ tools/ja16map/                    # Oracle の変換結果から odv_ja16map.c を作る生成スクリプト
+│     ├─ tools/sbmap/                      # Oracle の変換結果から odv_sbmap.c を作る生成スクリプト
 │     └─ _build.cmd                        # MSVCビルドスクリプト
 ├─ installer/                              # Inno Setup インストーラー
 │  ├─ setup.iss                            # Inno Setup スクリプト（10言語対応）
@@ -164,8 +167,8 @@ dotnet build "Open DUMP Viewer.vbproj" -p:EnableWindowsTargeting=true
 
 ### 生成した表（C ソース）の作り直し
 
-`odv_tzdata.c` と `odv_ja16map.c` は**生成物で、手で直さない**。C のソース一覧（`Makefile`・`build_dll.bat`・
-`Open_DumpParser.vcxproj`・`build-and-release*.yml` の `SRCS`）には、生成物と `odv_tz.c`・`odv_ja16.c` を含める。
+`odv_tzdata.c`・`odv_ja16map.c`・`odv_sbmap.c` は**生成物で、手で直さない**。C のソース一覧（`Makefile`・`build_dll.bat`・
+`Open_DumpParser.vcxproj`・`build-and-release*.yml` の `SRCS`）には、生成物と `odv_tz.c`・`odv_ja16.c`・`odv_sb.c` を含める。
 
 #### タイムゾーン（`odv_tzdata.c`）— tzdata の更新時
 
@@ -214,6 +217,37 @@ python3 gen_ja16map.py --fwd 'dir/map_{cs}.txt' --rev 'dir/rev_{cs}.txt' --check
 - TILDE 版・YEN 版は基の表（JA16SJIS / JA16EUC）との違いだけを持つ。JA16SJISYEN の逆変換は NEC 特殊文字
   （Ⅰ〜Ⅹ № ℡ ㈱）を IBM 拡張のコード（FAxx）にする点も JA16SJIS と違う
 - 名前に SJIS / EUC を含むがこの 6 つ以外の文字セットは、従来どおり CP932 / CP20932 で変換している
+
+#### 1 バイト系の文字セット（`odv_sbmap.c`）
+
+1 文字の最大バイト数が 1 の文字セット（222 種）の、各バイトの **Oracle 自身の変換結果**から作った表。2 つの用途がある。
+
+- **1 バイト系かどうかの判定**。Oracle は CLOB を、DB 文字セットが 1 バイト系なら **DB 文字セットのまま**格納し、
+  多バイト系（AL32UTF8・JA16SJIS など）のときだけ AL16UTF16（UTF-16BE）で格納する。exp・expdp（直接パス・外部表形式）は
+  この形のままダンプに書く（NCLOB は常に UTF-16BE）。expdp の外部表形式の LONG も、UTF-16BE になるのは多バイト系の DB
+  だけ。CLOB を常に UTF-16BE と読むと、1 バイト系の DB のダンプでは 2 バイトずつ 1 文字に化ける（`<?xml` → `㰿硭`）。
+  判定は EXP が `exp_state.db_charset_id`、EXPDP が列の CHARSETID（無ければダンプの DB 文字セット）で行う
+  （`odv_exp.c` の `exp_lob_finish`、`odv_expdp.c` の `clob_src_cs` / `long_form`）
+- **変換**。US7ASCII / WE8ISO8859P1 / WE8ISO8859P15 / WE8MSWIN1252 は従来どおり Windows のコードページで変換し、
+  それ以外（CL8MSWIN1251・EE8MSWIN1250・WE8ISO8859P9・EBCDIC 系など）は `CHARSET_ORA_SB_BASE` + NLS_CHARSET_ID で
+  この表を引く（どの環境でも同じ結果。`odv_charset_single_byte()`）
+
+表はどの DB 文字セットの DB でも取れる（2026-11 に取得。11.2 / 21c / 23.26 で、それぞれが持つ文字セットの結果がバイト一致。
+21c は 201 種、23.26 は IBM の EBCDIC 21 種を加えた 222 種、11.2 XE は 1 バイト系を 40 種しか持たない）。
+11.2 には `UTL_I18N.GET_MAX_CHARACTER_SIZE` が無いので、1 バイト系かどうかは 21c 以降の結果で決める。
+
+```bash
+cd Logics/DumpParser/tools/sbmap
+sqlplus -S system/...@db @query_sbmap.sql > sbmap_23.txt                # 版ごとに取る
+python3 gen_sbmap.py --map sbmap_23.txt --same sbmap_21.txt sbmap_11.txt --check
+```
+
+- 取得した `sbmap_*.txt` はリポジトリに入れない（生成した表と取得方法だけを置く）
+- `--check` は生成した表で取得結果の全バイト（順方向・逆方向・代替文字、約 11 万件）を `convert_charset()` 経由で
+  再現できることを確かめる（`ODV_CHECK_WINE=1` で Windows 版も）
+- 逆変換（表名の絞り込みで名前を照合するときに使う）は「その文字に読むバイトのうち最小のバイト」に戻し、Oracle が
+  それと違うバイトに戻す 3 文字だけを例外として持つ。U+FFFD・表せない文字・不正な UTF-8 は、その文字セットの代替文字
+  （多くは ¿ か ?）になる
 
 ### バージョンポリシー
 

@@ -107,6 +107,8 @@
     <ClCompile Include="odv_tzdata.c" />
     <ClCompile Include="odv_ja16.c" />
     <ClCompile Include="odv_ja16map.c" />
+    <ClCompile Include="odv_sb.c" />
+    <ClCompile Include="odv_sbmap.c" />
   </ItemGroup>
 
   <!-- Header Files -->
@@ -115,6 +117,7 @@
     <ClInclude Include="odv_types.h" />
     <ClInclude Include="odv_tzdata.h" />
     <ClInclude Include="odv_ja16map.h" />
+    <ClInclude Include="odv_sbmap.h" />
     <ClInclude Include="unistd.h" />
   </ItemGroup>
 

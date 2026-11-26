@@ -1512,6 +1512,24 @@ static int vector_to_text(const unsigned char *b, int len, ODV_SBUF *sb)
     return ODV_ERROR_FORMAT;
 }
 
+/* How the bytes of a CLOB / NCLOB value are encoded in the dump.  Oracle stores
+ * (and Data Pump writes, in both the direct-path and the external-table
+ * format) a CLOB in the database character set when that is single-byte
+ * (WE8MSWIN1252, CL8MSWIN1251, ...) and as AL16UTF16 = UTF-16BE in a
+ * multi-byte database (AL32UTF8, JA16SJIS, ...); an NCLOB always as
+ * AL16UTF16.  The column's CHARSETID tells which; without one, the dump's
+ * database character set. */
+static int clob_src_cs(const ODV_SESSION *s, const ODV_COLUMN *col)
+{
+    int cs;
+    if (col->type != COL_CLOB) return CHARSET_UTF16BE;
+    if (col->charset > 0 && col->charset != 2000) {
+        cs = odv_charset_single_byte(col->charset);
+        return cs != CHARSET_UNKNOWN ? cs : CHARSET_UTF16BE;
+    }
+    return odv_charset_is_single_byte(s->dump_charset) ? s->dump_charset : CHARSET_UTF16BE;
+}
+
 /* UTF-16BE -> UTF-8 (portable; the TABLE_T documents of the master table).
  * An unpaired surrogate becomes U+FFFD.  Returns a malloc'd NUL-terminated
  * string (or NULL) and its length in *out_len. */
@@ -1543,6 +1561,25 @@ static char *utf16be_to_utf8(const unsigned char *s, int n, int *out_len)
     }
     o[k] = '\0';
     if (out_len) *out_len = k;
+    return o;
+}
+
+/* The XML_CLOB of a master-table row (a TABLE_T document) as UTF-8: UTF-16BE
+ * in a multi-byte database, the database character set in a single-byte one
+ * (clob_src_cs).  Returns a malloc'd NUL-terminated string (or NULL). */
+static char *master_xml_utf8(ODV_SESSION *s, int col_idx, const ODV_VALUE *v, int *out_len)
+{
+    int cs = clob_src_cs(s, &s->table.columns[col_idx]);
+    int cap = v->data_len * 3 + 4;
+    char *o;
+    if (cs == CHARSET_UTF16BE) return utf16be_to_utf8(v->data, v->data_len, out_len);
+    o = (char *)malloc((size_t)cap);
+    if (!o) return NULL;
+    if (convert_charset((const char *)v->data, v->data_len, cs, o, cap,
+                        CHARSET_UTF8, out_len) != ODV_OK) {
+        free(o);
+        return NULL;
+    }
     return o;
 }
 
@@ -1717,16 +1754,20 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
     case COL_NVARCHAR:
     case COL_CLOB:
     case COL_NCLOB: {
-        /* NCHAR/NVARCHAR are always UTF-16BE; CLOB/NCLOB are UTF-16BE too but
-         * only ever arrive here inline in the external-table format, so latch
-         * external for a later inline LONG (H-21). */
+        /* NCHAR/NVARCHAR are always UTF-16BE; CLOB/NCLOB are encoded as
+         * clob_src_cs says and only ever arrive here inline in the
+         * external-table format, so latch external for a later inline LONG
+         * (H-21). */
         char conv_buf[ODV_VARCHAR_LEN];
         int conv_len = 0;
-        if (col->type == COL_CLOB || col->type == COL_NCLOB)
+        int src_cs = CHARSET_UTF16BE;
+        if (col->type == COL_CLOB || col->type == COL_NCLOB) {
             s->state.expdp_external = 1;
+            src_cs = clob_src_cs(s, col);
+        }
         if (v->data && v->data_len > 0 &&
             convert_charset((const char *)v->data, v->data_len,
-                            CHARSET_UTF16BE,
+                            src_cs,
                             conv_buf, sizeof(conv_buf),
                             CHARSET_UTF8, &conv_len) == ODV_OK) {
             set_value_string(v, conv_buf, conv_len);
@@ -2543,7 +2584,7 @@ static void master_row(ODV_SESSION *s)
             ODV_VALUE *v = &s->record.values[mc->c_xml];
             if (!v->is_null && v->data && v->data_len >= 16) {
                 int xl = 0;
-                char *xml = utf16be_to_utf8(v->data, v->data_len, &xl);
+                char *xml = master_xml_utf8(s, mc->c_xml, v, &xl);
                 if (xml) {
                     meta_add_tablet(mc->meta, xml, xl);
                     free(xml);
@@ -2605,7 +2646,7 @@ static void master_row(ODV_SESSION *s)
         if (v->is_null || !v->data || v->data_len < 16) return;
         odv_strcpy(schema, mval(s, mc->c_schema), ODV_OBJNAME_LEN);
         odv_strcpy(tname, name, ODV_OBJNAME_LEN);
-        xml = utf16be_to_utf8(v->data, v->data_len, &xl);
+        xml = master_xml_utf8(s, mc->c_xml, v, &xl);
         if (!xml) return;
         /* Keep only what can be needed: a table with no data entry, or a
          * partitioned table (its empty partitions). */
@@ -3202,8 +3243,38 @@ static void accumulate_lob_preview(ODV_SESSION *s, int abs_col,
             v->data_len += 2;
         }
         v->data[v->data_len] = '\0';
+    } else if (clob_src_cs(s, &s->table.columns[abs_col]) != CHARSET_UTF16BE) {
+        /* CLOB of a single-byte database: in the database character set
+         * (clob_src_cs), one byte per character, so a read block needs no
+         * carry; a byte gives at most 3 UTF-8 bytes, and the preview needs
+         * at most avail bytes of the block.  The visible preview is the first
+         * ODV_LOB_PREVIEW_LEN UTF-8 bytes, cut on a character boundary. */
+        char sb_buf[ODV_LOB_PREVIEW_LEN * 3 + 16];
+        int sb_len = 0;
+        int avail = ODV_LOB_PREVIEW_LEN - v->data_len;
+        int n = len;
+
+        if (avail <= 0) return;   /* preview already full for this column */
+        if (n > avail) n = avail;
+        if (convert_charset((const char *)data, n, clob_src_cs(s, &s->table.columns[abs_col]),
+                            sb_buf, sizeof(sb_buf),
+                            CHARSET_UTF8, &sb_len) == ODV_OK && sb_len > 0) {
+            int to_copy = (sb_len < avail) ? sb_len : avail;
+            if (to_copy < sb_len) {
+                while (to_copy > 0 &&
+                       ((unsigned char)sb_buf[to_copy] & 0xC0) == 0x80)
+                    to_copy--;
+            }
+            if (to_copy > 0) {
+                if (ensure_value_buf(v, v->data_len + to_copy + 1) != ODV_OK ||
+                    !v->data) return;
+                memcpy(v->data + v->data_len, sb_buf, to_copy);
+                v->data_len += to_copy;
+                v->data[v->data_len] = '\0';
+            }
+        }
     } else {
-        /* CLOB/NCLOB: Oracle EXPDP stores LOB data in AL16UTF16 (UTF-16BE).
+        /* CLOB/NCLOB in AL16UTF16 (UTF-16BE, clob_src_cs).
          * Convert to UTF-8, carrying any trailing incomplete UTF-16 unit or
          * unpaired high surrogate across the 4KB read-block boundary so a
          * character split by the boundary converts intact instead of being
@@ -3359,10 +3430,14 @@ static int utf8_ok(const unsigned char *p, int n)
  * is decided only when one reading is impossible: an odd length, a U+0000 or
  * an unpaired surrogate rules out UTF-16; a NUL byte or invalid UTF-8 (an
  * AL32UTF8 dump) rules out the DB character set.  Both readings possible ->
- * 0, shown as a marker rather than guessed. */
+ * 0, shown as a marker rather than guessed.
+ * A single-byte database writes LONG in its character set in both formats:
+ * the external-table format has it as UTF-16BE only in a multi-byte
+ * database, as it does a CLOB (clob_src_cs). */
 static int long_form(ODV_SESSION *s, const unsigned char *p, int n)
 {
     int db_ok = 1, u16_ok = (n % 2) == 0, i;
+    if (odv_charset_is_single_byte(s->dump_charset)) return 1;
     if (s->state.expdp_method == 1) return 1;
     if (s->state.expdp_method == 2 || s->state.expdp_external) return 2;
     for (i = 0; i < n && db_ok; i++) if (p[i] == 0) db_ok = 0;
@@ -3467,8 +3542,8 @@ static void decode_body_value(ODV_SESSION *s, int ac, int truncated)
 }
 
 /* A LOB value read whole for the export writers (s->full_values, M-12):
- * BLOB to upper-case hex, CLOB / NCLOB from UTF-16BE (as Data Pump stores
- * them) to the output charset. `truncated`: the value was longer than
+ * BLOB to upper-case hex, CLOB / NCLOB from the form Data Pump stores them in
+ * (clob_src_cs) to the output charset. `truncated`: the value was longer than
  * ODV_FULL_VALUE_MAX and is flagged as not whole. */
 static void decode_lob_full(ODV_SESSION *s, int ac, int truncated)
 {
@@ -3497,9 +3572,15 @@ static void decode_lob_full(ODV_SESSION *s, int ac, int truncated)
         set_value_text(v, hx, n * 2, col->type);
         free(hx);
     } else {
-        int cap = n * 2 + 16, out_len = 0;
+        /* the bytes as clob_src_cs says: UTF-16BE (whole units), or the
+         * database character set of a single-byte database (every byte a
+         * character, up to 3 UTF-8 bytes; n is at most ODV_FULL_VALUE_MAX so
+         * this fits an int) */
+        int src_cs = clob_src_cs(s, col);
+        int sb = src_cs != CHARSET_UTF16BE;
+        int cap = sb ? n * 3 + 16 : n * 2 + 16, out_len = 0;
         char *cb = (char *)malloc((size_t)cap);
-        if (!cb || convert_charset((const char *)v->data, n & ~1, CHARSET_UTF16BE, cb, cap,
+        if (!cb || convert_charset((const char *)v->data, sb ? n : (n & ~1), src_cs, cb, cap,
                                    s->out_charset, &out_len) != ODV_OK) {
             free(cb);
             v->flags = ODV_VFLAG_CUT;

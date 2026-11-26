@@ -91,6 +91,11 @@
 #define CHARSET_EUC_CP20932   18  /* other "EUC" charsets: Windows CP20932 */
 #define CHARSET_SJIS_YEN      19  /* JA16SJISYEN */
 #define CHARSET_EUC_YEN       20  /* JA16EUCYEN */
+/* The other Oracle single-byte charsets (CL8MSWIN1251, EE8MSWIN1250,
+   WE8ISO8859P9, EBCDIC, ...) are decoded with Oracle's own mapping
+   (odv_sb.c / odv_sbmap.c): CHARSET_ORA_SB_BASE + the NLS_CHARSET_ID. */
+#define CHARSET_ORA_SB_BASE   0x10000
+#define CHARSET_IS_ORA_SB(cs) ((cs) >= CHARSET_ORA_SB_BASE && (cs) < CHARSET_ORA_SB_BASE + 0x10000)
 
 /* Column data types */
 #define COL_NULL               0
@@ -546,6 +551,9 @@ typedef struct {
     int     db_charset;          /* Header record 7 DB charset (row-value decode).
                                     s->dump_charset holds the client charset used
                                     for DDL text (names/comments/CHECK/DEFAULT). */
+    int     db_charset_id;       /* The same as its NLS_CHARSET_ID (0 = not known):
+                                    a CLOB is in db_charset when this is a
+                                    single-byte character set, else AL16UTF16 */
     char    export_user[ODV_OBJNAME_LEN + 1]; /* Header record 1: export user/schema */
 } ODV_EXP_STATE;
 
@@ -924,6 +932,8 @@ void odv_tz_capture_dbtz_xml(ODV_SESSION *s, const char *xml, int len);
 /* odv_charset.c */
 int convert_charset(const char *src, int src_len, int src_cs,
                     char *dst, int dst_size, int dst_cs, int *out_len);
+int odv_charset_single_byte(int oracle_id);
+int odv_charset_is_single_byte(int cs);
 
 /* odv_ja16.c (Oracle JA16SJIS / JA16EUC and their TILDE / YEN variants) */
 int odv_ja16_is_table_charset(int cs);
@@ -931,6 +941,16 @@ int odv_ja16_to_utf8(const unsigned char *src, int src_len, int cs,
                      char *dst, int dst_size, int *out_len);
 int odv_utf8_to_ja16(const unsigned char *src, int src_len, int cs,
                      char *dst, int dst_size, int *out_len);
+
+/* odv_sb.c (Oracle single-byte character sets) */
+int odv_sb_id_is_single_byte(int oracle_id);
+int odv_sb_charset_from_id(int oracle_id);
+int odv_sb_charset_from_name(const char *name);
+int odv_sb_is_table_charset(int cs);
+int odv_sb_to_utf8(const unsigned char *src, int src_len, int cs,
+                   char *dst, int dst_size, int *out_len);
+int odv_utf8_to_sb(const unsigned char *src, int src_len, int cs,
+                   char *dst, int dst_size, int *out_len);
 
 /* odv_xml.c */
 typedef void (*xml_tag_callback)(const char *tag, const char *value, int depth, void *ctx);

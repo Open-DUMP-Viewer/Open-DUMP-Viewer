@@ -75,6 +75,13 @@ static int get_charset_from_name(const char *name)
         return CHARSET_WIN1252;
     if (strstr(name, "WE8ISO8859P15"))
         return CHARSET_ISO8859P15;
+    {
+        /* any other single-byte character set (CL8MSWIN1251, EE8MSWIN1250,
+           WE8ISO8859P9, EBCDIC, ...): Oracle's own table (odv_sb.c) */
+        int sb = odv_sb_charset_from_name(name);
+        if (sb != CHARSET_UNKNOWN)
+            return odv_charset_single_byte(sb - CHARSET_ORA_SB_BASE);
+    }
     if (strstr(name, "WE8ISO"))
         return CHARSET_US8;  /* WE8ISO8859P1 = ISO-8859-1 */
     if (strstr(name, "WE8MSWIN"))

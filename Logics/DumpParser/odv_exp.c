@@ -138,7 +138,14 @@ static int id_to_charset(int id)
     case 871:                              /* UTF8 (CESU-8) */
     case 873:  return CHARSET_UTF8;        /* AL32UTF8 */
     case 2000: return CHARSET_UTF16LE;     /* AL16UTF16 */
-    default:   return byte_to_charset((unsigned char)(id & 0xFF));
+    default: {
+        /* any other single-byte character set: Oracle's own table (odv_sb.c),
+           before the low-byte guess, which reads e.g. CL8MSWIN1251 (171) as
+           US-ASCII and AR8MSWIN1256 (560 = 0x230) as EUC */
+        int sb = odv_charset_single_byte(id);
+        if (sb != CHARSET_UNKNOWN) return sb;
+        return byte_to_charset((unsigned char)(id & 0xFF));
+    }
     }
 }
 
@@ -308,13 +315,15 @@ static int parse_exp_header(ODV_SESSION *s, ODV_VFILE *fp)
     if (cs_start >= 0 && cs_start + 4 <= EXP_HEADER_SIZE) {
         int client_id = ((int)hdr[cs_start]     << 8) | (int)hdr[cs_start + 1];
         int db_id     = ((int)hdr[cs_start + 2] << 8) | (int)hdr[cs_start + 3];
-        s->dump_charset         = id_to_charset(client_id);
-        s->exp_state.db_charset = id_to_charset(db_id);
+        s->dump_charset            = id_to_charset(client_id);
+        s->exp_state.db_charset    = id_to_charset(db_id);
+        s->exp_state.db_charset_id = db_id;
     } else {
         /* Malformed header: fall back to a safe default rather than the
            tentative guess detect_dump_kind() made from the "EXPORT" bytes. */
-        s->dump_charset         = CHARSET_UTF8;
-        s->exp_state.db_charset = CHARSET_UTF8;
+        s->dump_charset            = CHARSET_UTF8;
+        s->exp_state.db_charset    = CHARSET_UTF8;
+        s->exp_state.db_charset_id = 0;
     }
 
     s->exp_state.header_size = EXP_HEADER_SIZE;
@@ -1849,9 +1858,12 @@ static int exp_value_append(ODV_VALUE *v, const unsigned char *d, int n)
     return ODV_OK;
 }
 
-/* A LOB read whole: BLOB to upper-case hex, CLOB / NCLOB from UTF-16BE (the
-   form exp writes them in, as the LOB extraction files show) to the output
-   charset. A value that could not be kept whole is flagged. */
+/* A LOB read whole: BLOB to upper-case hex, CLOB / NCLOB to the output
+   charset. exp writes a CLOB as the database stores it: in the database
+   character set when that is single-byte (WE8MSWIN1252, CL8MSWIN1251, ...),
+   as AL16UTF16 (UTF-16BE) in a multi-byte database (AL32UTF8, JA16SJIS, ...);
+   an NCLOB is always AL16UTF16. A value that could not be kept whole is
+   flagged. */
 static void exp_lob_finish(ODV_SESSION *s, int col_idx, ODV_VALUE *v, int cut)
 {
     int t = s->table.columns[col_idx].type;
@@ -1870,9 +1882,14 @@ static void exp_lob_finish(ODV_SESSION *s, int col_idx, ODV_VALUE *v, int cut)
         set_value_string(v, hx, n * 2);
         free(hx);
     } else {
-        int cap = n * 2 + 16, out_len = 0;
+        int sb = t == COL_CLOB && odv_sb_id_is_single_byte(s->exp_state.db_charset_id);
+        int src_cs = sb ? s->exp_state.db_charset : CHARSET_UTF16BE;
+        /* single-byte: every byte is a character (up to 3 UTF-8 bytes, n is at
+           most ODV_FULL_VALUE_MAX so this fits an int); UTF-16BE: whole units */
+        int src_len = sb ? n : (n & ~1);
+        int cap = sb ? n * 3 + 16 : n * 2 + 16, out_len = 0;
         char *cb = (char *)malloc((size_t)cap);
-        if (!cb || convert_charset((const char *)v->data, n & ~1, CHARSET_UTF16BE,
+        if (!cb || convert_charset((const char *)v->data, src_len, src_cs,
                                    cb, cap, s->out_charset, &out_len) != ODV_OK) {
             free(cb);
             v->flags = ODV_VFLAG_CUT;
