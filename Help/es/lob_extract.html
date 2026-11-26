@@ -17,14 +17,14 @@ como un archivo por registro.</p>
 <table>
 <tr><th>Tipo de columna</th><th>Contenido de salida</th></tr>
 <tr><td>BLOB</td><td>Archivos binarios (imágenes, PDF, ZIP, etc.)</td></tr>
-<tr><td>CLOB</td><td>Archivos de texto (decodificados usando el juego de caracteres del archivo de volcado)</td></tr>
-<tr><td>NCLOB</td><td>Archivos de texto Unicode</td></tr>
+<tr><td>CLOB</td><td>Archivos de texto con los bytes tal como están en el archivo de volcado: en el juego de caracteres de la base de datos si es de un solo byte (como WE8MSWIN1252), en UTF-16BE sin BOM si es multibyte (como AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>Archivos de texto en UTF-16BE sin BOM</td></tr>
 </table>
 
 <h2>Pasos</h2>
 <ol>
     <li>Seleccione una tabla que contenga columnas LOB en la lista de tablas.</li>
-    <li>Seleccione <strong>Archivo(&amp;F)</strong> &gt; <strong>Extraer archivos(&amp;F)</strong> en el menú.</li>
+    <li>Seleccione <strong>Herramientas</strong> &gt; <strong>Extraer archivo</strong> en el menú.</li>
     <li>Se muestra el cuadro de diálogo de extracción de LOB.</li>
     <li>Configure lo siguiente:
         <ul>
@@ -66,9 +66,9 @@ Puede cancelar mediante el cuadro de diálogo de progreso.
 </div>
 
 <div class="note">
-<strong>Nota:</strong> En la vista previa de la tabla, los datos LOB se muestran como marcadores:
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Use esta función de extracción de archivos LOB para obtener los datos reales.
+<strong>Nota:</strong> En la vista previa de la tabla, solo se muestra la primera parte de los datos LOB
+(en un volcado creado con exp, los marcadores <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Use esta función de extracción de archivos LOB para obtener los datos completos.
 </div>
 
 <p><a href="toc.html">Volver a la tabla de contenido</a></p>

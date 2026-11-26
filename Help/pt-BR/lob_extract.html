@@ -17,14 +17,14 @@ como um arquivo por registro.</p>
 <table>
 <tr><th>Tipo de Coluna</th><th>Conteúdo de Saída</th></tr>
 <tr><td>BLOB</td><td>Arquivos binários (imagens, PDF, ZIP, etc.)</td></tr>
-<tr><td>CLOB</td><td>Arquivos de texto (decodificados usando o conjunto de caracteres do arquivo de dump)</td></tr>
-<tr><td>NCLOB</td><td>Arquivos de texto Unicode</td></tr>
+<tr><td>CLOB</td><td>Arquivos de texto com os bytes como estão no arquivo de dump: no conjunto de caracteres do banco de dados, em um banco de byte único (como WE8MSWIN1252); em UTF-16BE sem BOM, em um banco multibyte (como AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>Arquivos de texto em UTF-16BE sem BOM</td></tr>
 </table>
 
 <h2>Passos</h2>
 <ol>
     <li>Selecione uma tabela que contenha colunas LOB na lista de tabelas.</li>
-    <li>Selecione <strong>Arquivo(&amp;F)</strong> &gt; <strong>Extrair Arquivos(&amp;F)</strong> no menu.</li>
+    <li>Selecione <strong>Ferramentas</strong> &gt; <strong>Extrair arquivo</strong> no menu.</li>
     <li>A caixa de diálogo de extração LOB é exibida.</li>
     <li>Configure o seguinte:
         <ul>
@@ -66,9 +66,9 @@ Você pode cancelar pela caixa de diálogo de progresso.
 </div>
 
 <div class="note">
-<strong>Nota:</strong> Na visualização da tabela, os dados LOB são exibidos como marcadores:
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Use este recurso de Extração de Arquivos LOB para obter os dados reais.
+<strong>Nota:</strong> Na visualização da tabela, apenas a parte inicial dos dados LOB é exibida
+(em um dump criado com exp, os marcadores <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Use este recurso de Extração de Arquivos LOB para obter os dados completos.
 </div>
 
 <p><a href="toc.html">Voltar ao Sumário</a></p>

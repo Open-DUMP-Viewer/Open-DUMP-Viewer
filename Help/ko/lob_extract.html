@@ -17,14 +17,14 @@
 <table>
 <tr><th>컬럼 타입</th><th>출력 내용</th></tr>
 <tr><td>BLOB</td><td>바이너리 파일 (이미지, PDF, ZIP 등)</td></tr>
-<tr><td>CLOB</td><td>텍스트 파일 (덤프 파일의 문자 세트로 디코딩)</td></tr>
-<tr><td>NCLOB</td><td>유니코드 텍스트 파일</td></tr>
+<tr><td>CLOB</td><td>덤프 파일에 저장된 바이트 그대로의 텍스트 파일 (싱글바이트 데이터베이스(WE8MSWIN1252 등)는 데이터베이스 문자 세트, 멀티바이트 데이터베이스(AL32UTF8 등)는 BOM 없는 UTF-16BE)</td></tr>
+<tr><td>NCLOB</td><td>BOM 없는 UTF-16BE 텍스트 파일</td></tr>
 </table>
 
 <h2>절차</h2>
 <ol>
     <li>테이블 목록에서 LOB 컬럼이 포함된 테이블을 선택합니다.</li>
-    <li>메뉴에서 <strong>파일(&amp;F)</strong> &gt; <strong>파일 추출(&amp;F)</strong>을 선택합니다.</li>
+    <li>메뉴에서 <strong>도구(&amp;T)</strong> &gt; <strong>파일 추출(&amp;F)</strong>을 선택합니다.</li>
     <li>LOB 추출 대화 상자가 표시됩니다.</li>
     <li>다음을 설정합니다:
         <ul>
@@ -66,9 +66,9 @@
 </div>
 
 <div class="note">
-<strong>참고:</strong> 테이블 미리보기에서 LOB 데이터는
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>으로 표시됩니다.
-실제 데이터를 가져오려면 이 LOB 파일 추출 기능을 사용하세요.
+<strong>참고:</strong> 테이블 미리보기에서는 LOB 데이터의 앞부분만 표시됩니다
+(exp로 만든 덤프에서는 <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>으로 표시됩니다).
+전체 데이터를 가져오려면 이 LOB 파일 추출 기능을 사용하세요.
 </div>
 
 <p><a href="toc.html">목차로 돌아가기</a></p>

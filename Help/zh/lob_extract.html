@@ -16,14 +16,14 @@
 <table>
 <tr><th>列类型</th><th>输出内容</th></tr>
 <tr><td>BLOB</td><td>二进制文件（图片、PDF、ZIP 等）</td></tr>
-<tr><td>CLOB</td><td>文本文件（使用转储文件的字符集进行解码）</td></tr>
-<tr><td>NCLOB</td><td>Unicode 文本文件</td></tr>
+<tr><td>CLOB</td><td>文本文件（与转储文件中的字节相同：单字节数据库（如 WE8MSWIN1252）为数据库字符集，多字节数据库（如 AL32UTF8）为不带 BOM 的 UTF-16BE）</td></tr>
+<tr><td>NCLOB</td><td>不带 BOM 的 UTF-16BE 文本文件</td></tr>
 </table>
 
 <h2>操作步骤</h2>
 <ol>
     <li>在表列表中选择包含 LOB 列的表。</li>
-    <li>从菜单选择 <strong>文件(&amp;F)</strong> &gt; <strong>提取文件(&amp;F)</strong>。</li>
+    <li>从菜单选择 <strong>工具(&amp;T)</strong> &gt; <strong>提取文件(&amp;F)</strong>。</li>
     <li>显示 LOB 提取对话框。</li>
     <li>配置以下项目：
         <ul>
@@ -65,9 +65,9 @@
 </div>
 
 <div class="note">
-<strong>说明：</strong> 在表预览中，LOB 数据显示为占位符：
-<code>%BLOB%</code>、<code>%CLOB%</code>、<code>%NCLOB%</code>。
-请使用此 LOB 文件提取功能获取实际数据。
+<strong>说明：</strong> 在表预览中，只显示 LOB 数据的开头部分
+（用 exp 创建的转储显示为占位符 <code>%BLOB%</code>、<code>%CLOB%</code>、<code>%NCLOB%</code>）。
+请使用此 LOB 文件提取功能获取完整数据。
 </div>
 
 <p><a href="toc.html">返回目录</a></p>

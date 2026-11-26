@@ -17,14 +17,14 @@
 <table>
 <tr><th>カラム型</th><th>出力内容</th></tr>
 <tr><td>BLOB</td><td>バイナリファイル (画像、PDF、ZIP 等)</td></tr>
-<tr><td>CLOB</td><td>テキストファイル (ダンプの文字セットでデコード)</td></tr>
-<tr><td>NCLOB</td><td>Unicode テキストファイル</td></tr>
+<tr><td>CLOB</td><td>テキストファイル (ダンプ内のバイト列のまま。1 バイト系の DB (WE8MSWIN1252 など) では DB の文字セット、多バイト系の DB (AL32UTF8 など) では BOM なしの UTF-16BE)</td></tr>
+<tr><td>NCLOB</td><td>BOM なしの UTF-16BE のテキストファイル</td></tr>
 </table>
 
 <h2>操作手順</h2>
 <ol>
     <li>テーブル一覧で LOB カラムを含むテーブルを選択します。</li>
-    <li>メニューの <strong>ファイル(&amp;F)</strong> &gt; <strong>ファイルの取り出し(&amp;F)</strong> を選択します。</li>
+    <li>メニューの <strong>ツール(&amp;T)</strong> &gt; <strong>ファイルの取り出し(&amp;F)</strong> を選択します。</li>
     <li>LOB 抽出ダイアログが表示されます。</li>
     <li>以下を設定します:
         <ul>
@@ -66,9 +66,9 @@
 </div>
 
 <div class="note">
-<strong>注意:</strong> テーブルプレビューでは LOB データは <code>%BLOB%</code>、
-<code>%CLOB%</code>、<code>%NCLOB%</code> とプレースホルダー表示されます。
-実データを取得するにはこの LOB ファイル抽出機能を使用してください。
+<strong>注意:</strong> テーブルプレビューでは、LOB データは先頭の一部だけが表示されます
+(exp で作ったダンプでは <code>%BLOB%</code>、<code>%CLOB%</code>、<code>%NCLOB%</code> と表示されます)。
+データ全体を取得するにはこの LOB ファイル抽出機能を使用してください。
 </div>
 
 <p><a href="toc.html">目次に戻る</a></p>

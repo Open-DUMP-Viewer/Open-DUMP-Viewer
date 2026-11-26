@@ -17,14 +17,14 @@ en un fichier par enregistrement.</p>
 <table>
 <tr><th>Type de colonne</th><th>Contenu de sortie</th></tr>
 <tr><td>BLOB</td><td>Fichiers binaires (images, PDF, ZIP, etc.)</td></tr>
-<tr><td>CLOB</td><td>Fichiers texte (d&eacute;cod&eacute;s avec le jeu de caract&egrave;res du fichier dump)</td></tr>
-<tr><td>NCLOB</td><td>Fichiers texte Unicode</td></tr>
+<tr><td>CLOB</td><td>Fichiers texte contenant les octets tels qu'ils figurent dans le fichier dump&nbsp;: dans le jeu de caract&egrave;res de la base pour une base mono-octet (par exemple WE8MSWIN1252), en UTF-16BE sans BOM pour une base multi-octets (par exemple AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>Fichiers texte en UTF-16BE sans BOM</td></tr>
 </table>
 
 <h2>&Eacute;tapes</h2>
 <ol>
     <li>S&eacute;lectionnez une table contenant des colonnes LOB dans la liste des tables.</li>
-    <li>S&eacute;lectionnez <strong>Fichier(&amp;F)</strong> &gt; <strong>Extraire les fichiers(&amp;F)</strong> dans le menu.</li>
+    <li>S&eacute;lectionnez <strong>Outils</strong> &gt; <strong>Extraire un fichier</strong> dans le menu.</li>
     <li>La bo&icirc;te de dialogue d'extraction LOB s'affiche.</li>
     <li>Configurez les &eacute;l&eacute;ments suivants :
         <ul>
@@ -66,9 +66,9 @@ Vous pouvez annuler via la bo&icirc;te de dialogue de progression.
 </div>
 
 <div class="note">
-<strong>Remarque :</strong> Dans l'aper&ccedil;u de table, les donn&eacute;es LOB sont affich&eacute;es sous forme d'espaces r&eacute;serv&eacute;s :
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Utilisez cette fonctionnalit&eacute; d'extraction de fichiers LOB pour r&eacute;cup&eacute;rer les donn&eacute;es r&eacute;elles.
+<strong>Remarque :</strong> Dans l'aper&ccedil;u de table, seul le d&eacute;but des donn&eacute;es LOB est affich&eacute;
+(un dump cr&eacute;&eacute; avec exp affiche les espaces r&eacute;serv&eacute;s <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Utilisez cette fonctionnalit&eacute; d'extraction de fichiers LOB pour r&eacute;cup&eacute;rer les donn&eacute;es compl&egrave;tes.
 </div>
 
 <p><a href="toc.html">Retour &agrave; la table des mati&egrave;res</a></p>

@@ -17,14 +17,14 @@ als eine Datei pro Datensatz.</p>
 <table>
 <tr><th>Spaltentyp</th><th>Ausgabeinhalt</th></tr>
 <tr><td>BLOB</td><td>Bin&auml;rdateien (Bilder, PDF, ZIP usw.)</td></tr>
-<tr><td>CLOB</td><td>Textdateien (dekodiert mit dem Zeichensatz der Dump-Datei)</td></tr>
-<tr><td>NCLOB</td><td>Unicode-Textdateien</td></tr>
+<tr><td>CLOB</td><td>Textdateien mit den Bytes, wie sie in der Dump-Datei stehen: im Zeichensatz der Datenbank bei einer Einzelbyte-Datenbank (z.&nbsp;B. WE8MSWIN1252), in UTF-16BE ohne BOM bei einer Multibyte-Datenbank (z.&nbsp;B. AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>Textdateien in UTF-16BE ohne BOM</td></tr>
 </table>
 
 <h2>Vorgehensweise</h2>
 <ol>
     <li>W&auml;hlen Sie eine Tabelle mit LOB-Spalten in der Tabellenliste aus.</li>
-    <li>W&auml;hlen Sie <strong>Datei(&amp;F)</strong> &gt; <strong>Dateien extrahieren(&amp;F)</strong> aus dem Men&uuml;.</li>
+    <li>W&auml;hlen Sie <strong>Extras</strong> &gt; <strong>Datei extrahieren</strong> aus dem Men&uuml;.</li>
     <li>Der LOB-Extraktionsdialog wird angezeigt.</li>
     <li>Konfigurieren Sie Folgendes:
         <ul>
@@ -66,9 +66,9 @@ Sie k&ouml;nnen den Vorgang &uuml;ber den Fortschrittsdialog abbrechen.
 </div>
 
 <div class="note">
-<strong>Hinweis:</strong> In der Tabellenvorschau werden LOB-Daten als Platzhalter angezeigt:
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Verwenden Sie diese LOB-Dateiextraktionsfunktion, um die tats&auml;chlichen Daten abzurufen.
+<strong>Hinweis:</strong> In der Tabellenvorschau wird von LOB-Daten nur der Anfang angezeigt
+(bei einem mit exp erstellten Dump die Platzhalter <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Verwenden Sie diese LOB-Dateiextraktionsfunktion, um die vollst&auml;ndigen Daten abzurufen.
 </div>
 
 <p><a href="toc.html">Zur&uuml;ck zum Inhaltsverzeichnis</a></p>

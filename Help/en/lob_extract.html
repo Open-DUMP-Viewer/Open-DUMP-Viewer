@@ -17,14 +17,14 @@ as one file per record.</p>
 <table>
 <tr><th>Column Type</th><th>Output Content</th></tr>
 <tr><td>BLOB</td><td>Binary files (images, PDF, ZIP, etc.)</td></tr>
-<tr><td>CLOB</td><td>Text files (decoded using the dump file's character set)</td></tr>
-<tr><td>NCLOB</td><td>Unicode text files</td></tr>
+<tr><td>CLOB</td><td>Text files with the bytes as stored in the dump: in the database character set for a single-byte database (such as WE8MSWIN1252), in UTF-16BE without a BOM for a multi-byte database (such as AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>Text files in UTF-16BE without a BOM</td></tr>
 </table>
 
 <h2>Steps</h2>
 <ol>
     <li>Select a table containing LOB columns in the table list.</li>
-    <li>Select <strong>File(&amp;F)</strong> &gt; <strong>Extract Files(&amp;F)</strong> from the menu.</li>
+    <li>Select <strong>Tools</strong> &gt; <strong>Extract File</strong> from the menu.</li>
     <li>The LOB extraction dialog is displayed.</li>
     <li>Configure the following:
         <ul>
@@ -66,9 +66,9 @@ You can cancel via the progress dialog.
 </div>
 
 <div class="note">
-<strong>Note:</strong> In the table preview, LOB data is displayed as placeholders:
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Use this LOB File Extraction feature to retrieve the actual data.
+<strong>Note:</strong> In the table preview, only the first part of LOB data is shown
+(a dump made with exp shows the placeholders <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Use this LOB File Extraction feature to retrieve the whole data.
 </div>
 
 <p><a href="toc.html">Back to Table of Contents</a></p>

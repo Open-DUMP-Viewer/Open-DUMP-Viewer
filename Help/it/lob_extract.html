@@ -17,14 +17,14 @@ come un file per ogni record.</p>
 <table>
 <tr><th>Tipo di colonna</th><th>Contenuto dell'output</th></tr>
 <tr><td>BLOB</td><td>File binari (immagini, PDF, ZIP, ecc.)</td></tr>
-<tr><td>CLOB</td><td>File di testo (decodificati utilizzando il set di caratteri del file dump)</td></tr>
-<tr><td>NCLOB</td><td>File di testo Unicode</td></tr>
+<tr><td>CLOB</td><td>File di testo con i byte così come sono nel file dump: nel set di caratteri del database per un database a byte singolo (ad esempio WE8MSWIN1252), in UTF-16BE senza BOM per un database multibyte (ad esempio AL32UTF8)</td></tr>
+<tr><td>NCLOB</td><td>File di testo in UTF-16BE senza BOM</td></tr>
 </table>
 
 <h2>Procedura</h2>
 <ol>
     <li>Selezionare una tabella contenente colonne LOB nell'elenco delle tabelle.</li>
-    <li>Selezionare <strong>File(&amp;F)</strong> &gt; <strong>Estrai file(&amp;F)</strong> dal menu.</li>
+    <li>Selezionare <strong>Strumenti</strong> &gt; <strong>Estrai file</strong> dal menu.</li>
     <li>Viene visualizzata la finestra di dialogo di estrazione LOB.</li>
     <li>Configurare i seguenti parametri:
         <ul>
@@ -66,9 +66,9 @@ come un file per ogni record.</p>
 </div>
 
 <div class="note">
-<strong>Nota:</strong> Nell'anteprima della tabella, i dati LOB vengono visualizzati come segnaposto:
-<code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>.
-Utilizzare questa funzionalità di estrazione file LOB per recuperare i dati effettivi.
+<strong>Nota:</strong> Nell'anteprima della tabella viene visualizzata solo la parte iniziale dei dati LOB
+(in un dump creato con exp, i segnaposto <code>%BLOB%</code>, <code>%CLOB%</code>, <code>%NCLOB%</code>).
+Utilizzare questa funzionalità di estrazione file LOB per recuperare i dati completi.
 </div>
 
 <p><a href="toc.html">Torna al sommario</a></p>
