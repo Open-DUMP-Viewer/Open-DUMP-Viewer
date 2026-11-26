@@ -4355,7 +4355,6 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
              *
              * Char types (need 4 charset bytes):
              *   0x01=VARCHAR2, 0x60=CHAR, 0x70=CLOB, 0xD0=NCLOB
-             *   (per reference: 0x40=LONG_RAW also flagged)
              *
              * XMLTYPE (0x3A) triggers abort — back to DDL.
              */
