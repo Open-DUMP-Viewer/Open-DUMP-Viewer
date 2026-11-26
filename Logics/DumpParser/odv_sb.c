@@ -20,13 +20,17 @@
     Byte rules (Oracle's behaviour, tools/sbmap/query_sbmap.sql):
       single byte -> UTF-8: every byte is one character (undefined bytes are
             whatever Oracle gives them, mostly U+FFFD or the C1 control).
-      UTF-8 -> single byte (used to match table-name filters against the
-            dump's names): a character goes back to the byte Oracle converts
-            it to (the lowest byte that decodes to it, or one of the measured
-            exceptions); U+FFFD, a character the set lacks and an invalid
-            UTF-8 byte become the set's replacement character (mostly '?' or
-            an inverted question mark); an incomplete sequence at the end is
-            dropped.
+      UTF-8 -> single byte (matching table-name filters against the dump's
+            names, and the names / DDL text of the expdp master table, which
+            are kept in the dump's character set): a character read from one
+            byte goes back to that byte, so a decoded name re-encodes to its
+            original bytes (Oracle itself converts AR8XBASIC U+0649,
+            WE8EBCDIC924 U+0178 and RU8PC866 U+00A0 to another byte); a
+            character that several bytes read as goes back to the byte Oracle
+            converts it to (the lowest of them, or a generated exception);
+            U+FFFD, a character the set lacks and an invalid UTF-8 byte become
+            the set's replacement character (mostly '?' or an inverted
+            question mark); an incomplete sequence at the end is dropped.
 
     Copyright (C) 2026 YANAI Taketo
  *****************************************************************************/

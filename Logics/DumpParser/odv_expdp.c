@@ -296,9 +296,11 @@ static void ddl_col_finish(DDL_CONTEXT *dc)
 
     if (!is_display) return;
 
-    /* CHARSETID 2000 = AL16UTF16 (national charset, UTF-16BE).
-     * Upgrade VARCHAR2→NVARCHAR2 and CHAR→NCHAR accordingly. */
-    if (col->charset == 2000) {
+    /* A column in the national character set (CHARSETFORM 2; CHARSETID 2000
+     * = AL16UTF16, 871 = UTF8): upgrade VARCHAR2→NVARCHAR2 and CHAR→NCHAR.
+     * col->charset keeps the national character set, which decode_column_value
+     * decodes the values from (not the database character set). */
+    if (dc->col_charset_form == 2 || col->charset == 2000) {
         if (col->type == COL_VARCHAR) col->type = COL_NVARCHAR;
         else if (col->type == COL_CHAR)    col->type = COL_NCHAR;
     }
@@ -310,13 +312,14 @@ static void ddl_col_finish(DDL_CONTEXT *dc)
     /* Build type string */
     switch (col->type) {
     case COL_NVARCHAR:
-        /* length is in bytes (2 bytes/char in UTF-16) */
-        snprintf(col->type_str, sizeof(col->type_str),
-                 "NVARCHAR2(%d)", col->length / 2);
+        /* length is in bytes: 2 bytes/char in AL16UTF16; in UTF8 (3 bytes/char)
+         * the declared length is CHARLENGTH */
+        snprintf(col->type_str, sizeof(col->type_str), "NVARCHAR2(%d)",
+                 (col->charset == 871 && dc->col_char_len > 0) ? dc->col_char_len : col->length / 2);
         break;
     case COL_NCHAR:
-        snprintf(col->type_str, sizeof(col->type_str),
-                 "NCHAR(%d)", col->length / 2);
+        snprintf(col->type_str, sizeof(col->type_str), "NCHAR(%d)",
+                 (col->charset == 871 && dc->col_char_len > 0) ? dc->col_char_len : col->length / 2);
         break;
     case COL_VARCHAR:
     case COL_CHAR: {
@@ -1530,6 +1533,30 @@ static int clob_src_cs(const ODV_SESSION *s, const ODV_COLUMN *col)
     return odv_charset_is_single_byte(s->dump_charset) ? s->dump_charset : CHARSET_UTF16BE;
 }
 
+/* Oracle UTF8 (CESU-8) -> UTF-8 in place: a supplementary character is two
+ * 3-byte surrogate halves in CESU-8 and one 4-byte sequence in UTF-8; every
+ * other byte stays.  The result is never longer.  Returns the new length. */
+static int cesu8_to_utf8(unsigned char *p, int n)
+{
+    int i = 0, k = 0;
+    while (i < n) {
+        if (i + 5 < n && p[i] == 0xED && (p[i + 1] & 0xF0) == 0xA0 && (p[i + 2] & 0xC0) == 0x80 &&
+            p[i + 3] == 0xED && (p[i + 4] & 0xF0) == 0xB0 && (p[i + 5] & 0xC0) == 0x80) {
+            unsigned hi = ((unsigned)(p[i + 1] & 0x0F) << 6) | (p[i + 2] & 0x3F);
+            unsigned lo = ((unsigned)(p[i + 4] & 0x0F) << 6) | (p[i + 5] & 0x3F);
+            unsigned cp = 0x10000u + ((hi << 10) | lo);
+            p[k++] = (unsigned char)(0xF0 | (cp >> 18));
+            p[k++] = (unsigned char)(0x80 | ((cp >> 12) & 0x3F));
+            p[k++] = (unsigned char)(0x80 | ((cp >> 6) & 0x3F));
+            p[k++] = (unsigned char)(0x80 | (cp & 0x3F));
+            i += 6;
+        } else {
+            p[k++] = p[i++];
+        }
+    }
+    return k;
+}
+
 /* UTF-16BE -> UTF-8 (portable; the TABLE_T documents of the master table).
  * An unpaired surrogate becomes U+FFFD.  Returns a malloc'd NUL-terminated
  * string (or NULL) and its length in *out_len. */
@@ -1754,8 +1781,9 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
     case COL_NVARCHAR:
     case COL_CLOB:
     case COL_NCLOB: {
-        /* NCHAR/NVARCHAR are always UTF-16BE; CLOB/NCLOB are encoded as
-         * clob_src_cs says and only ever arrive here inline in the
+        /* NCHAR/NVARCHAR are in the national character set: UTF-16BE
+         * (AL16UTF16), or UTF8 (CESU-8, CHARSETID 871); CLOB/NCLOB are encoded
+         * as clob_src_cs says and only ever arrive here inline in the
          * external-table format, so latch external for a later inline LONG
          * (H-21). */
         char conv_buf[ODV_VARCHAR_LEN];
@@ -1764,6 +1792,12 @@ static void decode_column_value(ODV_SESSION *s, int col_idx)
         if (col->type == COL_CLOB || col->type == COL_NCLOB) {
             s->state.expdp_external = 1;
             src_cs = clob_src_cs(s, col);
+        } else if (col->charset == 871) {
+            /* UTF8: already UTF-8 except for supplementary characters */
+            if (v->data && v->data_len > 0) v->data_len = cesu8_to_utf8(v->data, v->data_len);
+            if (v->data && v->data_len < v->buf_size) v->data[v->data_len] = '\0';
+            v->type = col->type;
+            break;
         }
         if (v->data && v->data_len > 0 &&
             convert_charset((const char *)v->data, v->data_len,
@@ -4897,7 +4931,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                                 char tmp[ODV_OBJNAME_LEN + 1];
                                 int tlen = 0;
                                 if (convert_charset(ft, ft_len, s->out_charset,
-                                                    tmp, ODV_OBJNAME_LEN, s->dump_charset,
+                                                    tmp, (int)sizeof(tmp), s->dump_charset,
                                                     &tlen) == ODV_OK) {
                                     tmp[tlen] = '\0';
                                     odv_strcpy(ft, tmp, ODV_OBJNAME_LEN);
@@ -4916,7 +4950,7 @@ int parse_expdp_dump(ODV_SESSION *s, int list_only)
                                 char tmp[ODV_OBJNAME_LEN + 1];
                                 int tlen = 0;
                                 if (convert_charset(fs, fs_len, s->out_charset,
-                                                    tmp, ODV_OBJNAME_LEN, s->dump_charset,
+                                                    tmp, (int)sizeof(tmp), s->dump_charset,
                                                     &tlen) == ODV_OK) {
                                     tmp[tlen] = '\0';
                                     odv_strcpy(fs, tmp, ODV_OBJNAME_LEN);

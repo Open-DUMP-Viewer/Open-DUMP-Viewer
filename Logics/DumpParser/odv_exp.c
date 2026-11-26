@@ -3889,7 +3889,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
             if (s->dump_charset != s->out_charset &&
                 s->dump_charset != CHARSET_UNKNOWN) {
                 if (convert_charset(s->filter_schema, (int)strlen(s->filter_schema),
-                                    s->out_charset, tmp, ODV_OBJNAME_LEN,
+                                    s->out_charset, tmp, (int)sizeof(tmp),
                                     s->dump_charset, &tlen) == ODV_OK) {
                     tmp[tlen] = '\0';
                     odv_strcpy(current_schema, tmp, ODV_OBJNAME_LEN);
@@ -4140,7 +4140,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                                         char tmp[ODV_OBJNAME_LEN + 1];
                                         int tlen = 0;
                                         int cvt_rc = convert_charset(ft, ft_len, s->out_charset,
-                                                            tmp, ODV_OBJNAME_LEN, s->dump_charset,
+                                                            tmp, (int)sizeof(tmp), s->dump_charset,
                                                             &tlen);
                                         if (cvt_rc == ODV_OK) {
                                             tmp[tlen] = '\0';
@@ -4160,7 +4160,7 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
                                         char tmp[ODV_OBJNAME_LEN + 1];
                                         int tlen = 0;
                                         if (convert_charset(fs, fs_len, s->out_charset,
-                                                            tmp, ODV_OBJNAME_LEN, s->dump_charset,
+                                                            tmp, (int)sizeof(tmp), s->dump_charset,
                                                             &tlen) == ODV_OK) {
                                             tmp[tlen] = '\0';
                                             odv_strcpy(fs, tmp, ODV_OBJNAME_LEN);

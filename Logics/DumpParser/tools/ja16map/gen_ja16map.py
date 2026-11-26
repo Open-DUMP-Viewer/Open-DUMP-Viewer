@@ -359,7 +359,8 @@ def run_check(fwd_pat, rev_pat):
     tmp = tempfile.mkdtemp(prefix='odv_ja16chk_')
     atexit.register(shutil.rmtree, tmp, True)
     srcs = [os.path.join(HERE, 'ja16_selftest.c')] + [
-        os.path.join(DP, f) for f in ('odv_charset.c', 'odv_ja16.c', 'odv_ja16map.c')]
+        os.path.join(DP, f) for f in ('odv_charset.c', 'odv_ja16.c', 'odv_ja16map.c',
+                                      'odv_sb.c', 'odv_sbmap.c')]
     args = []
     for cs in CSS:
         args += [cs, fwd_pat.format(cs=cs), rev_pat.format(cs=cs)]

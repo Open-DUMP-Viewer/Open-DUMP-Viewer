@@ -22,9 +22,11 @@
 
 生成物の形 (odv_sbmap.h):
   文字セットごとに 00-7F と 80-FF の Unicode (BMP) を持つ。00-7F が US-ASCII と同じなら持たない。
-  同じ内容の半分は共有する。逆変換は「その文字に読むバイトのうち最も小さいバイト」に戻し、Oracle が
-  それと違うバイトに戻す文字だけを例外として持つ。U+FFFD と表せない文字は Oracle の代替文字
-  (多くは ¿ か ?) になる。
+  同じ内容の半分は共有する。逆変換は、1 つのバイトだけが読む文字をそのバイトに戻し (読んだ名前が元の
+  バイトに戻る)、複数のバイトが読む文字を Oracle が戻すバイト (最も小さいバイト。違う場合は例外として
+  持つ) に戻す。Oracle 自身は 3 文字 (AR8XBASIC の U+0649、WE8EBCDIC924 の U+0178、RU8PC866 の
+  U+00A0) を読んだバイトと違うバイトに戻すが、往復を優先してそうしない。U+FFFD と表せない文字は
+  Oracle の代替文字 (多くは ¿ か ?) になる。
 """
 import argparse, atexit, os, shutil, subprocess, sys, tempfile
 
@@ -116,18 +118,25 @@ def model(cs):
             if back_of.get(cp, back) != back:
                 raise ValueError(f'{where}: U+{cp:04X} goes back to {back_of[cp]:02X} and {back:02X}')
             back_of[cp] = back
-        # 逆変換の規則: その文字に読むバイトのうち最も小さいバイトに戻す (7 ビットの各国語文字セットでは
-        # 80-FF が 00-7F と同じ文字になり、Oracle は 00-7F に戻す)。U+FFFD は代替文字に戻す。
-        # 規則と違うものだけを例外として持つ (AR8XBASIC の U+0649 は DA で読むが D0 に戻る、など)
+        # 逆変換の規則: 1 つのバイトだけが読む文字はそのバイトに戻す (読んだ名前が元のバイトに戻る)。
+        # 複数のバイトが読む文字は Oracle が戻すバイトに戻す (7 ビットの各国語文字セットでは 80-FF が
+        # 00-7F と同じ文字になり、Oracle は最も小さいバイトに戻す)。U+FFFD は代替文字に戻す。
+        # 最も小さいバイト以外に戻すものだけを例外として持つ。Oracle 自身が読んだバイトと違うバイトに
+        # 戻す文字 (AR8XBASIC の U+0649 は DA で読み D0 に戻す、など) は、往復を優先して持たない
         rev_exc = {}
+        quirks = []
         for cp, back in back_of.items():
             if cp == FFFD:
                 if back != repl:
                     rev_exc[cp] = back
                 continue
+            if len(owners[cp]) == 1:
+                if back != owners[cp][0]:
+                    quirks.append((cp, owners[cp][0], back))
+                continue
             if back != min(owners[cp]):
                 rev_exc[cp] = back
-        out[cid] = {'name': e['name'], 'cps': cps, 'rev_exc': rev_exc, 'repl': repl}
+        out[cid] = {'name': e['name'], 'cps': cps, 'rev_exc': rev_exc, 'repl': repl, 'quirks': quirks}
     return out
 
 
@@ -250,6 +259,10 @@ def main():
         nhalf, nexc = emit(f, mdl)
     print(f'{a.out}: {len(mdl)} character sets, {nhalf} distinct 128-entry halves, '
           f'{nexc} reverse exceptions')
+    for m in mdl.values():
+        for cp, own, back in m['quirks']:
+            print(f"  kept the round trip: {m['name']} U+{cp:04X} is read from {own:02X}, "
+                  f"Oracle converts it back to {back:02X}")
     if a.check and not run_check(a.map):
         sys.exit(1)
 

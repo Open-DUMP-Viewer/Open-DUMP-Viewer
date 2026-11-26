@@ -10,12 +10,14 @@
     For every single-byte character set in Oracle's measured conversions
     (query_sbmap.sql):
       "<id> <byte>=<AL32UTF8> <back>" -> convert_charset(set -> UTF-8) gives
-          the same character, and convert_charset(UTF-8 -> set) gives <back>
-          (a result Oracle gave in a non-shortest form is compared as the
-          character it stands for, and not converted back)
+          the same character (a result Oracle gave in a non-shortest form is
+          compared as the character it stands for)
+      convert_charset(UTF-8 -> set) gives back the byte the character is read
+          from when only that byte reads as it, and <back> (Oracle's choice)
+          when several bytes do; U+FFFD gives the replacement
       the 256 bytes in one call give the 256 characters in order
-      "R <id> <byte>" -> U+4E00, U+FFFD and an invalid UTF-8 byte (FF) give
-          the replacement <byte>, an incomplete sequence at the end is dropped
+      "R <id> <byte>" -> U+4E00 and an invalid UTF-8 byte (FF) give the
+          replacement <byte>, an incomplete sequence at the end is dropped
       the name and the id lead to the same charset constant
     Exit status 0 = all equal.
 
@@ -69,22 +71,66 @@ static void bad(const char *what, int id, int byte, const char *detail)
     if (g_bad <= 30) fprintf(stderr, "MISMATCH %s: id %d byte %02X %s\n", what, id, byte, detail);
 }
 
+/* one character set, all 256 bytes read: forward, reverse, string, replacement */
+static void check_set(int id, int cs, const char *name, const unsigned *ucs, const int *shortest,
+                      const int *back, const int *have, int repl)
+{
+    static const unsigned char u4e00[] = { 0xE4, 0xB8, 0x80 };
+    static const unsigned char inval[] = { 0x41, 0xFF, 0x42 };
+    static const unsigned char trunc[] = { 0x41, 0xC3 };
+    unsigned char all[256], out[16], u8[4];
+    char allout[256 * 3 + 1];
+    int b, olen = 0, pos = 0;
+
+    for (b = 0; b < 256; b++) {
+        int n, owners = 0, o, expect_back;
+        if (!have[b]) { bad("missing byte", id, b, name); return; }
+        n = put_utf8(ucs[b], u8);
+        all[0] = (unsigned char)b;
+        convert_charset((const char *)all, 1, cs, (char *)out, sizeof(out), CHARSET_UTF8, &olen);
+        if (olen != n || memcmp(out, u8, (size_t)n) != 0) bad("forward", id, b, name);
+        g_checked++;
+        if (!shortest[b]) continue;
+        for (o = 0; o < 256; o++) if (ucs[o] == ucs[b]) owners++;
+        expect_back = ucs[b] == 0xFFFD ? repl : (owners == 1 ? b : back[b]);
+        convert_charset((const char *)u8, n, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
+        if (olen != 1 || out[0] != (unsigned char)expect_back) bad("reverse", id, b, name);
+        g_checked++;
+    }
+    for (b = 0; b < 256; b++) all[b] = (unsigned char)b;
+    if (convert_charset((const char *)all, 256, cs, allout, sizeof(allout), CHARSET_UTF8, &olen) == ODV_OK) {
+        for (b = 0; b < 256; b++) {
+            int n = put_utf8(ucs[b], u8);
+            if (pos + n > olen || memcmp(allout + pos, u8, (size_t)n) != 0) { bad("string", id, b, name); break; }
+            pos += n;
+        }
+        if (b == 256 && pos != olen) bad("string length", id, 0, name);
+    } else bad("string rc", id, 0, name);
+    g_checked++;
+    convert_charset((const char *)u4e00, 3, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
+    if (olen != 1 || out[0] != (unsigned char)repl) bad("U+4E00", id, 0, name);
+    convert_charset((const char *)inval, 3, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
+    if (olen != 3 || out[1] != (unsigned char)repl) bad("invalid UTF-8", id, 0, name);
+    convert_charset((const char *)trunc, 2, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
+    if (olen != 1) bad("incomplete UTF-8", id, 0, name);
+    g_checked += 3;
+}
+
 int main(int argc, char **argv)
 {
     FILE *f;
     char line[256], name[64];
     int id = 0, cs = CHARSET_UNKNOWN, nsets = 0;
-    unsigned expect[256];
-    int have[256];
+    unsigned ucs[256];
+    int shortest[256], back[256], have[256];
 
     if (argc < 2) { fprintf(stderr, "usage: sb_selftest <sbmap.txt>\n"); return 2; }
     f = fopen(argv[1], "r");
     if (!f) { perror(argv[1]); return 2; }
     memset(have, 0, sizeof(have));
     while (fgets(line, sizeof(line), f)) {
-        char dep[16], width[8];
+        char dep[16], width[8], res[64], bk[64];
         int lid, byte;
-        char res[64], back[64];
         if (sscanf(line, "CS %d %63s %15s %7s", &lid, name, dep, width) == 4) {
             id = lid;
             cs = (strcmp(width, "1") == 0) ? odv_sb_charset_from_id(id) : CHARSET_UNKNOWN;
@@ -101,56 +147,18 @@ int main(int argc, char **argv)
         }
         if (cs == CHARSET_UNKNOWN) continue;
         if (sscanf(line, "R %d %63s", &lid, res) == 2 && lid == id) {
-            unsigned char rb[4], out[16];
-            int rn = unhex(res, rb, 4), olen = 0, b;
-            static const unsigned char u4e00[] = { 0xE4, 0xB8, 0x80 };
-            static const unsigned char fffd[] = { 0xEF, 0xBF, 0xBD };
-            static const unsigned char inval[] = { 0x41, 0xFF, 0x42 };
-            static const unsigned char trunc[] = { 0x41, 0xC3 };
-            unsigned char all[256];
-            char allout[256 * 3 + 1];
-            /* whole-string conversion */
-            for (b = 0; b < 256; b++) all[b] = (unsigned char)b;
-            if (convert_charset((const char *)all, 256, cs, allout, sizeof(allout), CHARSET_UTF8, &olen) == ODV_OK) {
-                int pos = 0;
-                for (b = 0; b < 256 && have[b]; b++) {
-                    unsigned char u8[4];
-                    int n = put_utf8(expect[b], u8);
-                    if (pos + n > olen || memcmp(allout + pos, u8, (size_t)n) != 0) { bad("string", id, b, name); break; }
-                    pos += n;
-                }
-                if (b == 256 && pos != olen) bad("string length", id, 0, name);
-            } else bad("string rc", id, 0, name);
-            g_checked++;
-            if (rn != 1) { bad("replacement line", id, 0, res); continue; }
-            convert_charset((const char *)u4e00, 3, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
-            if (olen != 1 || out[0] != rb[0]) bad("U+4E00", id, 0, name);
-            convert_charset((const char *)fffd, 3, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
-            if (olen != 1 || out[0] != rb[0]) bad("U+FFFD", id, 0, name);
-            convert_charset((const char *)inval, 3, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
-            if (olen != 3 || out[1] != rb[0]) bad("invalid UTF-8", id, 0, name);
-            convert_charset((const char *)trunc, 2, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
-            if (olen != 1) bad("incomplete UTF-8", id, 0, name);
-            g_checked += 4;
+            unsigned char rb[4];
+            if (unhex(res, rb, 4) != 1) { bad("replacement line", id, 0, res); continue; }
+            check_set(id, cs, name, ucs, shortest, back, have, rb[0]);
             continue;
         }
-        if (sscanf(line, "%d %x=%63s %63s", &lid, &byte, res, back) == 4 && lid == id && byte >= 0 && byte < 256) {
-            unsigned char in = (unsigned char)byte, rb[8], bb[4], out[16], u8[4];
-            int rn = unhex(res, rb, 8), bn = unhex(back, bb, 4), olen = 0, shortest = 0, n;
-            unsigned u;
+        if (sscanf(line, "%d %x=%63s %63s", &lid, &byte, res, bk) == 4 && lid == id && byte >= 0 && byte < 256) {
+            unsigned char rb[8], bb[4];
+            int rn = unhex(res, rb, 8), bn = unhex(bk, bb, 4);
             if (rn < 1 || rn > 3) { bad("result line", id, byte, res); continue; }
-            u = ucs_of_utf8(rb, rn, &shortest);
-            expect[byte] = u;
+            ucs[byte] = ucs_of_utf8(rb, rn, &shortest[byte]);
+            back[byte] = (bn == 1) ? bb[0] : -1;
             have[byte] = 1;
-            n = put_utf8(u, u8);
-            convert_charset((const char *)&in, 1, cs, (char *)out, sizeof(out), CHARSET_UTF8, &olen);
-            if (olen != n || memcmp(out, u8, (size_t)n) != 0) bad("forward", id, byte, res);
-            g_checked++;
-            if (shortest) {
-                convert_charset((const char *)u8, n, CHARSET_UTF8, (char *)out, sizeof(out), cs, &olen);
-                if (bn != 1 || olen != 1 || out[0] != bb[0]) bad("reverse", id, byte, back);
-                g_checked++;
-            }
         }
     }
     fclose(f);

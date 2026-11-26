@@ -4916,18 +4916,6 @@ static const uint16_t H257[128] = {
     0x0038, 0x0039, 0x00B3, 0x00DB, 0x00DC, 0x00D9, 0x00DA, 0x009F,
 };
 
-static const ODV_SBMAP_REV R72[] = {
-    { 0x0649, 0xD0 },
-};
-
-static const ODV_SBMAP_REV R101[] = {
-    { 0x0178, 0xE8 },
-};
-
-static const ODV_SBMAP_REV R152[] = {
-    { 0x00A0, 0x20 },
-};
-
 const ODV_SBMAP_CHARSET odv_sbmap_charsets[222] = {
     {    1, "US7ASCII",        NULL , H0   , NULL  ,  0, 0x3F },
     {    2, "WE8DEC",          NULL , H1   , NULL  ,  0, 0xBF },
@@ -4979,7 +4967,7 @@ const ODV_SBMAP_CHARSET odv_sbmap_charsets[222] = {
     {   52, "AZ8ISO8859P9E",   NULL , H52  , NULL  ,  0, 0x3F },
     {   61, "AR8ASMO708PLUS",  NULL , H53  , NULL  ,  0, 0x3F },
     {   70, "AR8EBCDICX",      H54  , H55  , NULL  ,  0, 0x7B },
-    {   72, "AR8XBASIC",       H56  , H57  , R72   ,  1, 0xAB },
+    {   72, "AR8XBASIC",       H56  , H57  , NULL  ,  0, 0xAB },
     {   81, "EL8DEC",          NULL , H58  , NULL  ,  0, 0xBF },
     {   82, "TR8DEC",          NULL , H59  , NULL  ,  0, 0xBF },
     {   90, "WE8EBCDIC37C",    H5   , H60  , NULL  ,  0, 0xAB },
@@ -4993,13 +4981,13 @@ const ODV_SBMAP_CHARSET odv_sbmap_charsets[222] = {
     {   98, "WE8EBCDIC1145",   H69  , H74  , NULL  ,  0, 0x6F },
     {   99, "WE8EBCDIC1148C",  H61  , H75  , NULL  ,  0, 0xAB },
     {  100, "WE8EBCDIC1047E",  H71  , H76  , NULL  ,  0, 0xAB },
-    {  101, "WE8EBCDIC924",    H77  , H78  , R101  ,  1, 0xAB },
+    {  101, "WE8EBCDIC924",    H77  , H78  , NULL  ,  0, 0xAB },
     {  110, "EEC8EUROASCI",    H79  , H80  , NULL  ,  0, 0x20 },
     {  113, "EEC8EUROPA3",     H81  , H82  , NULL  ,  0, 0x3F },
     {  114, "LA8PASSPORT",     NULL , H83  , NULL  ,  0, 0x3F },
     {  140, "BG8PC437S",       NULL , H84  , NULL  ,  0, 0xFE },
     {  150, "EE8PC852",        NULL , H85  , NULL  ,  0, 0xFE },
-    {  152, "RU8PC866",        NULL , H86  , R152  ,  1, 0x3F },
+    {  152, "RU8PC866",        NULL , H86  , NULL  ,  0, 0x3F },
     {  153, "RU8BESTA",        NULL , H87  , NULL  ,  0, 0x3F },
     {  154, "IW8PC1507",       NULL , H88  , NULL  ,  0, 0xFE },
     {  155, "RU8PC855",        NULL , H89  , NULL  ,  0, 0x3F },
