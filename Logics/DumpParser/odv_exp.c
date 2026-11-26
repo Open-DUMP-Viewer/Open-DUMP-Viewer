@@ -1907,7 +1907,7 @@ static void exp_lob_finish(ODV_SESSION *s, int col_idx, ODV_VALUE *v, int cut)
 
     Reads a single LOB column from the EXP LOB section.
 
-    Wire format (verified empirically + against ARK e2c_expdmp.c reference):
+    Wire format
       - 2-byte length value:
           > 0xFF00 (e.g. 0xFFFC) => extended:
               [4-byte total length LE]
@@ -4372,7 +4372,6 @@ static int parse_exp_ddl_and_data(ODV_SESSION *s, ODV_VFILE *fp, int list_only)
              *
              * Char types (need 4 charset bytes):
              *   0x01=VARCHAR2, 0x60=CHAR, 0x70=CLOB, 0xD0=NCLOB
-             *   (per reference: 0x40=LONG_RAW also flagged)
              *
              * XMLTYPE (0x3A) triggers abort — back to DDL.
              */
